@@ -6,4 +6,3 @@ data/connectome-weights.feather
 data/skeletons/
 data/banc/
 data/*.feather
-web/data/
