@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Living flies — Male CNS + BANC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="loader" id="loader">
+    <div class="kicker">FlyEM · Janelia · Princeton · BANC</div>
+    <h2>Male and female fruit flies</h2>
+    <p>Loading two complete central nervous systems — Male CNS v1.0 and the female BANC connectome — each driving its own body. You can add more.</p>
+    <div class="progress"><i id="bar"></i></div>
+    <p id="loadmsg">fetching maps…</p>
+  </div>
+  <div class="hud">
+    <div class="panel top-left" id="panelL">
+      <button class="collapse" type="button" title="collapse">–</button>
+      <div class="kicker">Flock · live</div>
+      <div class="panel-body">
+        <h1>They run themselves</h1>
+        <div class="sub">The dish hits photoreceptors, ORNs, taste, and tarsi. Histamine inhibits L1/L2. T4/T5, clock, and sleep are whatever the wiring does. Motor neurons command a NeuroMechFly MuJoCo body. No injected motion vision, no slip walk, no courtship scene.</div>
+        <div class="stats">
+          <div><b id="nNeurons">—</b><span>♂ map</span></div>
+          <div><b id="nFemale">—</b><span>♀ map</span></div>
+          <div><b id="nFlock">2</b><span>living flies</span></div>
+          <div><b id="gait">♂ …</b><span>male</span></div>
+          <div><b id="gaitF">♀ …</b><span>female</span></div>
+          <div><b id="hunger">—</b><span>selected hunger</span></div>
+          <div><b id="flesh">…</b><span>body plant</span></div>
+        </div>
+        <div class="kicker">living</div>
+        <div class="row" id="flock"></div>
+        <div class="row">
+          <button id="addM">+ male</button>
+          <button id="addF" class="pink">+ female</button>
+        </div>
+        <div class="row" id="stims"></div>
+        <div class="row">
+          <button id="pause">pause</button>
+          <button id="reset">reset</button>
+          <label class="tog on"><input type="checkbox" id="followFlock" checked /> follow flock</label>
+          <label class="tog"><input type="checkbox" id="followSel" /> follow selected</label>
+          <label class="tog"><input type="checkbox" id="xray" /> x-ray CNS</label>
+          <label class="tog"><input type="checkbox" id="showOdor" /> show odor</label>
+        </div>
+        <div id="info">Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Clock cells are not force-fed daylight (only l-LNv CRY). Jump is TTMn. Perch is landing, not a walk-up. Wall bounce is reflection.</div>
+      </div>
+    </div>
+    <div class="panel top-right" id="panelR">
+      <button class="collapse" type="button" title="collapse">–</button>
+      <div class="kicker">selected · <span id="selName">♂1</span></div>
+      <div class="panel-body">
+        <div class="kicker">commands</div>
+        <div id="acts"></div>
+        <div class="kicker" style="margin-top:10px">joints (flex − ext)</div>
+        <div id="joints"></div>
+        <div class="kicker" style="margin-top:10px">compound eyes</div>
+        <div class="eyes"><canvas id="eyeL" width="150" height="128"></canvas><canvas id="eyeR" width="150" height="128"></canvas></div>
+        <div class="kicker" style="margin-top:10px">slow physics</div>
+        <div id="slowBars">
+          <div class="barline"><div class="name">sleep</div><div class="track"><i id="slow-sleep" style="background:#7a8cff"></i></div></div>
+          <div class="barline"><div class="name">PDF</div><div class="track"><i id="slow-pdf" style="background:#f5d76e"></i></div></div>
+          <div class="barline"><div class="name">DA</div><div class="track"><i id="slow-da" style="background:#ff5c7a"></i></div></div>
+          <div class="barline"><div class="name">OA</div><div class="track"><i id="slow-oa" style="background:#ff9f1c"></i></div></div>
+        </div>
+        <div class="kicker" style="margin-top:10px">antennae (filament)</div>
+        <div id="odorBars">
+          <div class="barline"><div class="name">food L</div><div class="track"><i id="odorFL" style="background:#f0c040"></i></div></div>
+          <div class="barline"><div class="name">food R</div><div class="track"><i id="odorFR" style="background:#f0c040"></i></div></div>
+          <div class="barline"><div class="name">pher L</div><div class="track"><i id="odorPL" style="background:#ff4fd8"></i></div></div>
+          <div class="barline"><div class="name">pher R</div><div class="track"><i id="odorPR" style="background:#ff4fd8"></i></div></div>
+        </div>
+        <div class="hint" id="stimHint">every fly closed-loop</div>
+        <div class="hint" id="lifeHint">loading</div>
+      </div>
+    </div>
+    <div class="bottom">
+      <div class="panel rates" id="panelB">
+        <button class="collapse" type="button" title="collapse">–</button>
+        <div class="kicker">Shared world</div>
+        <div class="panel-body">
+          <div class="hint">A fly in the computer: world → real sensory cells → connectome → motor neurons → MuJoCo flesh. Light / odor flood / taste / escape buttons are optogenetics, not the fly.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+numpy>=2.0
+pandas>=2.2
+pyarrow>=17.0
+flygym>=2.1
+mujoco>=3.2
