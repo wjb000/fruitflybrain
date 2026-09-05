@@ -16,6 +16,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(ROOT, "web")
 
+# MuJoCo/flygym need a non-CGL backend under remote DYLD OpenGL overrides.
+if not os.environ.get("MUJOCO_GL"):
+    os.environ["MUJOCO_GL"] = "disable"
+for _dyld in (
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "DYLD_ROOT_PATH",
+):
+    os.environ.pop(_dyld, None)
+
 _plant = None
 _plant_err = None
 _init_lock = threading.Lock()

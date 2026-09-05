@@ -434,14 +434,13 @@ export class EmbodiedFly {
 
     if (physics.ok) {
       // Brain fires motor neurons only. MuJoCo is the flesh.
+      // walk/turn are UI mode labels only — never free-joint plant cheats.
       setCommand(this.physId, {
         muscle: cmd.muscle,
         dlm: e.DLM || 0,
         dvm: e.DVM || 0,
         admn: e.ADMN || 0,
         fly: cmd.fly || 0,
-        walk: cmd.walk || 0,
-        turn: cmd.turn || 0,
         x: this.body.position.x,
         z: this.body.position.z,
         yaw: this.heading,
@@ -450,7 +449,8 @@ export class EmbodiedFly {
       if (pose) this.applyMujoco(pose, cmd, dt);
       else stepLife(this.body, dt, this.clock, cmd);
     } else {
-      // Kinematic fallback if the plant is down.
+      // Kinematic fallback if the plant is down: MN → leg pose → stance slip.
+      // No cmd.walk thruster — ground motion from foot slip only; flight from wing MNs.
       const stand = this.body.userData.standZ || 1.3;
       const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
       if (this.y < stand + 0.08 && ttmn > 0.28) this.vy = 5.2 * Math.min(1, ttmn);

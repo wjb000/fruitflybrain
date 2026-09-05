@@ -299,7 +299,7 @@ class Plant:
             return self._snapshot(body)
 
     def step(self, dt: float, flies: dict) -> dict:
-        """flies: {id: {muscle, dlm, dvm, admn, walk, turn}}"""
+        """flies: {id: {muscle, dlm, dvm, admn, fly}} — MN rates only; no walk/turn cheats."""
         out = {}
         with self.lock:
             for fly_id, cmd in flies.items():
@@ -363,13 +363,25 @@ class Plant:
         return tgt
 
     def _step_one(self, body: Body, dt: float, cmd: dict) -> dict:
+        """Drive leg position actuators + adhesion from MNs.
+
+        Walking/turning/jumping must emerge from leg DoFs and contact — no
+        free-joint walk/turn forces. Flight lift/thrust (if any) comes only
+        from wing MN activity (`fly` / dlm / dvm / admn).
+        """
         sim = body.sim
         n_steps = int(max(1, min(240, round(dt / self.timestep))))
         tgt = self._targets(body, cmd.get("muscle") or {})
         sim.set_actuator_inputs(body.fly_id, ActuatorType.POSITION, tgt)
 
         muscle = cmd.get("muscle") or {}
+        # Wing power from explicit fly fraction or raw wing MN rates.
         fly_a = max(0.0, min(1.0, float(cmd.get("fly") or 0.0)))
+        if fly_a < 0.01:
+            dlm = float(cmd.get("dlm") or 0.0)
+            dvm = float(cmd.get("dvm") or 0.0)
+            admn = float(cmd.get("admn") or 0.0)
+            fly_a = max(0.0, min(1.0, dlm * 2.0 + dvm * 1.8 + admn * 1.4))
         if fly_a < 0.38:
             fly_a = 0.0
         adh = np.zeros(6, dtype=float) if fly_a else np.ones(6, dtype=float)
@@ -381,22 +393,19 @@ class Plant:
                 adh[i] = 0.2 if lifting else 1.0
         sim.set_leg_adhesion_states(body.fly_id, adh)
 
-        walk = max(0.0, min(1.0, float(cmd.get("walk") or 0.0)))
-        turn = max(-1.0, min(1.0, float(cmd.get("turn") or 0.0)))
         model, data = sim.mj_model, sim.mj_data
         weight = body.mass * 9810.0
-        pull = body.mass * (28000.0 * walk + 18000.0 * fly_a)
-        spin = body.mass * 350.0 * turn
+        # Modest wing-only free-joint force; legs alone move the body on the ground.
+        thrust = body.mass * 16000.0 * fly_a
         hover = body.stand_z + 0.35 + fly_a * 3.4
         for _ in range(n_steps):
             data.qfrc_applied[:] = 0
-            yaw, pitch, roll = quat_yaw_pitch_roll(
-                *data.qpos[body.free_qposadr + 3 : body.free_qposadr + 7]
-            )
-            data.qfrc_applied[body.free_dofadr + 0] = pull * math.cos(yaw)
-            data.qfrc_applied[body.free_dofadr + 1] = pull * math.sin(yaw)
-            data.qfrc_applied[body.free_dofadr + 5] = spin
             if fly_a:
+                yaw, _pitch, _roll = quat_yaw_pitch_roll(
+                    *data.qpos[body.free_qposadr + 3 : body.free_qposadr + 7]
+                )
+                data.qfrc_applied[body.free_dofadr + 0] = thrust * math.cos(yaw)
+                data.qfrc_applied[body.free_dofadr + 1] = thrust * math.sin(yaw)
                 mz = float(data.xpos[body.thorax_bodyid][2])
                 vz = float(data.qvel[body.free_dofadr + 2])
                 data.qfrc_applied[body.free_dofadr + 2] = (

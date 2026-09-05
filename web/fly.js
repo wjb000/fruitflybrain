@@ -15,6 +15,9 @@ const MUSCLE_TAU = 0.05;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();
+const _fkQ = new THREE.Quaternion();
+const _fkP = new THREE.Vector3();
+const _fkPivot = new THREE.Vector3();
 
 let nmf = null;
 let nmfGeos = [];
@@ -103,15 +106,43 @@ function setQuatWxyz(obj, wxyz) {
 }
 
 function setHinge(h, angle) {
-  _axis.copy(h.userData.axis);
-  h.setRotationFromAxisAngle(_axis, angle);
   h.userData.angle = angle;
+  if (h.isObject3D) {
+    _axis.copy(h.userData.axis);
+    h.setRotationFromAxisAngle(_axis, angle);
+  }
+}
+
+function makeVirtualHinge(axis) {
+  return {
+    isObject3D: false,
+    userData: {
+      axis: new THREE.Vector3(axis[0], axis[1], axis[2]),
+      rest: 0,
+      angle: 0,
+    },
+  };
+}
+
+/** Virtual antagonist hinges so kinematic mode can pose without a CPG clock. */
+function wireLegHinges(leg) {
+  leg.hinges["coxa-yaw"] = makeVirtualHinge([0, 1, 0]);
+  leg.hinges["coxa-pitch"] = makeVirtualHinge([1, 0, 0]);
+  leg.hinges["coxa-roll"] = makeVirtualHinge([0, 0, 1]);
+  leg.hinges["trochanterfemur-pitch"] = makeVirtualHinge([1, 0, 0]);
+  leg.hinges["trochanterfemur-roll"] = makeVirtualHinge([0, 0, 1]);
+  leg.hinges["tibia-pitch"] = makeVirtualHinge([1, 0, 0]);
+  leg.hinges["tarsus1-pitch"] = makeVirtualHinge([1, 0, 0]);
 }
 
 function applyRest(node, seg) {
   node.position.fromArray(seg.restPos || [0, 0, 0]);
   setQuatWxyz(node, seg.restQuat || [1, 0, 0, 0]);
+  node.userData.restPos = node.position.clone();
   node.userData.restQuat = node.quaternion.clone();
+  // Immutable anatomical rest for kinematic MN→FK (physics may rewrite restQuat).
+  node.userData.anatomicalRestPos = node.position.clone();
+  node.userData.anatomicalRestQuat = node.quaternion.clone();
 }
 
 function buildFly({ female = false } = {}) {
@@ -143,15 +174,27 @@ function buildFly({ female = false } = {}) {
     const tarsus = nodes[`${code}_tarsus5`]?.body;
     const tip = new THREE.Object3D();
     if (tarsus) tarsus.add(tip);
-    legs.push({
+    const leg = {
       name,
       side: name.startsWith("L") ? -1 : 1,
       code,
       tarsusTip: tip,
       hinges: {},
       angles: {},
+      chain: [
+        `${code}_coxa`,
+        `${code}_trochanterfemur`,
+        `${code}_tibia`,
+        `${code}_tarsus1`,
+        `${code}_tarsus2`,
+        `${code}_tarsus3`,
+        `${code}_tarsus4`,
+        `${code}_tarsus5`,
+      ],
       foot: { x: 0, y: 0, z: 0, stance: true, vx: 0, vy: 0, vz: 0 },
-    });
+    };
+    wireLegHinges(leg);
+    legs.push(leg);
   }
 
   const antennae = [];
@@ -192,6 +235,46 @@ function buildFly({ female = false } = {}) {
 export function createMaleFly() { return buildFly({ female: false }); }
 export function createFemaleFly() { return buildFly({ female: true }); }
 
+/**
+ * Apply hinge angle deltas onto flat thorax-relative NMF segments (FK).
+ * Proximal rotations move all distal segments so tarsus tips track muscle pose.
+ */
+function applyMuscleFk(leg, nodes) {
+  const names = (leg.chain || []).filter((n) => nodes[n]?.body);
+  for (const n of names) {
+    const body = nodes[n].body;
+    const rp = body.userData.anatomicalRestPos || body.userData.restPos;
+    const rq = body.userData.anatomicalRestQuat || body.userData.restQuat;
+    if (rp) body.position.copy(rp);
+    if (rq) body.quaternion.copy(rq);
+  }
+  const joints = [
+    { key: "coxa-yaw", pivot: 0 },
+    { key: "coxa-pitch", pivot: 0 },
+    { key: "coxa-roll", pivot: 0 },
+    { key: "trochanterfemur-pitch", pivot: 1 },
+    { key: "trochanterfemur-roll", pivot: 1 },
+    { key: "tibia-pitch", pivot: 2 },
+    { key: "tarsus1-pitch", pivot: 3 },
+  ];
+  for (const j of joints) {
+    const h = leg.hinges[j.key];
+    if (!h) continue;
+    const delta = (h.userData.angle ?? 0) - (h.userData.rest ?? 0);
+    if (Math.abs(delta) < 1e-5) continue;
+    const pivotBody = nodes[names[j.pivot]]?.body;
+    if (!pivotBody) continue;
+    _fkPivot.copy(pivotBody.position);
+    _fkQ.setFromAxisAngle(h.userData.axis, delta);
+    for (let i = j.pivot; i < names.length; i++) {
+      const body = nodes[names[i]].body;
+      _fkP.copy(body.position).sub(_fkPivot).applyQuaternion(_fkQ).add(_fkPivot);
+      body.position.copy(_fkP);
+      body.quaternion.premultiply(_fkQ);
+    }
+  }
+}
+
 function antagonist(pos, neg) {
   const p = pos || 0, n = neg || 0;
   const mag = p + n;
@@ -221,22 +304,57 @@ function poseLegFromMuscle(leg, muscle, dt) {
 /**
  * Pose the NeuroMechFly skeleton from connectome motor neurons.
  * cmd: {walk, turn, fly, feed, court, groom, escape, rest, head, abdomen, muscle}
+ * Body translation comes from stance slip (MN foot motion), not cmd.walk.
  */
 export function stepLife(fly, dt, t, cmd) {
   const d = fly.userData;
   const flyA = cmd.fly || 0;
   const feed = cmd.feed || 0;
+  const muscle = cmd.muscle || {};
   d.gait = 0;
+
   fly.updateMatrixWorld(true);
-  for (const leg of d.legs) {
+  const prev = d.legs.map((leg) => {
     if (leg.tarsusTip) leg.tarsusTip.getWorldPosition(_foot);
+    else _foot.set(0, 0, 0);
+    return { x: _foot.x, y: _foot.y, z: _foot.z };
+  });
+
+  for (const leg of d.legs) {
+    poseLegFromMuscle(leg, muscle[leg.name], dt);
+    applyMuscleFk(leg, d.nodes);
+  }
+
+  fly.updateMatrixWorld(true);
+  let slipX = 0, slipZ = 0, n = 0, yawL = 0, yawR = 0;
+  const hy = fly.rotation.y;
+  const cy = Math.cos(hy), sy = Math.sin(hy);
+  const idt = 1 / Math.max(dt, 1e-4);
+  d.legs.forEach((leg, i) => {
+    if (leg.tarsusTip) leg.tarsusTip.getWorldPosition(_foot);
+    else _foot.set(prev[i].x, prev[i].y, prev[i].z);
+    const dx = _foot.x - prev[i].x;
+    const dy = _foot.y - prev[i].y;
+    const dz = _foot.z - prev[i].z;
     leg.foot.x = _foot.x;
     leg.foot.y = _foot.y;
     leg.foot.z = _foot.z;
     leg.foot.stance = flyA < 0.28 && _foot.y < GROUND_Y + 0.18;
-    leg.foot.vx = 0; leg.foot.vy = 0; leg.foot.vz = 0;
-  }
-  d.slip = { x: 0, z: 0, n: 0, yawL: 0, yawR: 0 };
+    leg.foot.vx = dx * idt;
+    leg.foot.vy = dy * idt;
+    leg.foot.vz = dz * idt;
+    if (leg.foot.stance) {
+      // Planted foot: body slips opposite the world foot displacement.
+      slipX -= dx;
+      slipZ -= dz;
+      n += 1;
+      // Tank-steer from body-longitudinal foot slip (rearward push drives that side).
+      const back = -(dx * sy + dz * cy);
+      if (leg.side < 0) yawL += back * 0.55;
+      else yawR += back * 0.55;
+    }
+  });
+  d.slip = { x: slipX, z: slipZ, n, yawL, yawR };
   poseSoftParts(d, t, cmd, flyA, feed);
 }
 
