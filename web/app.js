@@ -62,11 +62,23 @@ const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 220);
 camera.position.set(0, 8.5, 16);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
-controls.dampingFactor = 0.07;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.55;
+controls.zoomSpeed = 0.9;
+controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 1.4;
-controls.maxDistance = 52;
+controls.minDistance = 0.8;
+controls.maxDistance = 70;
 controls.target.set(0, 0.7, 0);
+controls.touches = {
+  ONE: THREE.TOUCH.ROTATE,
+  TWO: THREE.TOUCH.DOLLY_PAN,
+};
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.DOLLY,
+  RIGHT: THREE.MOUSE.PAN,
+};
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
@@ -103,6 +115,7 @@ const worldShared = {
 const flies = [];
 let selected = null;
 let followMode = "flock";
+let userDriving = false;
 let xrayOn = false;
 let paused = false;
 let nMale = 0, nFemale = 0;
@@ -264,6 +277,7 @@ function paintFlock() {
     b.onclick = () => {
       selectFly(f);
       followMode = "selected";
+      userDriving = false;
       syncFollow();
     };
     el.appendChild(b);
@@ -339,12 +353,18 @@ function syncFollow() {
 }
 $("followFlock").onchange = (e) => {
   followMode = e.target.checked ? "flock" : "off";
-  if (followMode === "flock") $("followSel").checked = false;
+  if (followMode === "flock") {
+    $("followSel").checked = false;
+    userDriving = false;
+  }
   syncFollow();
 };
 $("followSel").onchange = (e) => {
   followMode = e.target.checked ? "selected" : "off";
-  if (followMode === "selected") $("followFlock").checked = false;
+  if (followMode === "selected") {
+    $("followFlock").checked = false;
+    userDriving = false;
+  }
   syncFollow();
 };
 $("xray").onchange = (e) => {
@@ -369,29 +389,90 @@ $("addF").onclick = () => {
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let downX = 0, downY = 0;
-canvas.addEventListener("pointerdown", (ev) => { downX = ev.clientX; downY = ev.clientY; });
-canvas.addEventListener("pointerup", (ev) => {
-  if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6) return;
-  pointer.x = (ev.clientX / innerWidth) * 2 - 1;
-  pointer.y = -(ev.clientY / innerHeight) * 2 + 1;
+let lastTapT = 0, lastTapX = 0, lastTapY = 0;
+
+function hitFlyAt(clientX, clientY) {
+  pointer.x = (clientX / innerWidth) * 2 - 1;
+  pointer.y = -(clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
   const meshes = [];
   for (const f of flies) f.body.traverse((o) => { if (o.isMesh) meshes.push(o); });
   const hits = raycaster.intersectObjects(meshes, false);
-  if (!hits.length) {
-    followMode = "off";
-    syncFollow();
-    return;
-  }
+  if (!hits.length) return null;
   let obj = hits[0].object;
   while (obj && !flies.some((f) => f.body === obj)) obj = obj.parent;
-  const fly = flies.find((f) => f.body === obj);
+  return flies.find((f) => f.body === obj) || null;
+}
+
+function overviewCamera() {
+  userDriving = false;
+  followMode = "off";
+  syncFollow();
+  controls.target.set(0, 0.7, 0);
+  camera.position.set(0, 8.5, 16);
+  controls.update();
+}
+
+function dollyBy(factor) {
+  userDriving = true;
+  const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+  const dist = offset.length();
+  const next = Math.min(controls.maxDistance, Math.max(controls.minDistance, dist * factor));
+  if (dist > 1e-6) offset.multiplyScalar(next / dist);
+  camera.position.copy(controls.target).add(offset);
+  controls.update();
+}
+
+canvas.addEventListener("pointerdown", (ev) => { downX = ev.clientX; downY = ev.clientY; });
+canvas.addEventListener("pointerup", (ev) => {
+  if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 8) return;
+  const now = performance.now();
+  const dbl = now - lastTapT < 320 && Math.hypot(ev.clientX - lastTapX, ev.clientY - lastTapY) < 28;
+  lastTapT = now; lastTapX = ev.clientX; lastTapY = ev.clientY;
+  const fly = hitFlyAt(ev.clientX, ev.clientY);
   if (fly) {
     selectFly(fly);
     followMode = "selected";
+    userDriving = false;
     syncFollow();
+    return;
   }
+  if (dbl) {
+    overviewCamera();
+    return;
+  }
+  followMode = "off";
+  syncFollow();
 });
+
+// User orbit/zoom/pan pauses follow lerp until they re-enable follow
+controls.addEventListener("start", () => { userDriving = true; });
+canvas.addEventListener("wheel", () => { userDriving = true; }, { passive: true });
+canvas.addEventListener("touchmove", (ev) => {
+  if (ev.touches && ev.touches.length > 1) ev.preventDefault();
+}, { passive: false });
+
+const camZoomIn = $("camZoomIn");
+const camZoomOut = $("camZoomOut");
+const camRecenter = $("camRecenter");
+if (camZoomIn) camZoomIn.onclick = () => dollyBy(0.82);
+if (camZoomOut) camZoomOut.onclick = () => dollyBy(1.22);
+if (camRecenter) camRecenter.onclick = () => overviewCamera();
+
+const camHint = $("camHint");
+if (camHint) {
+  let seen = false;
+  try { seen = localStorage.getItem("ffb-cam-hint") === "1"; } catch (_) {}
+  if (seen) camHint.classList.add("fade");
+  else {
+    const dismiss = () => {
+      camHint.classList.add("fade");
+      try { localStorage.setItem("ffb-cam-hint", "1"); } catch (_) {}
+    };
+    camHint.onclick = dismiss;
+    setTimeout(dismiss, 6500);
+  }
+}
 
 const stimBtns = [
   ["loop", "live", ""],
@@ -424,25 +505,31 @@ function applyStim(id) {
   $("stimHint").textContent = id === "loop" ? "every fly closed-loop" : id;
 }
 
-function wireCollapse(panelId, key) {
+function wireCollapse(panelId, key, defaultCollapsed = false) {
   const panel = $(panelId);
   if (!panel) return;
   const btn = panel.querySelector(".collapse");
-  const apply = (on) => {
+  const apply = (on, persist) => {
     panel.classList.toggle("collapsed", on);
     if (btn) btn.textContent = on ? "+" : "–";
-    try { localStorage.setItem("ffb-" + key, on ? "1" : "0"); } catch (_) {}
+    if (persist) {
+      try { localStorage.setItem("ffb-" + key, on ? "1" : "0"); } catch (_) {}
+    }
   };
-  let start = false;
-  try { start = localStorage.getItem("ffb-" + key) === "1"; } catch (_) {}
-  apply(start);
-  if (btn) btn.onclick = () => apply(!panel.classList.contains("collapsed"));
+  let start = defaultCollapsed;
+  try {
+    const v = localStorage.getItem("ffb-" + key);
+    if (v === "1") start = true;
+    else if (v === "0") start = false;
+  } catch (_) {}
+  apply(start, false);
+  if (btn) btn.onclick = () => apply(!panel.classList.contains("collapsed"), true);
 }
-wireCollapse("panelL", "left");
-wireCollapse("panelR", "right");
-wireCollapse("panelB", "bottom");
+const narrow = innerWidth <= 900;
+wireCollapse("panelL", "left", narrow);
+wireCollapse("panelR", "right", narrow);
+wireCollapse("panelB", "bottom", narrow);
 
-const _cam = new THREE.Vector3();
 const _tgt = new THREE.Vector3();
 let lastT = performance.now();
 function loop() {
@@ -459,14 +546,26 @@ function loop() {
       flies,
     });
   }
-  if (followMode === "selected" && selected) {
+  if (!userDriving && followMode === "selected" && selected) {
     const h = selected.heading;
     const px = selected.body.position.x, pz = selected.body.position.z, py = selected.y;
-    _cam.set(px - Math.sin(h) * 6.2, 3.6 + py, pz - Math.cos(h) * 6.2);
-    camera.position.lerp(_cam, 0.08);
     _tgt.set(px + Math.sin(h) * 1.4, 0.85 + py, pz + Math.cos(h) * 1.4);
+    const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.12);
-  } else if (followMode === "flock" && flies.length) {
+    const delta = controls.target.clone().sub(prevT);
+    camera.position.add(delta);
+    // Preserve current zoom radius; gently steer azimuth toward behind the fly
+    const offset = camera.position.clone().sub(controls.target);
+    const radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
+    const desired = new THREE.Vector3(
+      -Math.sin(h) * radius * 0.92,
+      Math.max(1.2, radius * 0.42 + py * 0.2),
+      -Math.cos(h) * radius * 0.92
+    );
+    offset.lerp(desired, 0.045);
+    offset.setLength(radius);
+    camera.position.copy(controls.target).add(offset);
+  } else if (!userDriving && followMode === "flock" && flies.length) {
     let cx = 0, cz = 0, cy = 0, minx = 99, maxx = -99, minz = 99, maxz = -99;
     for (const f of flies) {
       const x = f.body.position.x, z = f.body.position.z;
@@ -476,11 +575,18 @@ function loop() {
     }
     const n = flies.length;
     cx /= n; cz /= n; cy /= n;
-    const span = Math.max(6, maxx - minx, maxz - minz);
-    _cam.set(cx + span * 0.15, 5.5 + span * 0.42 + cy, cz + 7.5 + span * 0.38);
-    camera.position.lerp(_cam, 0.06);
     _tgt.set(cx, 0.55 + cy, cz);
+    const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.09);
+    const delta = controls.target.clone().sub(prevT);
+    camera.position.add(delta);
+    const offset = camera.position.clone().sub(controls.target);
+    let radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
+    const span = Math.max(6, maxx - minx, maxz - minz);
+    const comfort = Math.min(controls.maxDistance, Math.max(8, 7.5 + span * 0.55));
+    radius += (comfort - radius) * 0.02;
+    offset.setLength(radius);
+    camera.position.copy(controls.target).add(offset);
   }
   controls.update();
   renderer.render(scene, camera);

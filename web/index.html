@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Living flies — Male CNS + BANC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -97,6 +97,12 @@
         </div>
       </div>
     </div>
+    <div class="cam-pad" id="camPad" aria-label="Camera controls">
+      <button type="button" id="camZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+      <button type="button" id="camZoomOut" aria-label="Zoom out" title="Zoom out">−</button>
+      <button type="button" id="camRecenter" class="cam-recenter" aria-label="Recenter overview" title="Recenter">⊙</button>
+    </div>
+    <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
   <script type="module" src="app.js"></script>
 </body>
