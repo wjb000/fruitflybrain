@@ -18,12 +18,13 @@ let params = {
   vReset: 0,
   vThresh: 1,
   refractory: 2,
-  // Throughput: denser MN drive + STD — slightly lower wScale vs prior to keep stable.
-  wScale: 0.0108,
-  inhibGain: 2.35,
-  stimAmp: 0.148,
-  // Per-neuron STD: release probability drop after spike; recovery with tauStd.
-  stdUse: 0.18,
+  // Sqrt-compressed synapse weights (see step): mid edges matter more vs hubs.
+  // Retuned so mean drive is slightly stronger than prior linear regime.
+  wScale: 0.044,
+  inhibGain: 2.15,
+  stimAmp: 0.155,
+  // Milder STD use → more reliable transmission while depression still present.
+  stdUse: 0.14,
   // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
   facOA: 0.08,
 };
@@ -217,25 +218,29 @@ function step() {
       // Dopamine: slow gain / threshold modulate — stronger deposit than before.
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = mDA[j] + 0.0030 * weight[k] * u;
+        const v = mDA[j] + 0.012 * Math.sqrt(weight[k]) * u;
         mDA[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 6) {
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = m5[j] + 0.0026 * weight[k] * u;
+        const v = m5[j] + 0.010 * Math.sqrt(weight[k]) * u;
         m5[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 7) {
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = mOA[j] + 0.0035 * weight[k] * u;
+        const v = mOA[j] + 0.014 * Math.sqrt(weight[k]) * u;
         mOA[j] = v > 1.5 ? 1.5 : v;
       }
     } else {
-      // Fast chemical: current pulse scaled by STD resource u.
+      // Fast chemical: sqrt-compress huge synapse counts so mid-weight edges
+      // stay expressive; STD resource u still gates reliability.
       const s = sign[i] * wScale * u;
-      for (let k = a; k < b; k++) I[indices[k]] += s * weight[k];
+      for (let k = a; k < b; k++) {
+        const w = weight[k];
+        I[indices[k]] += s * Math.sqrt(w);
+      }
     }
   }
 

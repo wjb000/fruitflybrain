@@ -6,9 +6,9 @@
  * (sky, checker floor, food, water, the other fly, arena wall).
  */
 
-const DA = 4.6 * Math.PI / 180;
-const FOV = 1.35;
-const RINGS = 16;
+const DA = 3.8 * Math.PI / 180;
+const FOV = 1.42;
+const RINGS = 19;
 const ARENA_R = 17.4;
 const ARENA_R2 = ARENA_R * ARENA_R;
 
@@ -274,27 +274,35 @@ export class CompoundEye {
       this.prevL[sideName].set(lum);
       this.prevOn[sideName].set(onArr);
       const inv = 1 / N;
-      const mot = 1 / Math.max(1, N * 0.08);
+      // Stronger Hassenstein–Reichardt gain so sparse motion still drives T4/T5 hard.
+      const mot = 1 / Math.max(1, N * 0.045);
       const sectors = secL.map((v, i) => (secN[i] ? v / secN[i] : 0));
       const sectorsUV = secUV.map((v, i) => (secN[i] ? v / secN[i] : 0));
+      // Opponency: preferred minus null direction (not just raw correlator sums).
+      const t4A = t4a * mot, t4B = t4b * mot, t4C = t4c * mot, t4D = t4d * mot;
+      const t5A = t5a * mot, t5B = t5b * mot, t5C = t5c * mot, t5D = t5d * mot;
       out[sideName] = {
         lum: sumL * inv,
         uv: sumUV * inv,
         on: sumOn * inv,
         off: sumOff * inv,
-        t4a: t4a * mot,
-        t4b: t4b * mot,
-        t4c: t4c * mot,
-        t4d: t4d * mot,
-        t5a: t5a * mot,
-        t5b: t5b * mot,
-        t5c: t5c * mot,
-        t5d: t5d * mot,
-        hs: (t4a - t4b) * mot,
-        vs: (t4c - t4d) * mot,
+        // R1–R6 luminance contrast vs R7 UV kept as separate maps for HUD / binding.
+        r16: sumL * inv,
+        r7: sumUV * inv,
+        t4a: Math.max(0, t4A - 0.55 * t4B),
+        t4b: Math.max(0, t4B - 0.55 * t4A),
+        t4c: Math.max(0, t4C - 0.55 * t4D),
+        t4d: Math.max(0, t4D - 0.55 * t4C),
+        t5a: Math.max(0, t5A - 0.55 * t5B),
+        t5b: Math.max(0, t5B - 0.55 * t5A),
+        t5c: Math.max(0, t5C - 0.55 * t5D),
+        t5d: Math.max(0, t5D - 0.55 * t5C),
+        hs: (t4A - t4B) + 0.65 * (t5A - t5B),
+        vs: (t4C - t4D) + 0.65 * (t5C - t5D),
         sectors,
         sectorsUV,
         map: lum,
+        mapUV: uvA,
       };
     }
     this.last = out;
@@ -306,22 +314,33 @@ export function drawOmmatidia(canvas, eye, side) {
   if (!canvas || !eye) return;
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
-  ctx.fillStyle = "#0b0d12";
+  ctx.fillStyle = "#07090e";
   ctx.fillRect(0, 0, w, h);
   const lum = eye.lum[side];
+  const uv = eye.uv[side];
   if (!lum) return;
   const cx = w * 0.5, cy = h * 0.52;
-  const sc = Math.min(w, h) * 0.42;
+  const sc = Math.min(w, h) * 0.46;
+  const rHex = Math.max(1.35, Math.min(w, h) * 0.0078);
   for (let i = 0; i < N; i++) {
     const om = OMM[i];
-    const v = Math.min(1, lum[i] * 2.8);
-    const g = (v * 220) | 0;
-    const b = (40 + v * 180) | 0;
-    ctx.fillStyle = `rgb(${(g * 0.7) | 0},${g},${b})`;
+    // R1–R6 luminance (green-cyan) + R7 UV (magenta bloom) for richer HUD.
+    const v = Math.min(1, lum[i] * 3.2);
+    const u = uv ? Math.min(1, uv[i] * 2.6) : 0;
+    const r = Math.min(255, (v * 140 + u * 200) | 0);
+    const g = Math.min(255, (v * 230 + u * 40) | 0);
+    const b = Math.min(255, (40 + v * 160 + u * 220) | 0);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
     const x = cx + om.az / FOV * sc * (side === "L" ? -1 : 1);
     const y = cy - om.el / FOV * sc;
     ctx.beginPath();
-    ctx.arc(x, y, 1.85, 0, Math.PI * 2);
+    for (let k = 0; k < 6; k++) {
+      const a = (Math.PI / 3) * k + Math.PI / 6;
+      const px = x + Math.cos(a) * rHex;
+      const py = y + Math.sin(a) * rHex;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
     ctx.fill();
   }
 }

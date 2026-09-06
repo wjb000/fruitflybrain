@@ -41,13 +41,14 @@ OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 # Promotor/remotor swing the coxa (pitch). Adductor vs remotor/abductor
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
 DOF_MAP = [
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.55, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.40, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.40, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.70, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.25, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.55, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.35, 0.0),
+    # Wider spans: mid MN softDrive still saturates actuators; MN-only, no cheats.
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.72, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.55, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.52, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.92, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.34, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.72, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.48, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.

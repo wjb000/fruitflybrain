@@ -51,7 +51,7 @@ function hzVis(v, gain = 120, base = 6) {
 /** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
  *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
  */
-function softDrive(v, gain = 5.2) {
+function softDrive(v, gain = 6.8) {
   const x = Math.max(0, v || 0);
   return Math.tanh(x * gain);
 }
@@ -380,42 +380,42 @@ export class EmbodiedFly {
     const c = Math.cos(this.heading), s = Math.sin(this.heading);
     const oView = other && Math.abs(bearingTo(ox, oz, x, z, c, s)) < 0.75 && distO < 11;
     const e = this.motEma;
-    const rates = m.rates || [];
-    const dnHz = rates[8] || 0;
-    const motHz = rates[12] || 0;
     const legs = (e.T1L + e.T1R + e.T2L + e.T2R + e.T3L + e.T3R) / 6;
     const cmd = this.cmd;
-    // Body commands are ONLY connectome motor readout. No odor/vision shortcuts,
-    // no scripted gait clocks — quiet MNs → quiet body.
+    // Body commands are ONLY connectome effector / MN readout.
+    // walk/turn are UI mode labels derived from MNs — never free-joint thrusters.
+    const legL = (e.T1L + e.T2L + e.T3L) / 3;
+    const legR = (e.T1R + e.T2R + e.T3R) / 3;
     cmd.walk = THREE.MathUtils.clamp(
-      softDrive((dnHz + motHz) / 40 + e.DNa * 0.55 + legs * 0.45, 4.2), 0, 1
+      softDrive(legs * 0.95 + e.DNa * 0.55 + (walkL + walkR) * 0.35, 5.6), 0, 1
     );
-    const lrTurn = (walkR - walkL) * 8 + (rEff - lEff) / (rEff + lEff + 8);
-    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 2.4), -1, 1);
+    const lrTurn = (legR - legL) * 3.2 + (walkR - walkL) * 6.5
+      + (rEff - lEff) / (rEff + lEff + 10);
+    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 2.8), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
-    const wingRaw = e.DLM * 1.15 + e.DVM * 1.05 + e.ADMN * 0.85;
-    cmd.fly = softDrive(wingRaw, 4.8);
+    const wingRaw = e.DLM * 1.25 + e.DVM * 1.15 + e.ADMN * 0.95;
+    cmd.fly = softDrive(wingRaw, 5.8);
     cmd.wing = {
-      dlm: softDrive(e.DLM, 5.5),
-      dvm: softDrive(e.DVM, 5.5),
-      admn: softDrive(e.ADMN, 5.0),
+      dlm: softDrive(e.DLM, 6.6),
+      dvm: softDrive(e.DVM, 6.6),
+      admn: softDrive(e.ADMN, 6.0),
     };
-    cmd.feed = softDrive(e.MN9 * 1.2 + e.proboscis * 0.95, 5.0);
+    cmd.feed = softDrive(e.MN9 * 1.35 + e.proboscis * 1.05, 6.0);
     cmd.court = softDrive(
-      this.sex === "female" ? e.fru * 0.9 + e.abdomen * 0.35
-        : e.aIPg * 1.05 + e.pIP1 * 1.15 + e.DNg02 * 0.9,
-      4.6
+      this.sex === "female" ? e.fru * 1.0 + e.abdomen * 0.4
+        : e.aIPg * 1.15 + e.pIP1 * 1.25 + e.DNg02 * 1.0,
+      5.5
     );
-    cmd.groom = softDrive((e.T1L + e.T1R) * 0.7, 4.4);
-    cmd.escape = softDrive(e.DNp01 * (this.sex === "female" ? 0.7 : 2.8), 5.5);
+    cmd.groom = softDrive((e.T1L + e.T1R) * 0.85, 5.4);
+    cmd.escape = softDrive(e.DNp01 * (this.sex === "female" ? 0.85 : 3.0), 6.4);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
-    cmd.head = softDrive(e.neck, 5.5);
-    cmd.abdomen = softDrive(e.abdomen * 0.9 + e.aIPg * 0.25 + cmd.court * 0.15, 4.8);
+    cmd.head = softDrive(e.neck, 6.6);
+    cmd.abdomen = softDrive(e.abdomen * 1.0 + e.aIPg * 0.3 + cmd.court * 0.15, 5.8);
     // Honest MN→muscle: empty annotation pools stay quiet (no neuromere fill-in).
     // Male T2/T3 coxaProm & Ta* are absent in FlyEM type labels — leave them 0.
     cmd.muscle = {};
     for (const name of LEG_NAMES) {
-      const pick = (muscle) => softDrive(e[`${name}_${muscle}`] || 0, 5.5);
+      const pick = (muscle) => softDrive(e[`${name}_${muscle}`] || 0, 6.8);
       cmd.muscle[name] = {
         coxaProm: pick("coxaProm"),
         coxaRem: pick("coxaRem"),
@@ -493,10 +493,10 @@ export class EmbodiedFly {
         // Still brain-derived — no free-joint walk thruster / CPG gait.
         // Stance slip from MN-posed feet only (plant down). Stronger gain so
         // sparse antagonists still translate the body without a walk thruster.
-        const slipGain = 3.4;
+        const slipGain = 4.8;
         this.body.position.x += (slip.x / slip.n) * slipGain;
         this.body.position.z += (slip.z / slip.n) * slipGain;
-        this.heading += (slip.yawR - slip.yawL) * 1.85;
+        this.heading += (slip.yawR - slip.yawL) * 2.35;
       }
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
@@ -664,7 +664,6 @@ export class EmbodiedFly {
       type: "rates",
       rates: {
         vision: extraV,
-        L1L: 22, L1R: 22, L2L: 22, L2R: 22,
         smellL: Math.max(smellL, extra.smellL || 0),
         smellR: Math.max(smellR, extra.smellR || 0),
         foodORNL: smellL,
@@ -696,11 +695,28 @@ export class EmbodiedFly {
     const r = {};
     for (const side of ["L", "R"]) {
       const e = eye[side];
+      // Sector photoreceptors: R1–R6 = luminance, R7 = UV, R8 = mixed.
+      // Contrast vs mean boosts cells when the scene has structure (not flat sky).
+      const meanL = e.lum || 0.001;
+      const meanU = e.uv || 0.001;
       for (let s = 0; s < 4; s++) {
-        r["R16" + side + s] = hzVis(e.sectors[s], 140, 6) + extraV;
-        r["R7" + side + s] = hzVis(e.sectorsUV[s], 150, 5) + extraV * 0.5;
-        r["R8" + side + s] = hzVis(e.sectors[s] * 0.45 + e.sectorsUV[s] * 0.4, 130, 5) + extraV * 0.4;
+        const cL = (e.sectors[s] - meanL) / (meanL + 0.08);
+        const cU = (e.sectorsUV[s] - meanU) / (meanU + 0.08);
+        const contrast = Math.max(0, Math.abs(cL));
+        const uvContrast = Math.max(0, Math.abs(cU));
+        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.35, 165, 5) + extraV;
+        r["R7" + side + s] = hzVis(e.sectorsUV[s] + uvContrast * 0.4, 175, 4) + extraV * 0.45;
+        r["R8" + side + s] = hzVis(
+          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.5 + contrast * 0.15, 150, 4
+        ) + extraV * 0.35;
       }
+      // L1 ON / L2 OFF lamina — drive from temporal contrast, not tonic fake Hz.
+      const on = e.on || 0, off = e.off || 0;
+      const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
+      const t4 = (e.t4a || 0) + (e.t4b || 0) + (e.t4c || 0) + (e.t4d || 0);
+      const t5 = (e.t5a || 0) + (e.t5b || 0) + (e.t5c || 0) + (e.t5d || 0);
+      r["L1" + side] = hzVis(on * 2.8 + t4 * 1.6 + mot * 0.55, 190, 4);
+      r["L2" + side] = hzVis(off * 2.8 + t5 * 1.6 + mot * 0.45, 190, 4);
     }
     return r;
   }

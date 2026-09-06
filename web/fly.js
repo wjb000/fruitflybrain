@@ -2,14 +2,14 @@ import * as THREE from "three";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
-  // Spans sized so mid–high MN drive (softDrive ~0.5–0.9) yields obvious joint motion.
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.85],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.62],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.58],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.95],
-  "trochanterfemur-roll": ["feRed", null, 0.38],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.80],
-  "tarsus1-pitch": ["taLev", "taDep", 0.50],
+  // Wider spans so mid MN softDrive (~0.5) still translates into stance slip.
+  "coxa-pitch": ["coxaProm", "coxaRem", 1.05],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.78],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.72],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 1.18],
+  "trochanterfemur-roll": ["feRed", null, 0.48],
+  "tibia-pitch": ["tiExt", "tiFlex", 1.00],
+  "tarsus1-pitch": ["taLev", "taDep", 0.62],
 };
 const GROUND_Y = 0.05;
 const MUSCLE_TAU = 0.05;
