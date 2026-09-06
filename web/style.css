@@ -244,3 +244,15 @@ button:disabled { opacity: 0.4; cursor: default; }
     bottom: calc(88px + var(--safe-b));
   }
 }
+
+#bombHint {
+  color: #ffd28a;
+  font-size: 11px;
+  margin-top: 8px;
+  letter-spacing: 0.02em;
+}
+label.tog:has(#sensoryBomb:checked),
+label.tog.bomb-on {
+  background: rgba(255, 159, 28, 0.18);
+  border-color: rgba(255, 159, 28, 0.55);
+}

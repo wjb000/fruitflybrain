@@ -126,6 +126,34 @@ class PuffField {
   }
 }
 
+
+function makeBombOrb() {
+  const geo = new THREE.SphereGeometry(0.42, 28, 22);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffc14a,
+    emissive: 0xff8a1a,
+    emissiveIntensity: 1.35,
+    roughness: 0.35,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.92,
+  });
+  const core = new THREE.Mesh(geo, mat);
+  const glowGeo = new THREE.SphereGeometry(0.62, 20, 16);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffb040,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  const g = new THREE.Group();
+  g.add(core, glow);
+  g.name = "scentBomb";
+  g.userData.isBomb = true;
+  return g;
+}
+
 export class OdorWorld {
   constructor() {
     this.food = new PuffField({ color: 0xf0c040, emitHz: 22, mass: 1.15, life: 6.5, y0: 0.35 });
@@ -137,6 +165,47 @@ export class OdorWorld {
     this.group.add(this.food.points, this.pher.points, this.co2.points, this.moist.points, this.bitter.points);
     this.t = 0;
     this.wind = { x: -1, z: -0.4 };
+    // Sensory bomb — intense optional food (and light pher) puff emitter. Default OFF.
+    this.bombEnabled = false;
+    this.bombPos = { x: 0, y: 0.7, z: 0 };
+    this._bombAcc = 0;
+    this._bombPherAcc = 0;
+    this.bombMesh = makeBombOrb();
+    this.bombMesh.visible = false;
+    this.group.add(this.bombMesh);
+    this._showOdor = false;
+    this._syncVis();
+  }
+
+  setBomb(on) {
+    this.bombEnabled = !!on;
+    this.bombMesh.visible = this.bombEnabled;
+    this._syncVis();
+  }
+
+  setBombPos(x, y, z) {
+    this.bombPos.x = x;
+    this.bombPos.y = y;
+    this.bombPos.z = z;
+    this.bombMesh.position.set(x, y, z);
+  }
+
+  getBombPos() {
+    return { x: this.bombPos.x, y: this.bombPos.y, z: this.bombPos.z };
+  }
+
+  setShowOdor(on) {
+    this._showOdor = !!on;
+    this._syncVis();
+  }
+
+  _syncVis() {
+    const showPuffs = this._showOdor;
+    for (const f of [this.food, this.pher, this.co2, this.moist, this.bitter]) {
+      f.points.visible = showPuffs;
+    }
+    this.bombMesh.visible = this.bombEnabled;
+    this.group.visible = showPuffs || this.bombEnabled;
   }
 
   step(dt, t, world) {
@@ -179,6 +248,30 @@ export class OdorWorld {
         const p = fly.body.position;
         this.co2.emit(p.x, p.y + 1.2, p.z, this.wind);
       }
+    }
+    // Sensory bomb: many high-mass food puffs (+ light pher) at orb — Lagrangian only.
+    if (this.bombEnabled) {
+      const bx = this.bombPos.x, by = this.bombPos.y, bz = this.bombPos.z;
+      this._bombAcc += dt * 90;
+      while (this._bombAcc >= 1) {
+        this._bombAcc -= 1;
+        // ~8× sugar-drop mass, burst of filaments each tick
+        const prevMass = this.food.mass0;
+        this.food.mass0 = 8.5;
+        this.food.emit(bx, by, bz, this.wind, 6);
+        this.food.mass0 = prevMass;
+      }
+      this._bombPherAcc += dt * 12;
+      while (this._bombPherAcc >= 1) {
+        this._bombPherAcc -= 1;
+        const prevMass = this.pher.mass0;
+        this.pher.mass0 = 1.4;
+        this.pher.emit(bx, by + 0.15, bz, this.wind, 2);
+        this.pher.mass0 = prevMass;
+      }
+      // Soft pulse on the orb marker
+      const s = 1.0 + 0.08 * Math.sin(t * 4.2);
+      this.bombMesh.scale.setScalar(s);
     }
     this.food.step(dt, t);
     this.pher.step(dt, t);

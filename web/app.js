@@ -101,7 +101,7 @@ scene.add(key);
 const arena = createArena();
 scene.add(arena);
 const odors = new OdorWorld();
-odors.group.visible = false;
+odors.setShowOdor(false);
 scene.add(odors.group);
 
 const worldShared = {
@@ -398,8 +398,47 @@ $("xray").onchange = (e) => {
 $("showOdor").onchange = (e) => {
   const on = e.target.checked;
   e.target.parentElement.classList.toggle("on", on);
-  odors.group.visible = on;
+  odors.setShowOdor(on);
 };
+
+function placeBombNearView() {
+  // Prefer dish food / center; fall back near camera look target
+  const food = arena.userData.food?.position;
+  let x = food ? food.x + 1.8 : controls.target.x;
+  let z = food ? food.z + 1.2 : controls.target.z;
+  const r2 = x * x + z * z;
+  if (r2 > 14 * 14) {
+    const s = 14 / Math.sqrt(r2);
+    x *= s; z *= s;
+  }
+  odors.setBombPos(x, 0.72, z);
+}
+
+function setSensoryBomb(on) {
+  const el = $("sensoryBomb");
+  if (el) el.checked = !!on;
+  if (el) el.parentElement.classList.toggle("on", !!on);
+  const hint = $("bombHint");
+  if (hint) hint.classList.toggle("hidden", !on);
+  if (on) {
+    placeBombNearView();
+    odors.setBomb(true);
+  } else {
+    odors.setBomb(false);
+  }
+  // Never persist as ON — only remember explicit off preference if stored
+  try {
+    if (on) localStorage.removeItem("ffb-sensoryBomb");
+    else localStorage.setItem("ffb-sensoryBomb", "0");
+  } catch (_) {}
+}
+
+if ($("sensoryBomb")) {
+  // Default OFF always on load (do not restore as on)
+  $("sensoryBomb").checked = false;
+  setSensoryBomb(false);
+  $("sensoryBomb").onchange = (e) => setSensoryBomb(e.target.checked);
+}
 $("addM").onclick = () => {
   expectedReady = readyN + 1;
   spawn("male");
@@ -411,13 +450,42 @@ $("addF").onclick = () => {
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+const _dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.72);
+const _dragHit = new THREE.Vector3();
 let downX = 0, downY = 0;
 let lastTapT = 0, lastTapX = 0, lastTapY = 0;
+let draggingBomb = false;
 
-function hitFlyAt(clientX, clientY) {
+function setPointer(clientX, clientY) {
   pointer.x = (clientX / innerWidth) * 2 - 1;
   pointer.y = -(clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
+}
+
+function hitBombAt(clientX, clientY) {
+  if (!odors.bombEnabled || !odors.bombMesh) return false;
+  setPointer(clientX, clientY);
+  const hits = raycaster.intersectObject(odors.bombMesh, true);
+  return hits.length > 0;
+}
+
+function dragBombTo(clientX, clientY) {
+  setPointer(clientX, clientY);
+  _dragPlane.constant = -0.72;
+  if (!raycaster.ray.intersectPlane(_dragPlane, _dragHit)) return;
+  let x = _dragHit.x, z = _dragHit.z;
+  const r2 = x * x + z * z;
+  const maxR = 16.2;
+  if (r2 > maxR * maxR) {
+    const s = maxR / Math.sqrt(r2);
+    x *= s; z *= s;
+  }
+  const y = Math.min(1.0, Math.max(0.4, 0.72));
+  odors.setBombPos(x, y, z);
+}
+
+function hitFlyAt(clientX, clientY) {
+  setPointer(clientX, clientY);
   const meshes = [];
   for (const f of flies) f.body.traverse((o) => { if (o.isMesh) meshes.push(o); });
   const hits = raycaster.intersectObjects(meshes, false);
@@ -446,8 +514,34 @@ function dollyBy(factor) {
   controls.update();
 }
 
-canvas.addEventListener("pointerdown", (ev) => { downX = ev.clientX; downY = ev.clientY; });
+canvas.addEventListener("pointerdown", (ev) => {
+  downX = ev.clientX; downY = ev.clientY;
+  draggingBomb = false;
+  if (odors.bombEnabled && hitBombAt(ev.clientX, ev.clientY)) {
+    draggingBomb = true;
+    controls.enabled = false;
+    userDriving = true;
+    try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+    dragBombTo(ev.clientX, ev.clientY);
+    ev.preventDefault();
+  }
+});
+canvas.addEventListener("pointermove", (ev) => {
+  if (!draggingBomb) return;
+  dragBombTo(ev.clientX, ev.clientY);
+  ev.preventDefault();
+});
+function endBombDrag(ev) {
+  if (!draggingBomb) return;
+  draggingBomb = false;
+  controls.enabled = true;
+  try { canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
+}
 canvas.addEventListener("pointerup", (ev) => {
+  const wasBomb = draggingBomb;
+  endBombDrag(ev);
+  // Skip fly-select taps while / after dragging the scent orb
+  if (wasBomb) return;
   if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 8) return;
   const now = performance.now();
   const dbl = now - lastTapT < 320 && Math.hypot(ev.clientX - lastTapX, ev.clientY - lastTapY) < 28;
@@ -467,6 +561,7 @@ canvas.addEventListener("pointerup", (ev) => {
   followMode = "off";
   syncFollow();
 });
+canvas.addEventListener("pointercancel", endBombDrag);
 
 // User orbit/zoom/pan pauses follow lerp until they re-enable follow
 controls.addEventListener("start", () => { userDriving = true; });
