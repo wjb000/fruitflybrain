@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
-  <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}</style>
+  <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}.stim-map-panel{position:fixed;right:12px;bottom:88px;max-width:360px;z-index:6;max-height:min(70vh,560px);overflow:auto}.stim-map-panel.collapsed .panel-body{display:none}</style>
   <script type="importmap">
   {
     "imports": {
@@ -33,7 +33,7 @@
       <div class="kicker">Flock · live</div>
       <div class="panel-body">
         <h1>They run themselves</h1>
-                <div class="sub"><b>Robot controller</b> (cube default): world → eye → optic/visionL/R → LIF → leg/descending MNs → portable <code>forward</code>/<code>yawRate</code> → <code>v</code>/<code>ω</code> (no thrusters). Soft pad rim. <code>?body=fly</code> = NeuroMechFly/MuJoCo. Cache <code>?v=robot1</code>.</div>
+                <div class="sub"><b>Robot controller</b> (cube default): world → eye → optic/visionL/R → LIF → leg/descending MNs → portable <code>forward</code>/<code>yawRate</code> → <code>v</code>/<code>ω</code> (no thrusters). Soft pad rim. <code>?body=fly</code> = NeuroMechFly/MuJoCo. Cache <code>?v=stimmap1</code> · <a href="?stim=1&amp;v=stimmap1" style="color:#4de4ff">stim map</a>.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
@@ -115,6 +115,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=robot1"></script>
+  <script type="module" src="app.js?v=stimmap1"></script>
 </body>
 </html>

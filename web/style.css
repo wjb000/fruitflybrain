@@ -256,3 +256,20 @@ label.tog.bomb-on {
   background: rgba(255, 159, 28, 0.18);
   border-color: rgba(255, 159, 28, 0.55);
 }
+
+
+/* Stim-map causal panel */
+.stim-map-panel .stim-readouts {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  margin: 8px 0; font-variant-numeric: tabular-nums;
+}
+.stim-map-panel .stim-readouts b { display: block; font-size: 15px; font-weight: 600; }
+.stim-map-panel .stim-readouts span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.stim-slider { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.stim-slider input[type=range] { flex: 1; }
+.stim-table-wrap { margin-top: 8px; max-height: 160px; overflow: auto; }
+.stim-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.stim-table th, .stim-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+.stim-table th { color: var(--muted); font-weight: 500; }
+a.stim-map-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+a.stim-map-link:hover { text-decoration: underline; }

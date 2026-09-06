@@ -42,11 +42,14 @@ eye L/R salience (beacon)
    in `agent.js` — same as fly mode UI labels. **No** bearing-to-food thruster.
 2. `portableControls()` → `steering.forward` / `steering.yawRate` (+ vision
    salience diagnostics for HUD / logging).
-3. `chassisSetpoints()` scales to `v` / `omega` (readability / hardware gains).
-4. `EmbodiedFly.stepCubeChassis`: integrate heading and XY with soft rim;
+3. `chassisSetpoints()` scales to `v` / `omega` (readability / hardware gains;
+   cube uses lower `vGain`, higher `yawGain` so MN L/R yaw is visible).
+4. Portable steering **gates forward by `|yawRate|`** (turn-then-approach) and
+   amplifies MN-derived turn — still no bearing-to-food thruster.
+5. `EmbodiedFly.stepCubeChassis`: integrate heading and XY with soft rim;
    **no** MuJoCo, **no** nmf mesh FK, **no** free-joint thrusters.
 
-Restore fly body: `?body=fly`. Cache-bust: `?v=robot1`.
+Restore fly body: `?body=fly`. Cache-bust: `?v=stimmap1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick; silence
@@ -56,6 +59,11 @@ Plant URL: `web/plantConfig.js` (Pages → Mac tunnel by default).
 Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load; soft rim bounce
 preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 **off by default**.
+
+
+## Stim-map mode (causal motor mapping)
+
+Open the sim (cube default) or `?stim=1` / `?map=1` (HUD link always). Hold or toggle a named pool button (e.g. **T1L**, **T1R**, **DNa**, **HS**, **visionL/R**). That **Hz-injects** those neuron IDs on the LIF worker (optional lesion **boost** gain), so they spike → synapses / effector readout → `cmd.walk`/`cmd.turn` → portable `forward`/`yawRate` → cube. Live HUD shows forward, yawRate, and a left/right hint; **pulse all** fills a small table of peak fwd vs yaw. This is causal stim mapping — not closed-loop beacon-chase gain tweaks. Do not bypass with direct chassis velocity from the button.
 
 ## Sensory channels → neuron pools
 

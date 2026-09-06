@@ -59,6 +59,22 @@ async function main() {
     throw new Error("quiet MNs must not invent thrust");
   }
   console.log("quiet OK (v=omega=0)");
+
+  // |yaw|/|omega| rises with L/R MN mismatch; forward gates down while yawing.
+  const aligned = chassisSetpoints(portableControls(fakeFly({ walk: 0.55, turn: 0.02 })));
+  const offset = chassisSetpoints(portableControls(fakeFly({ walk: 0.55, turn: 0.65 })));
+  console.log("aligned", { v: aligned.v, omega: aligned.omega, forward: aligned.forward, yawRate: aligned.yawRate });
+  console.log("offset ", { v: offset.v, omega: offset.omega, forward: offset.forward, yawRate: offset.yawRate });
+  if (!(Math.abs(offset.omega) > Math.abs(aligned.omega) * 2.5)) {
+    throw new Error("|omega| should rise clearly with L/R MN turn mismatch");
+  }
+  if (!(offset.forward < aligned.forward * 0.85)) {
+    throw new Error("forward should gate down when |turn| is high (turn-then-approach)");
+  }
+  if (!(Math.abs(offset.yawRate) > 0.45)) {
+    throw new Error("offset MN turn should produce clear yawRate");
+  }
+  console.log("yaw authority + forward gate OK");
   console.log(ROBOT_HOWTO.split("\n")[0]);
 
   console.log("\n--- headless dish: intact vs silence:HS ---");

@@ -4,7 +4,7 @@ The **complete adult male *Drosophila* central nervous system** (brain + ventral
 
 Honest MN→body coupling: cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
-**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` / `yawRate` → `v` / `omega`). Hard-refresh with `?v=robot1`. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
+**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` / `yawRate` → `v` / `omega`). Hard-refresh with `?v=stimmap1`. **Stim map** (default on cube, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch cube fwd/yaw — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 

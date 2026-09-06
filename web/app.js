@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=robot1";
-import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=robot1";
-import { createOpenWorld } from "./world/procgen.js?v=robot1";
-import { EmbodiedFly } from "./agent.js?v=robot1";
-import { drawOmmatidia } from "./eye.js?v=robot1";
-import { OdorWorld } from "./plume.js?v=robot1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=robot1";
-import { parseLesionFlag } from "./lesion.js";
-import { mountAssayPanel } from "./assay/panel.js";
-import { portableControls, stubRobotDriver, chassisSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=robot1";
+import { loadNmf, createMaleFly } from "./fly.js?v=stimmap1";
+import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=stimmap1";
+import { createOpenWorld } from "./world/procgen.js?v=stimmap1";
+import { EmbodiedFly } from "./agent.js?v=stimmap1";
+import { drawOmmatidia } from "./eye.js?v=stimmap1";
+import { OdorWorld } from "./plume.js?v=stimmap1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=stimmap1";
+import { parseLesionFlag } from "./lesion.js?v=stimmap1";
+import { mountAssayPanel } from "./assay/panel.js?v=stimmap1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=stimmap1";
+import { portableControls, stubRobotDriver, chassisSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=stimmap1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "cube"; ?body=fly for NeuroMechFly
 
@@ -785,6 +786,36 @@ function loop() {
   controls.update();
   renderer.render(scene, camera);
 }
+// --- Stim-map mode (causal pool → chassis; default on cube, ?stim=1 / ?map=1) ---
+const wantStimMap = stimMapWanted(BODY_MODE);
+let stimMapPanel = null;
+{
+  const host = document.querySelector(".hud") || document.body;
+  const panelL = document.getElementById("panelL")?.querySelector(".panel-body");
+  if (wantStimMap) {
+    const badge = document.createElement("div");
+    badge.className = "hint";
+    badge.style.marginTop = "8px";
+    badge.innerHTML = 'stim map on · <a class="stim-map-link" href="' + stimMapUrl(false) + '">off (?stim=0)</a>';
+    if (panelL) panelL.appendChild(badge);
+    stimMapPanel = mountStimMapPanel({
+      getFly: () => selected || flies[0],
+    });
+    host.appendChild(stimMapPanel.el);
+  } else {
+    const linkRow = document.createElement("div");
+    linkRow.className = "row";
+    linkRow.style.marginTop = "8px";
+    const a = document.createElement("a");
+    a.href = stimMapUrl(true);
+    a.textContent = "open stim map";
+    a.className = "stim-map-link";
+    a.title = "Causal stim → LIF → MNs → cube (not beacon-chase tuning)";
+    linkRow.appendChild(a);
+    if (panelL) panelL.appendChild(linkRow);
+  }
+}
+
 // --- Assay / lesion scaffolding (URL: ?assay=1&lesion=silence:HS) ---
 const _params = new URLSearchParams(location.search);
 const wantAssay = _params.get("assay") === "1" || _params.has("lesion") || _params.get("dev") === "1";
@@ -834,6 +865,9 @@ window.ffbPortable = {
     return f.applyLesion(cfg);
   },
   clearLesion: () => { const f = selected || flies[0]; if (f) f.clearLesion(); },
+  setRates: (rates) => { const f = selected || flies[0]; return f ? f.setRates(rates) : null; },
+  clearStim: () => { const f = selected || flies[0]; if (f) f.clearStimInject(); },
+  stimMap: () => stimMapPanel,
 };
 
 setLoad(1, "starting brains");
