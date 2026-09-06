@@ -1,10 +1,16 @@
 /**
- * Visual approach assay — see → remember (lights out) → reorient → retrieve.
+ * Visual approach assay v2 — see → remember → dark/reorient → dark-retrieve.
+ *
+ * Phases:
+ *   encode   — lights ON, landmark visible; fly may approach/fix
+ *   dark     — lights OUT; landmark hidden
+ *   yaw      — reorient the ANIMAL (heading += π); landmark stays fixed
+ *   retrieve — lights stay OUT / landmark hidden; success requires memory
  *
  * Scores distinguish:
  *   - blindness (optic pools never respond during encode)
  *   - motor failure (leg MNs / displacement dead)
- *   - memory_heading (senses + walks but post-yaw approach ≤ chance) ← interesting
+ *   - memory_heading (senses + walks but post-yaw dark approach ≤ chance) ← interesting
  *
  * North star: tiny thought, not a twitch. Lesions on LIF path only.
  * MN-only body; no thrusters.
@@ -14,9 +20,9 @@ import { lesionSummary, normalizeLesion } from "../lesion.js";
 import { portableControls } from "../controller/portable.js";
 
 export const ASSAY_DEFAULTS = {
-  durationSec: 22,
-  encodeSec: 7,
-  darkSec: 2.5,
+  durationSec: 32,
+  encodeSec: 12,
+  darkSec: 3,
   rotateRad: Math.PI,
   targetR: 6.5,
   spawnR: 2.2,
@@ -25,8 +31,9 @@ export const ASSAY_DEFAULTS = {
   motorDispMin: 0.9,
   motorLegMin: 0.03,
   sensoryOpticMin: 0.03,
-  chanceApproach: 0.12,
+  chanceApproach: 0.08,
   taskMargin: 0.04,
+  darkRetrieve: true,
 };
 
 /**
@@ -39,7 +46,6 @@ export function placeVisualTarget(arena, odors, angle = ASSAY_DEFAULTS.spawnAng,
   const food = arena?.userData?.food;
   if (food?.position) {
     food.position.set(x, food.position.y, z);
-    // Punch visual salience for the assay landmark.
     food.traverse?.((o) => {
       if (!o.isMesh || !o.material) return;
       const m = o.material;
@@ -52,21 +58,24 @@ export function placeVisualTarget(arena, odors, angle = ASSAY_DEFAULTS.spawnAng,
         m.emissiveIntensity = 1.35;
       }
     });
-    // Tall beacon child so eyes resolve above floor clutter.
-    if (!food.userData.assayBeacon && food.parent) {
-      // beacon attached in ensureAssayLandmark
-    }
   }
   return { x, z, angle, r };
 }
 
 export function ensureAssayLandmark(arena) {
-  // Beacon is created in createArena(); this just repositions/refreshes salience.
   return arena?.userData?.food?.userData?.assayBeacon || null;
 }
 
+/** Hide/show landmark for dark-retrieve (no visual reacquisition). */
+export function setLandmarkVisible(arena, visible) {
+  const food = arena?.userData?.food;
+  if (!food) return;
+  food.visible = !!visible;
+  const beacon = food.userData?.assayBeacon;
+  if (beacon) beacon.visible = !!visible;
+}
+
 export function setAssayLights(keyLight, ambient, lightsOn, opts = {}) {
-  const day = lightsOn ? 1 : 0.04;
   if (keyLight) {
     if (keyLight.userData._assayBaseInt == null) keyLight.userData._assayBaseInt = keyLight.intensity;
     keyLight.intensity = lightsOn ? (keyLight.userData._assayBaseInt || 1.2) : 0.05;
@@ -75,9 +84,29 @@ export function setAssayLights(keyLight, ambient, lightsOn, opts = {}) {
     if (ambient.userData._assayBaseInt == null) ambient.userData._assayBaseInt = ambient.intensity;
     ambient.intensity = lightsOn ? (ambient.userData._assayBaseInt || 0.45) : 0.02;
   }
-  return day;
+  return lightsOn ? 1 : 0.04;
 }
 
+/**
+ * Reorient the animal in place. Landmark stays fixed (allocentric place unchanged).
+ * Old target-rotate path inflated post-yaw scores when fly sat between spawn and food.
+ */
+export function yawAnimal(fly, rad) {
+  if (!fly) return;
+  fly.heading = (fly.heading || 0) + rad;
+  if (fly.body?.rotation) fly.body.rotation.y = fly.heading;
+  // Keep MuJoCo plant in sync if present.
+  if (typeof fly.syncPhysicsYaw === "function") fly.syncPhysicsYaw();
+  else if (fly.physId && fly.body?.position) {
+    // best-effort: resetPose preserves x,z
+    if (typeof fly.resetPose === "function") {
+      fly.resetPose(fly.body.position.x, fly.body.position.z, fly.heading);
+    }
+  }
+  return fly;
+}
+
+/** @deprecated use yawAnimal — target rotate was visual-reacquisition biased */
 export function rotateWorld(arena, cameraKey, rad, target) {
   if (target) {
     const c = Math.cos(rad), s = Math.sin(rad);
@@ -113,7 +142,7 @@ export function bearingToTarget(fly, target) {
 }
 
 /**
- * Live trial: encode (lights on) → dark → yaw → retrieve (lights on).
+ * Live trial: encode (lights on) → dark → yaw animal → retrieve (DARK).
  */
 export class ApproachAssay {
   constructor(opts = {}) {
@@ -158,12 +187,14 @@ export class ApproachAssay {
     const ang = this.opts.spawnAng;
     this.target = placeVisualTarget(this.arena, null, ang, this.opts.targetR);
     ensureAssayLandmark(this.arena);
+    setLandmarkVisible(this.arena, true);
     setAssayLights(this.keyLight, this.ambient, true);
     this._dayOverride = 1;
     if (this.fly?.resetPose) {
       const sx = -Math.sin(ang) * this.opts.spawnR;
       const sz = -Math.cos(ang) * this.opts.spawnR;
-      this.fly.resetPose(sx, sz, ang + Math.PI);
+      // Face toward landmark (heading=ang); yaw phase will add π.
+      this.fly.resetPose(sx, sz, ang);
     }
     this.startPos = {
       x: this.fly.body.position.x,
@@ -178,8 +209,10 @@ export class ApproachAssay {
   stop() {
     this.active = false;
     this.phase = "idle";
+    setLandmarkVisible(this.arena, true);
     setAssayLights(this.keyLight, this.ambient, true);
     this._dayOverride = null;
+    if (this.fly?.day != null) this.fly.day = 1;
   }
 
   tick(dt) {
@@ -189,25 +222,39 @@ export class ApproachAssay {
     const darkAt = o.encodeSec;
     const yawAt = o.encodeSec + o.darkSec;
     const fly = this.fly;
+    const darkRetrieve = o.darkRetrieve !== false;
 
     // Phase machine
     if (this.phase === "encode" && this.t >= darkAt) {
       this.phase = "dark";
       setAssayLights(this.keyLight, this.ambient, false);
+      setLandmarkVisible(this.arena, false);
       this._dayOverride = 0.04;
-      // Force eye day dim via fly if exposed
       if (fly.day != null) fly.day = 0.04;
     }
     if (!this.rotated && this.t >= yawAt) {
       this.preRotateDist = distToTarget(fly, this.target);
-      rotateWorld(this.arena, this.keyLight, o.rotateRad, this.target);
+      // Reorient animal; landmark stays put (no target jump artifact).
+      yawAnimal(fly, o.rotateRad);
       this.rotated = true;
       this.phase = "retrieve";
-      setAssayLights(this.keyLight, this.ambient, true);
-      this._dayOverride = 1;
-      if (fly.day != null) fly.day = 1;
+      // DARK retrieve — no lights, landmark stays hidden.
+      if (darkRetrieve) {
+        setAssayLights(this.keyLight, this.ambient, false);
+        setLandmarkVisible(this.arena, false);
+        this._dayOverride = 0.04;
+        if (fly.day != null) fly.day = 0.04;
+      } else {
+        setAssayLights(this.keyLight, this.ambient, true);
+        setLandmarkVisible(this.arena, true);
+        this._dayOverride = 1;
+        if (fly.day != null) fly.day = 1;
+      }
       this.postRotateDist = distToTarget(fly, this.target);
     }
+
+    // Keep day override applied during assay (app.js may fight it).
+    if (this._dayOverride != null && fly.day != null) fly.day = this._dayOverride;
 
     const d = distToTarget(fly, this.target);
     const e = fly.motEma || {};
@@ -234,13 +281,17 @@ export class ApproachAssay {
       x: px,
       z: pz,
       heading: fly.heading,
+      lightsOn: this.phase === "encode",
     });
 
     if (this.t >= o.durationSec) {
       this.result = this.score();
       this.active = false;
       this.phase = "done";
+      setLandmarkVisible(this.arena, true);
       setAssayLights(this.keyLight, this.ambient, true);
+      if (fly.day != null) fly.day = 1;
+      this._dayOverride = null;
       if (this.onComplete) this.onComplete(this.result);
       return this.result;
     }
@@ -258,10 +309,12 @@ export class ApproachAssay {
     const approachFrac = startPost > 1e-3
       ? Math.max(0, (startPost - endPost) / startPost)
       : 0;
+    const postRotateApproach = approachFrac;
     const enc = this.samples.filter((s) => s.phase === "encode");
     const encodeApproach = enc.length > 1
       ? Math.max(0, (enc[0].dist - enc[enc.length - 1].dist) / (enc[0].dist + 1e-6))
       : 0;
+    const encodeLocked = encodeApproach > 0.05;
     const reached = final.dist <= o.approachRadius;
     const motorOK =
       this.displacement >= o.motorDispMin ||
@@ -284,6 +337,8 @@ export class ApproachAssay {
       encodeSec: o.encodeSec,
       darkSec: o.darkSec,
       rotateRad: o.rotateRad,
+      yawMode: "animal_heading",
+      darkRetrieve: o.darkRetrieve !== false,
       target: { ...this.target },
       metrics: {
         finalDist: final.dist,
@@ -291,16 +346,20 @@ export class ApproachAssay {
         postRotateStartDist: startPost,
         postRotateEndDist: endPost,
         approachFrac,
+        postRotateApproach,
         encodeApproach,
+        encodeLocked,
         chanceApproach: o.chanceApproach,
         displacement: this.displacement,
         opticPeak: this.opticPeak,
         reached,
         motorOK,
         sensoryOK,
+        seeOK: sensoryOK,
         taskOK,
         betterThanChance,
         encodeSaw: this.encodeSaw,
+        darkRetrieve: o.darkRetrieve !== false,
       },
       failure,
       interesting,
@@ -310,7 +369,7 @@ export class ApproachAssay {
         descending: ctrl.descending,
       },
       nSamples: this.samples.length,
-      dish: "browser_assay_v1_see_remember_reorient_retrieve",
+      dish: "browser_assay_v2_dark_retrieve",
     };
   }
 }

@@ -25,7 +25,9 @@ import mujoco as mj
 
 # Three.js dish: x right, y up, z forward. MuJoCo NeuroMechFly: x forward, y left, z up.
 # three (x, y, z) <-> mujoco (z, -x, y)
-ARENA_R = 17.4
+ARENA_R = 17.4  # legacy dish; walls omitted in open world
+OPEN_WORLD = True
+WORLD_SOFT_LIMIT = 2400.0  # sanity only — not a playable rim
 FLY_CEILING = 5.8
 SPAWN_Z = 0.55
 VISUAL_THORAX_Y = 1.18  # fly.js body.position.y inside the outer group
@@ -129,7 +131,7 @@ def quat_yaw_pitch_roll(w: float, x: float, y: float, z: float) -> tuple[float, 
 
 
 def _add_dish(world: FlatGroundWorld) -> list:
-    """Perch + ring wall. Extra contact pairs are attached after each fly."""
+    """Spawn-perch only. Open world: no ring wall — fly may roam the flat ground."""
     extras = []
     mx, my, _ = three_to_mj(PERCH["three_x"], PERCH["three_z"], 0.0)
     pole = world.mjcf_root.worldbody.add_geom(
@@ -151,24 +153,26 @@ def _add_dish(world: FlatGroundWorld) -> list:
         conaffinity=0,
     )
     extras.extend([pole, cap])
-    n = 20
-    half = math.pi * ARENA_R / n
-    for i in range(n):
-        a = 2.0 * math.pi * i / n
-        hx, hy = ARENA_R * math.cos(a), ARENA_R * math.sin(a)
-        q = yaw_to_quat(a + math.pi / 2)
-        extras.append(
-            world.mjcf_root.worldbody.add_geom(
-                type=GEOM_TYPES["box"],
-                name=f"wall{i}",
-                size=(0.35, half, 2.2),
-                pos=(hx, hy, 2.2),
-                quat=q,
-                rgba=(0.22, 0.25, 0.3, 0.4),
-                contype=0,
-                conaffinity=0,
+    # Intentionally no ARENA_R ring walls when OPEN_WORLD — MuJoCo ground is unbounded flat.
+    if not OPEN_WORLD:
+        n = 20
+        half = math.pi * ARENA_R / n
+        for i in range(n):
+            a = 2.0 * math.pi * i / n
+            hx, hy = ARENA_R * math.cos(a), ARENA_R * math.sin(a)
+            q = yaw_to_quat(a + math.pi / 2)
+            extras.append(
+                world.mjcf_root.worldbody.add_geom(
+                    type=GEOM_TYPES["box"],
+                    name=f"wall{i}",
+                    size=(0.35, half, 2.2),
+                    pos=(hx, hy, 2.2),
+                    quat=q,
+                    rgba=(0.22, 0.25, 0.3, 0.4),
+                    contype=0,
+                    conaffinity=0,
+                )
             )
-        )
     return extras
 
 
@@ -210,7 +214,7 @@ class Body:
     born: float = field(default_factory=time.time)
 
 
-# Soft dish limit: keep thorax inside with slack so flies don't glue to the rim.
+# Soft dish limit (legacy). Open world uses WORLD_SOFT_LIMIT sanity only.
 ARENA_SOFT = ARENA_R - 1.8
 ARENA_EPS = 0.08
 MAX_BODIES = 8
@@ -372,6 +376,8 @@ class Plant:
             flies = {k: self._snapshot(v) for k, v in self.bodies.items()}
         return {
             "ok": True,
+            "open_world": OPEN_WORLD,
+            "world_soft_limit": WORLD_SOFT_LIMIT,
             "engine": "mujoco+neuromechfly",
             "timestep": self.timestep,
             "n": len(flies),
@@ -494,31 +500,25 @@ class Plant:
         return self._snapshot(body)
 
     def _contain(self, body: Body) -> None:
-        """Soft inward push — reflect velocity, place at limit-ε; never pin on rim."""
+        """Open world: no XY cage. Sanity soft-limit far out; still clamp Z ceiling/floor."""
         d = body.sim.mj_data
         th = d.xpos[body.thorax_bodyid]
         mx, my, mz = float(th[0]), float(th[1]), float(th[2])
         adr = body.free_qposadr
         dadr = body.free_dofadr
-        limit = ARENA_SOFT
-        r = math.hypot(mx, my)
         dirty = False
+        limit = WORLD_SOFT_LIMIT if OPEN_WORLD else ARENA_SOFT
+        r = math.hypot(mx, my)
         if r > limit and r > 1e-6:
             nx, ny = mx / r, my / r
-            # Place just inside the soft limit (ε slack) so they bounce off, not glue.
             target = max(0.0, limit - ARENA_EPS)
             d.qpos[adr] += nx * target - mx
             d.qpos[adr + 1] += ny * target - my
-            # Reflect outward radial velocity inward (keep tangential).
             vx, vy = float(d.qvel[dadr]), float(d.qvel[dadr + 1])
             outward = vx * nx + vy * ny
             if outward > 0:
                 d.qvel[dadr] = vx - 2.0 * outward * nx
                 d.qvel[dadr + 1] = vy - 2.0 * outward * ny
-            else:
-                # Still nudge a little inward so they don't re-hit next frame.
-                d.qvel[dadr] -= 0.15 * nx
-                d.qvel[dadr + 1] -= 0.15 * ny
             dirty = True
         if mz > FLY_CEILING:
             d.qpos[adr + 2] += FLY_CEILING - mz

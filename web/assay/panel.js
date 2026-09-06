@@ -20,7 +20,7 @@ export function mountAssayPanel({
     <button class="collapse" type="button" title="collapse">–</button>
     <div class="kicker">assay · lesion</div>
     <div class="panel-body">
-      <div class="hint">See landmark → lights out → world yaw → retrieve. Lesions hit LIF, not joints. MN-only body.</div>
+      <div class="hint">See landmark → lights out → yaw animal → DARK retrieve (memory). Lesions hit LIF, not joints. MN-only body.</div>
       <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
         <button type="button" id="assayRun">run trial</button>
         <button type="button" id="assaySilenceHS">silence HS</button>

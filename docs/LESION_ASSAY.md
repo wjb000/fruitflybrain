@@ -100,15 +100,19 @@ fly.clearLesion();
 Worker accepts `{ type: "lesion", lesion: { id, ops }, clear: true }` with ops already resolved to `ids` / `fromIds` / `toIds` (the agent does name→id resolution).
 
 
-## Dish v1 (calm2) — see → dark → yaw → retrieve
+## Dish v2 — see → dark → yaw animal → dark-retrieve
 
 Headless: `tools/lib/assay_dish.mjs` + `tools/sweep_lesions.mjs`  
-Browser: `web/assay/assay.js` (lights-out mid-trial, stable spawn, bright beacon landmark)
+Browser: `web/assay/assay.js` (stable spawn, bright beacon, landmark hidden after encode)
 
-Phases: **encode** (lights on) → **dark** → **yaw** (π world rotate) → **retrieve** (lights on).
+Phases: **encode** (lights on, long enough to lock-on) → **dark** → **yaw** (π **animal** heading; landmark fixed) → **retrieve** (**lights out / landmark hidden**).
 
-Scoring: `blindness` | `motor` | `memory_heading` (walk+see, post-yaw ≤ chance) | ok.
+Scoring: `blindness` | `motor` | `memory_heading` (walk+see, post-yaw dark approach ≤ chance) | ok.
 
-Baseline runner: `node tools/baseline_intact.mjs [N]` → `results/lesion_sweeps/baseline_intact_dish_v1.json`
+Metrics: `encodeApproach`, `postRotateApproach`, `chanceFloor`, `motorOK`, `seeOK`, `taskOK` under dark retrieve.
 
-**Honest limit:** retrieve has lights on, so intact success can be **visual reacquisition after reorientation**, not proven allocentric memory. Treat lesion hits as **candidate wires for follow-up**, not “memory cells.”
+Baseline: `node tools/baseline_intact.mjs [N]` → `results/lesion_sweeps/baseline_intact_dish_v2_dark.json`
+
+**Why yaw the animal (not the food):** rotating the landmark past the fly used to shrink distance without locomotion and let lights-on retrieve succeed by reacquisition. Fixed landmark + dark retrieve requires memory of bearing/place.
+
+**Honest limit:** headless LIF+MN tank-steer is still not full browser eye + MuJoCo. Wire-hunting waits until intact dark-retrieve is clearly above chance with non-zero encode lock-on.

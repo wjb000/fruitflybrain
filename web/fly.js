@@ -461,6 +461,7 @@ export function wanderFemale(female, dt, t) {
   stepLife(female, dt, t, { mode: "rest", walk: 0, turn: 0, muscle: {} });
 }
 
+/** @deprecated Prefer createOpenWorld() from world/procgen.js — dish cage retired. */
 export function createArena() {
   const g = new THREE.Group();
   const chk = document.createElement("canvas");

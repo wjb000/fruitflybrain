@@ -1,0 +1,938 @@
+{
+  "summary": {
+    "dish": "dish_v2_dark_retrieve",
+    "n": 16,
+    "darkRetrieve": true,
+    "yawMode": "animal_heading",
+    "chanceFloor": 0.08,
+    "chanceProbeApproach": 0,
+    "nMotorOK": 16,
+    "nSensoryOK": 16,
+    "nSeeOK": 16,
+    "nTaskOK": 0,
+    "nEncodeLocked": 16,
+    "successRate": 0,
+    "successRateAmongWalkAndSee": 0,
+    "meanApproachFrac": 0,
+    "meanPostRotateApproach": 0,
+    "meanEncodeApproach": 0.2803052525504989,
+    "meanDisplacement": 2.5128472962790624,
+    "aboveChance": false,
+    "readyForWireHunt": false,
+    "readyReason": "Dark-retrieve not clearly above chance and/or encodeApproach still weak — not ready to claim memory wires. Browser/MuJoCo eye still the gold plant check.",
+    "caveat": "Headless LIF dish proxy — not full browser eye/MuJoCo. Dark retrieve forbids visual reacquisition.",
+    "honestVerdict": "dark_retrieve_baseline_not_ready_for_wire_hunt",
+    "failures": {
+      "blindness": 0,
+      "motor": 0,
+      "memory_heading": 16,
+      "ok": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "intact-0",
+      "lesion": {
+        "id": "intact-0",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.844926509025553,
+        "postRotateStartDist": 6.844926509025553,
+        "postRotateEndDist": 6.844926509025553,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.21166430065981098,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 1.856665541559843,
+        "opticPeak": 0.9902121474060924,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9902121474060924,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-1",
+      "lesion": {
+        "id": "intact-1",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 0.9500000000000001
+          }
+        ]
+      },
+      "lesionSummary": "hunger(0.9500000000000001)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 4.932102726096231,
+        "postRotateStartDist": 4.932102726096231,
+        "postRotateEndDist": 4.932102726096231,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.41160960222874554,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 3.788482105955339,
+        "opticPeak": 1.1179624733073972,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 1.1179624733073972,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-2",
+      "lesion": {
+        "id": "intact-2",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.987796079840183,
+        "postRotateStartDist": 5.987796079840183,
+        "postRotateEndDist": 5.987796079840183,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.3117475411968133,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.714541346907727,
+        "opticPeak": 0.9933138381936459,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9933138381936459,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-3",
+      "lesion": {
+        "id": "intact-3",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 1.05
+          }
+        ]
+      },
+      "lesionSummary": "hunger(1.05)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.376240285740123,
+        "postRotateStartDist": 6.376240285740123,
+        "postRotateEndDist": 6.376240285740123,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.2670987870300103,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.3265565087910733,
+        "opticPeak": 0.9918298212086698,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9918298212086698,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-4",
+      "lesion": {
+        "id": "intact-4",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 7.196106294707565,
+        "postRotateStartDist": 7.196106294707565,
+        "postRotateEndDist": 7.196106294707565,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.1728613255667941,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 1.5099604395637451,
+        "opticPeak": 0.9887971135024093,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9887971135024093,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-5",
+      "lesion": {
+        "id": "intact-5",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 0.9
+          }
+        ]
+      },
+      "lesionSummary": "hunger(0.9)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.90155914860152,
+        "postRotateStartDist": 6.90155914860152,
+        "postRotateEndDist": 6.90155914860152,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.20671731548059355,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 1.8010540691549524,
+        "opticPeak": 0.9900864997753913,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9900864997753913,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-6",
+      "lesion": {
+        "id": "intact-6",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.235452060413278,
+        "postRotateStartDist": 6.235452060413278,
+        "postRotateEndDist": 6.235452060413278,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.28328133980521625,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.4679833205160837,
+        "opticPeak": 0.9922663138370184,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9922663138370184,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-7",
+      "lesion": {
+        "id": "intact-7",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 1
+          }
+        ]
+      },
+      "lesionSummary": "hunger(1)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.739858399162472,
+        "postRotateStartDist": 5.739858399162472,
+        "postRotateEndDist": 5.739858399162472,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.333901635152093,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.984020550626848,
+        "opticPeak": 0.9930600272999356,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9930600272999356,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-8",
+      "lesion": {
+        "id": "intact-8",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.972648594312885,
+        "postRotateStartDist": 5.972648594312885,
+        "postRotateEndDist": 5.972648594312885,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.3134886312871821,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.7314848129521008,
+        "opticPeak": 0.9933591270755807,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9933591270755807,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-9",
+      "lesion": {
+        "id": "intact-9",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 1.1
+          }
+        ]
+      },
+      "lesionSummary": "hunger(1.1)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.006440466781075,
+        "postRotateStartDist": 6.006440466781075,
+        "postRotateEndDist": 6.006440466781075,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.220067324926466,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.6974145384106456,
+        "opticPeak": 0.9899992562940577,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9899992562940577,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-10",
+      "lesion": {
+        "id": "intact-10",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.8246601822539725,
+        "postRotateStartDist": 5.8246601822539725,
+        "postRotateEndDist": 5.8246601822539725,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.3304987916376133,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.8892869441123845,
+        "opticPeak": 0.9935512823751238,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9935512823751238,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-11",
+      "lesion": {
+        "id": "intact-11",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 0.9500000000000001
+          }
+        ]
+      },
+      "lesionSummary": "hunger(0.9500000000000001)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.956291871615348,
+        "postRotateStartDist": 5.956291871615348,
+        "postRotateEndDist": 5.956291871615348,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.3153687141397629,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.763703032938506,
+        "opticPeak": 0.9932570493486431,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9932570493486431,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-12",
+      "lesion": {
+        "id": "intact-12",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 5.659013781276754,
+        "postRotateStartDist": 5.659013781276754,
+        "postRotateEndDist": 5.659013781276754,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.3495386056534069,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 3.0505310437915067,
+        "opticPeak": 0.993992720586383,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.993992720586383,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-13",
+      "lesion": {
+        "id": "intact-13",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 1.05
+          }
+        ]
+      },
+      "lesionSummary": "hunger(1.05)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.529083921030234,
+        "postRotateStartDist": 6.529083921030234,
+        "postRotateEndDist": 6.529083921030234,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.24953055510795522,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.171977363096251,
+        "opticPeak": 0.991526773750555,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.991526773750555,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-14",
+      "lesion": {
+        "id": "intact-14",
+        "ops": []
+      },
+      "lesionSummary": "none",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.466153069852107,
+        "postRotateStartDist": 6.466153069852107,
+        "postRotateEndDist": 6.466153069852107,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.25676398544642615,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.2457272159016184,
+        "opticPeak": 0.9915126658526793,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9915126658526793,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    },
+    {
+      "id": "intact-15",
+      "lesion": {
+        "id": "intact-15",
+        "ops": [
+          {
+            "op": "hunger",
+            "level": 0.9
+          }
+        ]
+      },
+      "lesionSummary": "hunger(0.9)",
+      "dish": {
+        "version": "dish_v2_dark_retrieve",
+        "encodeTicks": 100,
+        "darkTicks": 12,
+        "retrieveTicks": 80,
+        "rotateRad": 3.141592653589793,
+        "yawMode": "animal_heading",
+        "darkRetrieve": true,
+        "spawnAng": 1.0995574287564276,
+        "targetR": 6.5,
+        "chanceApproach": 0.08
+      },
+      "metrics": {
+        "finalDist": 6.518513155499315,
+        "postRotateStartDist": 6.518513155499315,
+        "postRotateEndDist": 6.518513155499315,
+        "approachFrac": 0,
+        "postRotateApproach": 0,
+        "encodeApproach": 0.2507455854890918,
+        "encodeLocked": true,
+        "chanceApproach": 0.08,
+        "displacement": 2.2061679061863706,
+        "opticPeak": 0.9911269907016553,
+        "reached": false,
+        "motorOK": true,
+        "sensoryOK": true,
+        "seeOK": true,
+        "taskOK": false,
+        "betterThanChance": false,
+        "encodeSaw": true,
+        "darkRetrieve": true
+      },
+      "failure": "memory_heading",
+      "interesting": true,
+      "portable": {
+        "steering": {
+          "forward": 0,
+          "yawRate": 0
+        },
+        "vision": {
+          "opticPeak": 0.9911269907016553,
+          "encodeSaw": true
+        }
+      },
+      "ticks": 192,
+      "rotateAt": 112
+    }
+  ]
+}

@@ -1,15 +1,17 @@
 /**
- * Clean see → remember → reorient → retrieve dish (headless).
+ * Dish v2 — see → remember → dark/reorient → dark-retrieve (headless).
  *
  * Phases:
- *   encode   — lights ON, distinct landmark visible, fly can approach
- *   dark     — lights OUT (vision drive 0); network state may persist
- *   yaw      — world/target rotates (allocentric reorientation)
- *   retrieve — lights ON again; score post-yaw approach
+ *   encode   — lights ON, landmark visible; fly may approach/fix
+ *   dark     — lights OUT; vision drive 0; network state may persist
+ *   yaw      — reorient the ANIMAL (heading += π); landmark stays fixed
+ *   retrieve — lights stay OUT / landmark hidden; score approach from memory
+ *
+ * Honest rule: post-yaw success with lights out requires memory of bearing/place,
+ * not visual reacquisition. No ground-truth bearing cheat into the body.
  *
  * Vision: retinotopic L/R landmark channels from geometry (resolvable blob).
- * Steering: MN L/R tank-steer + HS_L/R optic contribution — NO ground-truth
- *           bearing cheat into the body.
+ * Steering: MN L/R tank-steer + HS_L/R optic (lights-on only) — MN-only body.
  * Arena: soft wall so rim-pile does not dominate scores.
  * Spawn: fixed pose (stable across lesions).
  *
@@ -24,21 +26,23 @@ export const DISH = {
   spawnR: 2.2,
   spawnAng: Math.PI * 0.35, // fixed
   approachRadius: 2.2,
-  encodeTicks: 36,
-  darkTicks: 8,
-  retrieveTicks: 64,
+  // Long enough that intact can lock-on / approach during encode when vision→MN works.
+  encodeTicks: 100,
+  darkTicks: 12,
+  retrieveTicks: 80,
   rotateRad: Math.PI,
   dtBody: 0.05,
   stepsPerTick: 8,
   motorDispMin: 0.55,
   motorLegMin: 0.025,
   sensoryOpticMin: 0.025,
-  // Empirical floor: random-ish walk approach after yaw (calibrated in sweep).
-  chanceApproach: 0.10,
-  // Must beat chance by this margin AND preferably near control.
+  // Dark-retrieve chance floor (random walk after yaw); calibrated by probe.
+  chanceApproach: 0.08,
   taskMargin: 0.04,
   landmarkContrast: 1.0,
-  landmarkSize: 1.35, // angular half-width proxy
+  landmarkSize: 1.35,
+  // Retrieve with lights out (true memory). Set false only for legacy reacquisition.
+  darkRetrieve: true,
 };
 
 /** Split pool neuron ids by brain x (L = x<0, R = x>=0). */
@@ -63,7 +67,7 @@ export function soft(hz) {
  */
 export function landmarkEye(fly, target, lightsOn, opts = DISH) {
   if (!lightsOn) {
-    return { L: 0, R: 0, optic: 0, bearing: 0, loom: 0, onRetina: false };
+    return { L: 0, R: 0, optic: 0, bearing: 0, loom: 0, onRetina: false, dist: Math.hypot(target.x - fly.x, target.z - fly.z) };
   }
   const dx = target.x - fly.x;
   const dz = target.z - fly.z;
@@ -73,7 +77,6 @@ export function landmarkEye(fly, target, lightsOn, opts = DISH) {
   const bearing = Math.atan2(dx * c - dz * s, dx * s + dz * c);
   const loom = Math.max(0, 1.15 - dist / 9);
   const half = opts.landmarkSize;
-  // Each eye covers ~hemifield with peak in ipsilateral view; Gaussian-ish.
   const onRetina = Math.abs(bearing) < 1.45;
   const bright = opts.landmarkContrast * (75 + loom * 90);
   const L = onRetina
@@ -82,7 +85,6 @@ export function landmarkEye(fly, target, lightsOn, opts = DISH) {
   const R = onRetina
     ? bright * Math.exp(-((bearing - 0.55) ** 2) / (2 * (half * 0.55) ** 2))
     : 2;
-  // Wide-field HS-like: stronger when landmark sweeps / is offset ahead.
   const optic = (L + R) * 0.5;
   return { L, R, optic, bearing, loom, onRetina, dist };
 }
@@ -110,10 +112,12 @@ export function makeSpawn(opts = DISH) {
   return {
     x: -Math.sin(ang) * opts.spawnR,
     z: -Math.cos(ang) * opts.spawnR,
-    heading: ang + Math.PI, // face toward target at start
+    // step uses (sin(h), cos(h)); target lies along +ang from spawn → heading=ang
+    heading: ang,
   };
 }
 
+/** @deprecated target-rotate inflated post-yaw scores; yaw the animal instead. */
 export function rotateTarget(target, rad) {
   const c = Math.cos(rad), s = Math.sin(rad);
   const x = target.x * c - target.z * s;
@@ -122,6 +126,12 @@ export function rotateTarget(target, rad) {
   target.z = z;
   target.ang = Math.atan2(x, z);
   return target;
+}
+
+/** Reorient the animal (idiothetic yaw); landmark stays fixed in world frame. */
+export function yawAnimal(pose, rad) {
+  pose.heading = (pose.heading || 0) + rad;
+  return pose;
 }
 
 /**
@@ -143,7 +153,6 @@ export function bindDishChannels(engine, poolMap) {
     HS_R: hsLR.R,
     VS_L: vsLR.L,
     VS_R: vsLR.R,
-    // keep wholes for neuromod/chemotaxis dials
     vision,
     HS,
     VS,
@@ -172,7 +181,8 @@ export function bindDishChannels(engine, poolMap) {
 export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesionSummary, opts = {}) {
   const D = { ...DISH, ...opts };
   const totalTicks = D.encodeTicks + D.darkTicks + D.retrieveTicks;
-  const yawAt = D.encodeTicks + D.darkTicks; // rotate at end of dark
+  const yawAt = D.encodeTicks + D.darkTicks; // reorient at end of dark
+  const darkRetrieve = D.darkRetrieve !== false;
 
   const ops = expandLesionOps(lesionCfg, poolMap);
   engine.reset();
@@ -186,6 +196,7 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
   let displacement = 0;
   let lx = x, lz = z;
   let encodeSaw = false;
+  let encodeLocked = false; // approached during encode
   const samples = [];
 
   for (let tick = 0; tick < totalTicks; tick++) {
@@ -197,17 +208,17 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
     } else if (tick === yawAt) {
       phase = "yaw";
       lightsOn = false;
-      rotateTarget(target, D.rotateRad);
+      // Reorient animal; landmark FIXED (allocentric place unchanged).
+      heading += D.rotateRad;
     } else if (tick > yawAt) {
       phase = "retrieve";
-      lightsOn = true;
+      lightsOn = darkRetrieve ? false : true;
     }
 
     const eye = landmarkEye({ x, z, heading }, target, lightsOn, D);
-    if (eye.onRetina && lightsOn) encodeSaw = true;
-    if (eye.optic > opticPeak) opticPeak = soft(eye.optic); // peak proxy pre-LIF too
+    if (eye.onRetina && lightsOn && phase === "encode") encodeSaw = true;
+    if (eye.optic > opticPeak) opticPeak = soft(eye.optic);
 
-    // Drive L/R retina → vision / HS / VS channels (geometry only when lights on).
     const food = lightsOn ? 8 + eye.loom * 18 : 0;
     engine.setRates({
       visionL: eye.L,
@@ -228,17 +239,19 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
     const legsL = soft(((hz.T1L || 0) + (hz.T2L || 0) + (hz.T3L || 0)) / 3);
     const legsR = soft(((hz.T1R || 0) + (hz.T2R || 0) + (hz.T3R || 0)) / 3);
     const legs = (legsL + legsR) / 2;
-    const walk = Math.tanh(legs * 3.4);
 
-    // Steering from MN asymmetry + HS_L/R optic (LIF-readout), NOT GT bearing.
     const hsL = soft(hz.HS_L || 0);
     const hsR = soft(hz.HS_R || 0);
     const opticRead = hsL + hsR + soft(hz.VS_L || 0) + soft(hz.VS_R || 0);
     if (opticRead > opticPeak) opticPeak = opticRead;
 
+    // Walk from MN legs; mild optic arousal when lights on (LIF HS/VS readout, not GT).
+    const walk = Math.tanh(legs * 3.4 + (lightsOn ? opticRead * 0.4 : 0));
+
+    // Steering: MN asymmetry + HS only while landmark is visible.
     const turn =
       Math.tanh((legsR - legsL) * 2.15) +
-      Math.tanh((hsR - hsL) * 1.35) * (lightsOn ? 1 : 0.15);
+      Math.tanh((hsR - hsL) * 1.35) * (lightsOn ? 1 : 0.05);
 
     heading += turn * 1.15 * D.dtBody;
     const step = walk * 3.1 * D.dtBody;
@@ -247,7 +260,6 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
     const push = wallPush(nx, nz, D);
     nx += push.ax * D.dtBody;
     nz += push.az * D.dtBody;
-    // hard clamp inside arena
     const rr = Math.hypot(nx, nz);
     if (rr > D.arenaR) {
       nx *= D.arenaR / rr;
@@ -257,12 +269,13 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
     displacement += Math.hypot(x - lx, z - lz);
     lx = x; lz = z;
 
+    const dist = Math.hypot(target.x - x, target.z - z);
     samples.push({
       t: tick * D.dtBody,
       tick,
       phase,
       lightsOn,
-      dist: Math.hypot(target.x - x, target.z - z),
+      dist,
       legs,
       walk,
       turn,
@@ -270,6 +283,9 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
       eyeL: eye.L,
       eyeR: eye.R,
       bearing: eye.bearing,
+      x,
+      z,
+      heading,
     });
   }
 
@@ -277,6 +293,7 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
   const startPost = after[0]?.dist ?? samples[0].dist;
   const endPost = after.at(-1)?.dist ?? samples.at(-1).dist;
   const approachFrac = startPost > 1e-3 ? Math.max(0, (startPost - endPost) / startPost) : 0;
+  const postRotateApproach = approachFrac;
   const reached = endPost <= D.approachRadius;
   const motorOK = displacement >= D.motorDispMin || (samples.at(-1)?.legs ?? 0) >= D.motorLegMin;
   const sensoryOK = opticPeak >= D.sensoryOpticMin && encodeSaw;
@@ -288,22 +305,24 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
   else if (!taskOK) failure = "memory_heading";
   const interesting = sensoryOK && motorOK && !taskOK;
 
-  // Encode quality: did fly reduce distance during encode (pre-dark)?
   const enc = samples.filter((s) => s.phase === "encode");
   const encodeApproach = enc.length > 1
     ? Math.max(0, (enc[0].dist - enc.at(-1).dist) / (enc[0].dist + 1e-6))
     : 0;
+  encodeLocked = encodeApproach > 0.05;
 
   return {
     id: lesionCfg.id,
     lesion: lesionCfg,
     lesionSummary: lesionSummary(lesionCfg),
     dish: {
-      version: "dish_v1_see_remember_reorient_retrieve",
+      version: "dish_v2_dark_retrieve",
       encodeTicks: D.encodeTicks,
       darkTicks: D.darkTicks,
       retrieveTicks: D.retrieveTicks,
       rotateRad: D.rotateRad,
+      yawMode: "animal_heading",
+      darkRetrieve,
       spawnAng: D.spawnAng,
       targetR: D.targetR,
       chanceApproach: D.chanceApproach,
@@ -313,16 +332,20 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
       postRotateStartDist: startPost,
       postRotateEndDist: endPost,
       approachFrac,
+      postRotateApproach,
       encodeApproach,
+      encodeLocked,
       chanceApproach: D.chanceApproach,
       displacement,
       opticPeak,
       reached,
       motorOK,
       sensoryOK,
+      seeOK: sensoryOK,
       taskOK,
       betterThanChance,
       encodeSaw,
+      darkRetrieve,
     },
     failure,
     interesting,
@@ -335,11 +358,19 @@ export function runDishAssay(engine, poolMap, lesionCfg, expandLesionOps, lesion
   };
 }
 
-/** Chance calibration: lights always on but landmark position jittered each tick (no stable memory). */
+/**
+ * Chance calibration for dark-retrieve: intact network, landmark fixed, animal yawed,
+ * retrieve in dark (no vision). Floor = random walk approach after reorientation.
+ */
 export function runChanceProbe(engine, poolMap, expandLesionOps, lesionSummary, opts = {}) {
-  // Use intact network but scramble target bearing every tick during retrieve
-  // by spinning target randomly — estimates floor for "no allocentric hold".
-  const D = { ...DISH, ...opts, darkTicks: 4, encodeTicks: 20, retrieveTicks: 40 };
+  const D = {
+    ...DISH,
+    ...opts,
+    darkTicks: 8,
+    encodeTicks: 40,
+    retrieveTicks: 60,
+    darkRetrieve: true,
+  };
   const lesionCfg = { id: "chance-probe", ops: [] };
   const ops = expandLesionOps(lesionCfg, poolMap);
   engine.reset();
@@ -352,20 +383,11 @@ export function runChanceProbe(engine, poolMap, expandLesionOps, lesionSummary, 
   const samples = [];
   const total = D.encodeTicks + D.darkTicks + D.retrieveTicks;
   const yawAt = D.encodeTicks + D.darkTicks;
-  let rng = 0xA5A5;
-  const rnd = () => {
-    rng = (rng * 1664525 + 1013904223) >>> 0;
-    return rng / 0xffffffff;
-  };
   for (let tick = 0; tick < total; tick++) {
-    let lightsOn = !(tick >= D.encodeTicks && tick < yawAt);
-    if (tick === yawAt) rotateTarget(target, Math.PI);
-    // scramble landmark during retrieve → destroys stable heading signal
-    if (tick > yawAt) {
-      const ang = rnd() * Math.PI * 2;
-      target.x = Math.sin(ang) * D.targetR;
-      target.z = Math.cos(ang) * D.targetR;
-    }
+    let lightsOn = tick < D.encodeTicks;
+    if (tick === yawAt) heading += D.rotateRad;
+    // Always dark after encode for chance floor (no reacquisition).
+    if (tick >= D.encodeTicks) lightsOn = false;
     const eye = landmarkEye({ x, z, heading }, target, lightsOn, D);
     engine.setRates({
       visionL: eye.L, visionR: eye.R, vision: (eye.L + eye.R) * 0.5,
@@ -381,11 +403,14 @@ export function runChanceProbe(engine, poolMap, expandLesionOps, lesionSummary, 
     const hz = engine.effectorHz(D.stepsPerTick);
     const legsL = soft(((hz.T1L || 0) + (hz.T2L || 0) + (hz.T3L || 0)) / 3);
     const legsR = soft(((hz.T1R || 0) + (hz.T2R || 0) + (hz.T3R || 0)) / 3);
-    const walk = Math.tanh(((legsL + legsR) / 2) * 2.9);
+    const legs = (legsL + legsR) / 2;
     const hsL = soft(hz.HS_L || 0), hsR = soft(hz.HS_R || 0);
     const opticRead = hsL + hsR + soft(hz.VS_L || 0) + soft(hz.VS_R || 0);
     if (opticRead > opticPeak) opticPeak = opticRead;
-    const turn = Math.tanh((legsR - legsL) * 2.15) + Math.tanh((hsR - hsL) * 1.35) * (lightsOn ? 1 : 0.15);
+    const walk = Math.tanh(legs * 3.4 + (lightsOn ? opticRead * 0.4 : 0));
+    const turn =
+      Math.tanh((legsR - legsL) * 2.15) +
+      Math.tanh((hsR - hsL) * 1.35) * (lightsOn ? 1 : 0.05);
     heading += turn * 1.15 * D.dtBody;
     const step = walk * 3.1 * D.dtBody;
     let nx = x + Math.sin(heading) * step;
@@ -397,24 +422,34 @@ export function runChanceProbe(engine, poolMap, expandLesionOps, lesionSummary, 
     x = nx; z = nz;
     displacement += Math.hypot(x - lx, z - lz);
     lx = x; lz = z;
-    samples.push({ tick, dist: Math.hypot(target.x - x, target.z - z), legs: (legsL + legsR) / 2 });
+    samples.push({
+      tick,
+      dist: Math.hypot(target.x - x, target.z - z),
+      legs,
+      phase: tick < D.encodeTicks ? "encode" : tick < yawAt ? "dark" : "retrieve",
+    });
   }
-  // Rescore against FIXED post-yaw target (true target after single yaw) — use spawn-opposite.
-  // For chance probe we scrambled; approachFrac vs last scrambled pos is meaningless.
-  // Instead report displacement-normalized null: fraction of retrieve ticks moving closer to
-  // a FIXED phantom at rotated spawn target.
-  const phantom = makeTarget(D);
-  rotateTarget(phantom, Math.PI);
   const retr = samples.filter((s) => s.tick >= yawAt);
-  // Recompute distances to phantom from stored positions — we didn't store x,z.
-  // Fallback: use approachFrac against scrambled target as noisy floor estimate.
   const startPost = retr[0]?.dist ?? 5;
   const endPost = retr.at(-1)?.dist ?? 5;
   const approachFrac = startPost > 1e-3 ? Math.max(0, (startPost - endPost) / startPost) : 0;
+  const enc = samples.filter((s) => s.phase === "encode");
+  const encodeApproach = enc.length > 1
+    ? Math.max(0, (enc[0].dist - enc.at(-1).dist) / (enc[0].dist + 1e-6))
+    : 0;
   return {
     id: "chance-probe",
-    lesionSummary: "chance-probe(scramble-landmark)",
-    metrics: { approachFrac, displacement, opticPeak, motorOK: displacement >= D.motorDispMin, sensoryOK: opticPeak >= D.sensoryOpticMin },
+    lesionSummary: "chance-probe(dark-retrieve-after-yaw)",
+    metrics: {
+      approachFrac,
+      postRotateApproach: approachFrac,
+      encodeApproach,
+      displacement,
+      opticPeak,
+      motorOK: displacement >= D.motorDispMin,
+      sensoryOK: opticPeak >= D.sensoryOpticMin,
+      darkRetrieve: true,
+    },
     failure: null,
     interesting: false,
   };

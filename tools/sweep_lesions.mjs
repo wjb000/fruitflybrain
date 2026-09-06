@@ -62,7 +62,7 @@ function rankRows(rows, controlApproach) {
 function main() {
   if (has("--help") || has("-h")) {
     console.log("Usage: node tools/sweep_lesions.mjs [--out FILE] [--config JSON] [--lesion FLAG]");
-    console.log("Dish: encode → dark → yaw → retrieve (L/R landmark eyes, MN+HS steer, soft walls)");
+    console.log("Dish: encode → dark → yaw animal → dark-retrieve (L/R landmark eyes, MN+HS steer, soft walls)");
     process.exit(0);
   }
 
@@ -73,7 +73,7 @@ function main() {
   const configs = loadConfigs();
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "").replace("T", "T").slice(0, 16) + "Z";
-  const outPath = arg("--out", path.join(ROOT, "results", "lesion_sweeps", `dish_v1_${stamp}.jsonl`));
+  const outPath = arg("--out", path.join(ROOT, "results", "lesion_sweeps", `dish_v2_${stamp}.jsonl`));
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
 
   const dishOpts = {
@@ -92,7 +92,7 @@ function main() {
   const rows = [];
   const fd = fs.openSync(outPath, "w");
   // write chance probe first
-  chance.dish = { version: "dish_v1_see_remember_reorient_retrieve", chanceFloor };
+  chance.dish = { version: "dish_v2_dark_retrieve", chanceFloor };
   fs.writeSync(fd, JSON.stringify(chance) + "\n");
   rows.push(chance);
 
@@ -151,7 +151,7 @@ function main() {
   const summaryPath = outPath.replace(/\.jsonl$/, "") + ".summary.json";
   fs.writeFileSync(rankPath, JSON.stringify(ranked, null, 2));
   const summary = {
-    dish: "dish_v1_see_remember_reorient_retrieve",
+    dish: "dish_v2_dark_retrieve",
     outPath,
     n: rows.length - 1,
     chanceFloor,

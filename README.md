@@ -1,6 +1,6 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) driving a NeuroMechFly body in a dish. The public sim is **male CNS only** (the more complete map). Female BANC data may still exist under `web/data/female/` / `prepare_banc.py` as a historical offline path — it is not loaded or offered in the UI.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) driving a NeuroMechFly body in an **open procedural world** (streaming chunks around the fly — no petri-dish cage). The public sim is **male CNS only** (the more complete map). Female BANC data may still exist under `web/data/female/` / `prepare_banc.py` as a historical offline path — it is not loaded or offered in the UI.
 
 Honest MN→body coupling (Dan Robinson bar): legs, wings, head, abdomen, and proboscis move **only** from measured motor-neuron rates. Quiet pools → quiet body. No cosmetic wing flapping, no scripted CPG gait, no free-joint walk/turn thrusters.
 
@@ -45,7 +45,7 @@ See `web/plantConfig.js`. The Docker image (`Dockerfile`) runs `serve.py --host 
 
 Closed loop:
 
-1. Light and odor in the dish drive the real sensory neurons.
+1. Light and odor from procedural landmarks drive the real sensory neurons.
 2. Spikes propagate through the connectome (LIF + short-term depression, fast EPSP vs slow neuromod).
 3. Descending + VNC **motor neurons** set leg/wing/head/abdomen/proboscis actuators.
 4. Locally **MuJoCo** (NeuroMechFly) is the flesh; on static hosts the flesh is kinematic MN→pose→stance-slip.
@@ -56,7 +56,7 @@ See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN�
 
 ## Lesion assay + portable controller
 
-Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw → retrieve** assay (bright beacon landmark), and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
+Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw animal → dark-retrieve** assay (bright beacon; memory, not reacquisition), and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
 
 Calm closed-loop: MN-only body drive (no thrusters). `calm2` lowers softDrive / joint spans / plant cartoon gain and raises flight gates.
 
@@ -68,5 +68,5 @@ node tools/baseline_intact.mjs 16
 node tools/sweep_lesions.mjs --lesion none --lesion 'silence:HS'
 ```
 
-Intact headless baseline scores live under `results/lesion_sweeps/`. Wire-hunting waits until browser/MuJoCo post-yaw approach is solid — headless success is visual reacquisition, not proven memory.
+Intact dark-retrieve baselines live under `results/lesion_sweeps/baseline_intact_dish_v2_dark.json`. Wire-hunting waits until intact post-yaw **dark** approach is clearly above chance with encode lock-on — lights-on reacquisition no longer counts.
 

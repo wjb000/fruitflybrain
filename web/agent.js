@@ -144,7 +144,9 @@ function gradedContact(dist, reach, peak = 100) {
   return peak * u * u;
 }
 
-const ARENA_R = 17.4;
+const ARENA_R = 17.4; // legacy dish radius — rim disabled for open world
+const OPEN_WORLD = true;
+const WORLD_SOFT_LIMIT = 2400; // sanity clip only
 const READOUT_POOLS = [
   // Optic / descending readouts for assay + portable controller (not muscles).
   "HS", "VS", "R16", "L1", "L2", "L3",
@@ -623,18 +625,13 @@ export class EmbodiedFly {
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
         : cmd.fly) * 0.7;
-      // Soft rim: bounce inward before exact ARENA_R so they don't park on the edge.
-      const softLim = ARENA_R - 1.6;
-      const rad = Math.hypot(this.body.position.x, this.body.position.z);
-      if (rad > softLim && rad > 1e-6) {
-        const nx = this.body.position.x / rad, nz = this.body.position.z / rad;
-        const target = softLim - 0.12;
-        this.body.position.x = nx * target;
-        this.body.position.z = nz * target;
-        const dx = Math.sin(this.heading), dz = Math.cos(this.heading);
-        const dot = dx * nx + dz * nz;
-        if (dot > 0) {
-          this.heading = Math.atan2(dx - 2 * dot * nx, dz - 2 * dot * nz);
+      // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
+      if (OPEN_WORLD) {
+        const rad = Math.hypot(this.body.position.x, this.body.position.z);
+        if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
+          const s = (WORLD_SOFT_LIMIT - 1) / rad;
+          this.body.position.x *= s;
+          this.body.position.z *= s;
         }
       }
       const perch = this.world.perch;
@@ -672,13 +669,11 @@ export class EmbodiedFly {
     this.heading = pose.yaw;
     this.y = pose.y;
     this.vy = 0;
-    // Visual soft limit matches plant ARENA_SOFT — don't re-pin on the exact rim.
-    const lim = ARENA_R - 1.8;
+    // Open world: trust MuJoCo XY; sanity clip only.
     let px = pose.x, pz = pose.z;
     const rad = Math.hypot(px, pz);
-    if (rad > lim && rad > 1e-6) {
-      const target = lim - 0.08;
-      const s = target / rad;
+    if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
+      const s = (WORLD_SOFT_LIMIT - 1) / rad;
       px *= s;
       pz *= s;
     }
@@ -825,11 +820,9 @@ export class EmbodiedFly {
     const ppk25R = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, bOth) * 0.22));
     const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
-    const radial = Math.hypot(x, z);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    // Soft wall contact: earlier onset, lower peak — avoid constant scream into escape MNs.
-    const wallProx = Math.max(0, radial - (ARENA_R - 3.2));
-    const wall = wallProx > 0 ? Math.min(28, 4 + wallProx * 10) : 0;
+    // Open world: no cage wall mechanosensation.
+    const wall = 0;
     const touch = wall + (grounded ? 8 + this.speedS * 24 : 3) + ppkBase * 0.12;
 
     const proprio = this.readProprio(wall, grounded);

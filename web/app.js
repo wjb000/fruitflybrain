@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly, createArena } from "./fly.js";
+import { loadNmf, createMaleFly } from "./fly.js";
+import { createOpenWorld } from "./world/procgen.js";
 import { EmbodiedFly } from "./agent.js";
 import { drawOmmatidia } from "./eye.js";
 import { OdorWorld } from "./plume.js";
@@ -52,7 +53,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 220);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 2500);
 camera.position.set(0, 8.5, 16);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -62,7 +63,7 @@ controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
 controls.minDistance = 0.8;
-controls.maxDistance = 70;
+controls.maxDistance = 180;
 controls.target.set(0, 0.7, 0);
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
@@ -88,12 +89,13 @@ key.position.set(8, 16, 10);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.camera.near = 1;
-key.shadow.camera.far = 50;
-key.shadow.camera.left = key.shadow.camera.bottom = -18;
-key.shadow.camera.right = key.shadow.camera.top = 18;
+key.shadow.camera.far = 120;
+key.shadow.camera.left = key.shadow.camera.bottom = -40;
+key.shadow.camera.right = key.shadow.camera.top = 40;
 scene.add(key);
 
-const arena = createArena();
+const procWorld = createOpenWorld();
+const arena = procWorld.root;
 scene.add(arena);
 const odors = new OdorWorld();
 odors.setShowOdor(false);
@@ -105,6 +107,8 @@ const worldShared = {
   bitter: arena.userData.bitter.position,
   perch: arena.userData.perch.userData,
   odors,
+  landmarks: [],
+  procedural: true,
 };
 
 const flies = [];
@@ -311,8 +315,11 @@ function onAny() {
   }
   if (focus.day != null) {
     const day = focus.day;
+    const fx = focus.body.position.x, fz = focus.body.position.z;
     key.intensity = 0.12 + day * 1.35;
-    key.position.set(Math.sin(day * Math.PI) * 14, 3 + day * 14, Math.cos(day * Math.PI) * 8);
+    key.position.set(fx + Math.sin(day * Math.PI) * 14, 3 + day * 14, fz + Math.cos(day * Math.PI) * 8);
+    key.target.position.set(fx, 0, fz);
+    if (!key.target.parent) scene.add(key.target);
     renderer.setClearColor(0x0b0d12, 1);
   }
   const focusMode = focus.life?.mode || "…";
@@ -326,7 +333,10 @@ function onAny() {
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
-  if ($("lifeHint")) $("lifeHint").textContent = flesh + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+  if ($("lifeHint")) {
+    const ps = procWorld.stats();
+    $("lifeHint").textContent = flesh + " · open world chunks " + ps.chunks + " @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+  }
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
   setW("slow-sleep", focus.life.sleep);
@@ -650,6 +660,23 @@ function loop() {
   lastT = now;
   if (!paused) {
     flushPhysics(dt);
+    const focusPos = (selected || flies[0])?.body?.position;
+    const wx = focusPos?.x ?? 0, wz = focusPos?.z ?? 0;
+    procWorld.update(wx, wz);
+    worldShared.food = arena.userData.food.position;
+    worldShared.water = arena.userData.water.position;
+    worldShared.bitter = arena.userData.bitter.position;
+    worldShared.perch = arena.userData.perch.userData;
+    worldShared.landmarks = procWorld.landmarksNear(wx, wz, 24);
+    for (const f of flies) {
+      if (f.world) {
+        f.world.food = worldShared.food;
+        f.world.water = worldShared.water;
+        f.world.bitter = worldShared.bitter;
+        f.world.perch = worldShared.perch;
+        f.world.landmarks = worldShared.landmarks;
+      }
+    }
     odors.step(dt, now * 0.001, {
       food: arena.userData.food.position,
       water: arena.userData.water.position,

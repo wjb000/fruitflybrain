@@ -6,6 +6,7 @@
 import * as THREE from "three";
 
 const ARENA_R = 17.4;
+const PUFF_MAX_R2 = 2400 * 2400; // open world — don't cull at dish rim
 const MAX_PUFFS = 560;
 
 function makeSprite() {
@@ -86,7 +87,7 @@ class PuffField {
       p.z += p.w * dt;
       p.sig += (0.10 + 0.04 * p.age) * dt;
       p.q *= Math.exp(-dt / (this.life * 0.55));
-      if (p.x * p.x + p.z * p.z > ARENA_R * ARENA_R) continue;
+      if (p.x * p.x + p.z * p.z > PUFF_MAX_R2) continue;
       if (p.y < 0.05) { p.y = 0.05; p.v = Math.abs(p.v) * 0.2; }
       if (p.y > 2.4) p.y = 2.4;
       next.push(p);

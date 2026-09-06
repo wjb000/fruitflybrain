@@ -187,6 +187,18 @@ export class CompoundEye {
         if (tFood < best) { best = tFood; hit = "food"; }
         const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 2.15, food.z, 0.42);
         if (tBeacon < best) { best = tBeacon; hit = "food"; }
+        // Procedural extras (other chunk landmarks within eye range).
+        const extras = world.landmarks || [];
+        for (let li = 0; li < extras.length && li < 12; li++) {
+          const L = extras[li];
+          if (!L) continue;
+          const tL = raySphere(ox, oy, oz, dx, dy, dz, L.x, L.y || 0.35, L.z, L.r || 0.5);
+          if (tL < best) {
+            best = tL;
+            hit = L.kind === "water" ? "water" : L.kind === "bitter" ? "bitter"
+              : L.kind === "perch" ? "perch" : "food";
+          }
+        }
         const bitter = world.bitter;
         if (bitter) {
           const tB = raySphere(ox, oy, oz, dx, dy, dz, bitter.x, 0.22, bitter.z, 0.42);
