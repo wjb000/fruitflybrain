@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=walkfix1";
-import { CompoundEye } from "./eye.js?v=walkfix1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=walkfix1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=walkfix1";
-import { portableControls, stubRobotDriver } from "./controller/portable.js?v=walkfix1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=cube1";
+import { CompoundEye } from "./eye.js?v=cube1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cube1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cube1";
+import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=cube1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -162,6 +162,16 @@ function flightEnabledFromUrl() {
   }
 }
 export const FLIGHT_ENABLED = typeof location !== "undefined" && flightEnabledFromUrl();
+function bodyModeFromUrl() {
+  try {
+    const q = new URLSearchParams(location.search).get("body");
+    if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
+    return "cube";
+  } catch (_) {
+    return "cube";
+  }
+}
+export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "cube";
 const READOUT_POOLS = [
   // Optic / descending readouts for assay + portable controller (not muscles).
   "HS", "VS", "R16", "L1", "L2", "L3",
@@ -183,6 +193,10 @@ export class EmbodiedFly {
   }) {
     this.sex = "male"; // public sim: male CNS only
     this.body = body;
+    // Default cube chassis; ?body=fly restores NeuroMechFly / MuJoCo path.
+    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "cube";
+    this.plantLabel = this.bodyMode === "cube" ? "cube chassis" : "fly";
+    this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0 };
     this.onReady = onReady;
     this.onFrame = onFrame;
     this.heading = yaw != null ? yaw : Math.random() * Math.PI * 2;
@@ -237,6 +251,7 @@ export class EmbodiedFly {
     this.physId = `${sex}-${Math.random().toString(36).slice(2, 8)}`;
     this.mjPose = null;
     this._ensurePlant = () => {
+      if (this.bodyMode === "cube") return; // cube chassis: no MuJoCo plant
       if (!physics.ok) return;
       spawnPhysics(this.physId, this.body.position.x, this.body.position.z, this.heading).then((pose) => {
         if (!pose) return;
@@ -250,7 +265,7 @@ export class EmbodiedFly {
     };
     this._ensurePlant();
     this._onPhysicsResume = () => this._ensurePlant();
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && this.bodyMode !== "cube") {
       window.addEventListener("ffb-physics-resume", this._onPhysicsResume);
     }
     this.lastOdor = { foodL: 0, foodR: 0, pherL: 0, pherR: 0 };
@@ -392,13 +407,15 @@ export class EmbodiedFly {
     this.points.visible = on;
     this.brainMesh.visible = on;
     this.vncMesh.visible = on;
-    this.body.userData.body.traverse((o) => {
+    const vis = this.body?.userData?.body;
+    if (!vis || !vis.traverse) return;
+    vis.traverse((o) => {
       if (!o.isMesh || !o.material || o.material.opacity === undefined) return;
       const m = o.material;
       if (m.userData._baseOpacity == null) m.userData._baseOpacity = m.opacity;
       const base = m.userData._baseOpacity;
       m.transparent = on || base < 0.99;
-      m.opacity = on ? Math.min(0.16, base) : base;
+      m.opacity = on ? Math.min(0.22, base) : base;
       m.depthWrite = !on && base > 0.5;
     });
   }
@@ -464,7 +481,7 @@ export class EmbodiedFly {
     this.body.rotation.set(0, this.heading, 0);
     this.life.hunger = 0.7;
     this.life.crop = 0.2; this.life.energy = 1; this.life.sleep = 0.1;
-    if (physics.ok) {
+    if (physics.ok && this.bodyMode !== "cube") {
       resetPhysics(this.physId, x, z, this.heading).then((pose) => {
         if (pose) this.mjPose = pose;
       }).catch(() => {});
@@ -600,7 +617,11 @@ export class EmbodiedFly {
     this.clock = m.t * 0.001;
     this.body.userData.perch = this.world.perch;
 
-    if (physics.ok) {
+    if (this.bodyMode === "cube") {
+      // Cube chassis: MN/descending → portable steering → kinematic translate/yaw.
+      // No MuJoCo, no nmf mesh posing, no thrusters that bypass the brain.
+      this.stepCubeChassis(dt);
+    } else if (physics.ok) {
       // Brain fires motor neurons only. MuJoCo is the flesh.
       // walk/turn are UI mode labels only — never free-joint plant cheats.
       setCommand(this.physId, {
@@ -697,6 +718,48 @@ export class EmbodiedFly {
       this.hzMean = w ? s / w : 0;
     }
     if (this.onFrame) this.onFrame(this);
+  }
+
+  /**
+   * Kinematic cube plant from portable MN steering (forward + yawRate).
+   * Gains scale readability only — velocity source is connectome MNs.
+   */
+  stepCubeChassis(dt) {
+    const snap = portableControls(this);
+    const drive = chassisSetpoints(snap, { vGain: 2.8, yawGain: 2.5 });
+    const forward = drive.forward || 0;
+    const yawRate = drive.yawRate || 0;
+    const v = drive.v || 0;
+    const omega = drive.omega || 0;
+    this.lastSteering = { forward, yawRate, v, omega };
+    this.heading += omega * dt;
+    this.body.position.x += Math.sin(this.heading) * v * dt;
+    this.body.position.z += Math.cos(this.heading) * v * dt;
+    if (OPEN_WORLD) {
+      const rad = Math.hypot(this.body.position.x, this.body.position.z);
+      if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
+        const s = (WORLD_SOFT_LIMIT - 0.6) / rad;
+        this.body.position.x *= s;
+        this.body.position.z *= s;
+        // Soft bounce: reflect heading slightly outward
+        const nx = this.body.position.x / Math.max(1e-6, Math.hypot(this.body.position.x, this.body.position.z));
+        const nz = this.body.position.z / Math.max(1e-6, Math.hypot(this.body.position.x, this.body.position.z));
+        const inward = Math.atan2(-nx, -nz);
+        this.heading = this.heading * 0.7 + inward * 0.3;
+      }
+    }
+    const stand = this.body.userData.standZ || 0.42;
+    this.y = stand;
+    this.vy = 0;
+    this.body.position.y = stand;
+    this.body.rotation.set(0, this.heading, 0);
+    this.speedS = this.speedS * 0.25 + Math.min(1.4, Math.abs(v) / 2.5) * 0.75;
+    this.plantLabel = "cube chassis";
+    this.planted = true;
+    this.plantNLeg = 0;
+    this.onPerch = false;
+    this.lastSlipAbs = Math.abs(v) * dt;
+    this.slipMeanAbs = (this.slipMeanAbs || 0) * 0.88 + Math.abs(v) * 0.12;
   }
 
   applyMujoco(pose, cmd, dt) {

@@ -1,10 +1,10 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) driving a NeuroMechFly body in an **open procedural world** (streaming chunks around the fly — no petri-dish cage). The public sim is **male CNS only** (the more complete map). Female BANC data may still exist under `web/data/female/` / `prepare_banc.py` as a historical offline path — it is not loaded or offered in the UI.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is **brain + cube chassis**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → kinematic box (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=fly` to restore the NeuroMechFly / MuJoCo path. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
 
-Honest MN→body coupling (Dan Robinson bar): legs, wings, head, abdomen, and proboscis move **only** from measured motor-neuron rates. Quiet pools → quiet body. No cosmetic wing flapping, no scripted CPG gait, no free-joint walk/turn thrusters.
+Honest MN→body coupling: cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain. Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
-**Walking-focused (default):** flight free-joint lift/thrust is **off** (kinematic + MuJoCo). Re-enable with `?flight=1`. Vision→walk is sensory write-in only: compound eye (incl. procgen landmarks) → `visionL/R` + optic pools (R16/L1–L3/T4–T5/HS/VS) → connectome LIF → leg MNs → stance slip / contact — not a hand-coded “steer to food” thruster.
+**Vision→steer:** compound eye (incl. landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → `web/controller/portable.js` (`steering.forward` / `yawRate`). Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -49,12 +49,12 @@ Closed loop:
 
 1. Light and odor from procedural landmarks drive the real sensory neurons.
 2. Spikes propagate through the connectome (LIF + short-term depression, fast EPSP vs slow neuromod).
-3. Descending + VNC **motor neurons** set leg/wing/head/abdomen/proboscis actuators.
-4. Locally **MuJoCo** (NeuroMechFly) is the flesh; on static hosts the flesh is kinematic MN→pose→stance-slip.
+3. Descending + VNC **motor neurons** produce portable chassis commands (`forward`, `yawRate`).
+4. **Default (Pages):** a simple **cube chassis** translates/yaws from those commands on the small pad. **`?body=fly`:** NeuroMechFly mesh + MuJoCo (local/remote plant) or kinematic MN→pose→stance-slip.
 
-**x-ray CNS** makes the cuticle transparent so you can see the reconstructed brain inside. Stim buttons bias sensory channels — body motion still only emerges if MNs fire.
+**x-ray CNS** shows the reconstructed brain (inside the cube or cuticle). Stim buttons bias sensory channels — motion still only emerges if MNs fire.
 
-See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN→actuator map and the honest gap list (empty annotation pools stay empty).
+See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actuator map, cube steering math, and annotation gaps.
 
 ## Lesion assay + portable controller
 

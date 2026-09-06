@@ -5,7 +5,7 @@
  * robot (or stub) can consume. Does not invent actuators — values come from
  * the same EmbodiedFly cmd + effector EMAs as the dish sim.
  *
- * Robot driver is stubbed: see stubRobotDriver().
+ * Robot driver is stubbed: see stubRobotDriver() / chassisSetpoints().
  */
 
 /**
@@ -21,8 +21,15 @@ export function portableControls(fly) {
   const vsR = num(fly?.opticEma?.VS_R, e.VS);
   const legsL = mean([e.T1L, e.T2L, e.T3L]);
   const legsR = mean([e.T1R, e.T2R, e.T3R]);
+  // Prefer agent cmd (already MN→softDrive from T1–T3 + DNa); fall back to pools.
   const walk = clamp01(cmd.walk ?? soft(legsL * 0.5 + legsR * 0.5));
   const turn = clamp(cmd.turn ?? Math.tanh((legsR - legsL) * 2), -1, 1);
+  const dna = e.DNa || 0;
+  const dnp = e.DNp || 0;
+  const dng = e.DNg02 || 0;
+  // Chassis commands = MN-derived walk/turn only (no vision bypass, no invented thrust).
+  const forward = walk;
+  const yawRate = turn;
   return {
     t: fly?.clock ?? 0,
     heading: fly?.heading ?? 0,
@@ -42,10 +49,10 @@ export function portableControls(fly) {
         : { ready: false },
     },
     descending: {
-      DNa: e.DNa || 0,
-      DNp: e.DNp || 0,
+      DNa: dna,
+      DNp: dnp,
       DNp01: e.DNp01 || 0,
-      DNg02: e.DNg02 || 0,
+      DNg02: dng,
     },
     motor: {
       walk,
@@ -60,8 +67,8 @@ export function portableControls(fly) {
       },
     },
     steering: {
-      forward: walk,
-      yawRate: turn,
+      forward,
+      yawRate,
       mode: fly?.life?.mode || "rest",
     },
     neuromod: {
@@ -73,12 +80,24 @@ export function portableControls(fly) {
   };
 }
 
-/** Thin stub — returns chassis setpoints; no hardware. */
+/** Thin stub — returns chassis setpoints; no hardware. Conservative gains. */
 export function stubRobotDriver(controls) {
+  return chassisSetpoints(controls, { vGain: 0.12, yawGain: 0.8 });
+}
+
+/**
+ * Map MN-derived steering → kinematic chassis velocities.
+ * Gains are readability only; source is always portableControls (connectome MNs).
+ */
+export function chassisSetpoints(controls, { vGain = 2.6, yawGain = 2.4 } = {}) {
   const c = controls || {};
+  const forward = c.steering?.forward ?? 0;
+  const yawRate = c.steering?.yawRate ?? 0;
   return {
-    v: (c.steering?.forward ?? 0) * 0.12,
-    omega: (c.steering?.yawRate ?? 0) * 0.8,
+    forward,
+    yawRate,
+    v: forward * vGain,
+    omega: yawRate * yawGain,
     source: "fruitflybrain.portable",
     t: c.t ?? 0,
   };

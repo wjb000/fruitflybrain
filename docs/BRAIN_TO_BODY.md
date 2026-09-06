@@ -14,9 +14,25 @@ Dish (light, odor, contact, proprio)
   → sensory pools (stim/effectors IDs)
     → LIF worker (sim.worker.js): Poisson drive + connectome synapses
       → MN / effector pool rates (Hz → soft 0–1)
-        → agent.js cmd.muscle / wing / head / abdomen / feed …
-          → MuJoCo plant (physics.py) OR kinematic fallback (fly.js)
+        → agent.js cmd.walk/turn (+ muscle/wing/…) from bilateral leg + descending EMAs
+          → DEFAULT: portable.js steering.forward/yawRate → cube chassis (kinematic)
+          → ?body=fly: MuJoCo plant (physics.py) OR kinematic NMF (fly.js)
 ```
+
+## Cube chassis mode (Pages default)
+
+Embodiment is a box+arrow on the small pad (`web/chassis.js`). The male
+connectome, compound eye, and optional odor still run. Plant motion:
+
+1. `cmd.walk` / `cmd.turn` from neuromere MN EMAs (`T1L…T3R`) + `DNa` (walk)
+   in `agent.js` — same as fly mode UI labels.
+2. `portableControls()` → `steering.forward` / `steering.yawRate` (optional
+   mild descending nudge when turn is near 0).
+3. `chassisSetpoints()` scales to `v` / `omega` (readability gains only).
+4. `EmbodiedFly.stepCubeChassis`: integrate heading and XY with soft rim;
+   **no** MuJoCo, **no** nmf mesh FK, **no** free-joint thrusters.
+
+Restore fly body: `?body=fly`. Cache-bust: `?v=cube1`.
 
 Plant URL: `web/plantConfig.js` (Pages → Mac tunnel by default).
 Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load; soft rim bounce
