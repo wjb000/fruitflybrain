@@ -47,14 +47,14 @@ function sectorize(ids, xyz, n = 4) {
   return { L, R, Ls: bins(L), Rs: bins(R) };
 }
 
-function hzVis(v, gain = 90, base = 4) {
-  return Math.max(0, Math.min(140, base + v * gain));
+function hzVis(v, gain = 70, base = 3) {
+  return Math.max(0, Math.min(110, base + v * gain));
 }
 
 /** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
  *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
  */
-function softDrive(v, gain = 4.0) {
+function softDrive(v, gain = 2.8) {
   const x = Math.max(0, v || 0);
   return Math.tanh(x * gain);
 }
@@ -62,13 +62,13 @@ function softDrive(v, gain = 4.0) {
 /** Antagonist pair from real pool EMAs. Quiet×quiet → 0. Mild asymmetry
  *  so flex/ext can step without saturating; never invents a CPG clock.
  */
-function antagPair(posEma, negEma, gain = 4.0) {
+function antagPair(posEma, negEma, gain = 2.8) {
   const p = softDrive(posEma, gain);
   const n = softDrive(negEma, gain);
-  const d = Math.tanh((p - n) * 1.55);
+  const d = Math.tanh((p - n) * 1.35);
   return {
-    pos: Math.max(0, Math.min(1, p + Math.max(0, d) * 0.22)),
-    neg: Math.max(0, Math.min(1, n + Math.max(0, -d) * 0.22)),
+    pos: Math.max(0, Math.min(1, p + Math.max(0, d) * 0.16)),
+    neg: Math.max(0, Math.min(1, n + Math.max(0, -d) * 0.16)),
   };
 }
 
@@ -420,46 +420,46 @@ export class EmbodiedFly {
     const legL = (e.T1L + e.T2L + e.T3L) / 3;
     const legR = (e.T1R + e.T2R + e.T3R) / 3;
     cmd.walk = THREE.MathUtils.clamp(
-      softDrive(legs * 1.15 + e.DNa * 0.65, 3.8), 0, 1
+      softDrive(legs * 1.05 + e.DNa * 0.55, 2.9), 0, 1
     );
     // Turn from bilateral leg MN pools only (no walkL/R / descending-class spike thruster).
-    const lrTurn = (legR - legL) * 2.4;
-    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.6), -1, 1);
+    const lrTurn = (legR - legL) * 2.0;
+    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.35), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
-    const wingRaw = e.DLM * 1.15 + e.DVM * 1.05 + e.ADMN * 0.9;
-    cmd.fly = softDrive(wingRaw, 3.6);
+    const wingRaw = e.DLM * 1.05 + e.DVM * 0.95 + e.ADMN * 0.8;
+    cmd.fly = softDrive(wingRaw, 2.7);
     cmd.wing = {
-      dlm: softDrive(e.DLM, 4.2),
-      dvm: softDrive(e.DVM, 4.2),
-      admn: softDrive(e.ADMN, 3.8),
+      dlm: softDrive(e.DLM, 3.1),
+      dvm: softDrive(e.DVM, 3.1),
+      admn: softDrive(e.ADMN, 2.9),
     };
-    cmd.feed = softDrive(e.MN9 * 1.2 + e.proboscis * 1.0, 3.8);
+    cmd.feed = softDrive(e.MN9 * 1.1 + e.proboscis * 0.9, 2.9);
     cmd.court = softDrive(
-      e.aIPg * 1.05 + e.pIP1 * 1.1 + e.DNg02 * 0.9,
-      3.5
+      e.aIPg * 0.95 + e.pIP1 * 1.0 + e.DNg02 * 0.8,
+      2.7
     );
-    cmd.groom = softDrive((e.T1L + e.T1R) * 0.75, 3.4);
-    cmd.escape = softDrive(e.DNp01 * 2.4, 3.8);
+    cmd.groom = softDrive((e.T1L + e.T1R) * 0.65, 2.6);
+    cmd.escape = softDrive(e.DNp01 * 2.0, 2.9);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
     const neckMag = Math.max(e.neck || 0, 0.5 * ((e.neckL || 0) + (e.neckR || 0)));
-    cmd.head = softDrive(neckMag, 3.8);
+    cmd.head = softDrive(neckMag, 2.9);
     // Neck L/R asymmetry → yaw (annotated CvN sides); quiet → 0.
     cmd.headYaw = THREE.MathUtils.clamp(
-      Math.tanh(((e.neckR || 0) - (e.neckL || 0)) * 3.2), -1, 1
+      Math.tanh(((e.neckR || 0) - (e.neckL || 0)) * 2.6), -1, 1
     );
-    cmd.abdomen = softDrive(e.abdomen * 1.0 + e.aIPg * 0.25 + cmd.court * 0.12, 3.6);
+    cmd.abdomen = softDrive(e.abdomen * 0.9 + e.aIPg * 0.2 + cmd.court * 0.1, 2.8);
     // Honest MN→muscle: empty annotation pools stay quiet (no neuromere fill-in).
     // Male T2/T3 coxaProm & Ta* are absent in FlyEM type labels — leave them 0.
     // Antagonist pairs get contrast from real pool asymmetries only.
     cmd.muscle = {};
     for (const name of LEG_NAMES) {
       const ema = (muscle) => e[`${name}_${muscle}`] || 0;
-      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 4.2);
-      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 4.0);
-      const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 3.8);
-      const tr = antagPair(ema("trFlex"), ema("trExt"), 4.4);
-      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 4.4);
-      const ta = antagPair(ema("taDep"), ema("taLev"), 4.0);
+      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 3.0);
+      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 2.9);
+      const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 2.8);
+      const tr = antagPair(ema("trFlex"), ema("trExt"), 3.2);
+      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 3.2);
+      const ta = antagPair(ema("taDep"), ema("taLev"), 2.9);
       cmd.muscle[name] = {
         coxaProm: coxa.pos,
         coxaRem: Math.max(coxa.neg, add.neg * 0.35),
@@ -468,7 +468,7 @@ export class EmbodiedFly {
         coxaAdd: add.pos,
         trFlex: tr.pos,
         trExt: tr.neg,
-        feRed: softDrive(ema("feRed"), 4.0),
+        feRed: softDrive(ema("feRed"), 2.9),
         tiFlex: ti.pos,
         tiExt: ti.neg,
         taDep: ta.pos,
@@ -518,28 +518,28 @@ export class EmbodiedFly {
       // No cmd.walk thruster — ground motion from foot slip only; flight from wing MNs.
       const stand = this.body.userData.standZ || 1.3;
       const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
-      if (this.y < stand + 0.08 && ttmn > 0.45) this.vy = 3.2 * Math.min(1, ttmn);
-      // Flight threshold not hair-trigger from MN noise.
-      if (cmd.fly > 0.42) {
-        this.vy += (2.5 + stand - this.y) * 3.5 * dt * cmd.fly;
+      if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
+      // Flight threshold not hair-trigger from MN noise (raised post-densify).
+      if (cmd.fly > 0.52) {
+        this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
       } else this.vy -= 18 * dt;
       this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && cmd.fly < 0.42) this.vy = 0;
+      if (this.y === stand && cmd.fly < 0.52) this.vy = 0;
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
-      if (cmd.fly > 0.42) {
-        const step = 5.5 * cmd.fly * dt;
+      if (cmd.fly > 0.52) {
+        const step = 4.2 * cmd.fly * dt;
         this.body.position.x += Math.sin(this.heading) * step;
         this.body.position.z += Math.cos(this.heading) * step;
-        this.heading += this.turnS * 1.6 * dt;
+        this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Moderate stance-slip gain — feet translate body without thrashing.
+        // Quiet stance-slip — feet still translate body; no thrashing.
         // Still brain-derived — no free-joint walk thruster / CPG gait.
-        const slipGain = 1.6;
+        const slipGain = 1.1;
         this.body.position.x += (slip.x / slip.n) * slipGain;
         this.body.position.z += (slip.z / slip.n) * slipGain;
-        this.heading += (slip.yawR - slip.yawL) * 1.5;
+        this.heading += (slip.yawR - slip.yawL) * 1.15;
       }
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
@@ -711,15 +711,15 @@ export class EmbodiedFly {
     const slp = this.life.sleep || 0;
     const esc = this.cmd.escape || 0;
     const clockRates = {
-      lLNv: 4 + day * 32,
-      sLNv: 4 + day * 26 + Math.max(0, Math.sin(t * 0.012)) * 8,
-      LNd: 3 + day * 16 + night * 10,
-      DN1a: 3 + night * 20,
-      DN1p: 3 + night * 24 + slp * 14,
-      DAN: 4 + aro * 16 + (1 - hung) * 6,
-      OA: 4 + aro * 24 + esc * 18,
-      HT: 3 + slp * 14 + night * 8,
-      pep: 3 + hung * 14,
+      lLNv: 3 + day * 22,
+      sLNv: 3 + day * 18 + Math.max(0, Math.sin(t * 0.012)) * 5,
+      LNd: 2 + day * 11 + night * 7,
+      DN1a: 2 + night * 14,
+      DN1p: 2 + night * 16 + slp * 10,
+      DAN: 3 + aro * 11 + (1 - hung) * 4,
+      OA: 3 + aro * 16 + esc * 12,
+      HT: 2 + slp * 10 + night * 5,
+      pep: 2 + hung * 10,
     };
     const extraV = (this.extra && this.extra.vision) || 0;
     const opticRates = this.opticRates(eye, extraV);
@@ -806,12 +806,12 @@ export class EmbodiedFly {
         const contrast = Math.max(0, Math.abs(cL));
         const uvContrast = Math.max(0, Math.abs(cU));
         const obj = (sFood[s] || 0) * 0.7 + (sWater[s] || 0) * 0.55 + (sFly[s] || 0) * 0.8;
-        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.4 + obj * 0.25, 140, 5) + extraV * 0.6;
+        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.35 + obj * 0.2, 105, 4) + extraV * 0.6;
         r["R7" + side + s] = hzVis(
-          e.sectorsUV[s] + uvContrast * 0.45 + (sWater[s] || 0) * 0.4, 145, 4
+          e.sectorsUV[s] + uvContrast * 0.4 + (sWater[s] || 0) * 0.35, 110, 3
         ) + extraV * 0.35;
         r["R8" + side + s] = hzVis(
-          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.2 + obj * 0.15, 130, 4
+          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.18 + obj * 0.12, 100, 3
         ) + extraV * 0.3;
       }
       // L1 ON / L2 OFF / L3 — temporal contrast + object motion salience.
@@ -820,21 +820,21 @@ export class EmbodiedFly {
       const sal = (e.sal || 0) + (e.salFood || 0) + (e.salFly || 0) * 0.9;
       const t4 = (e.t4a || 0) + (e.t4b || 0) + (e.t4c || 0) + (e.t4d || 0);
       const t5 = (e.t5a || 0) + (e.t5b || 0) + (e.t5c || 0) + (e.t5d || 0);
-      r["L1" + side] = hzVis(on * 2.6 + t4 * 1.5 + mot * 0.55 + sal * 0.3, 155, 4);
-      r["L2" + side] = hzVis(off * 2.6 + t5 * 1.5 + mot * 0.5 + sal * 0.25, 155, 4);
-      r["L3" + side] = hzVis(e.uv * 1.1 + on * 0.9 + (e.salWater || 0) * 1.1, 130, 4);
+      r["L1" + side] = hzVis(on * 2.2 + t4 * 1.25 + mot * 0.45 + sal * 0.25, 115, 3);
+      r["L2" + side] = hzVis(off * 2.2 + t5 * 1.25 + mot * 0.4 + sal * 0.2, 115, 3);
+      r["L3" + side] = hzVis(e.uv * 1.0 + on * 0.8 + (e.salWater || 0) * 0.95, 100, 3);
       // Direction-selective T4/T5 pools — map Hassenstein–Reichardt arms 1:1.
-      r["T4a" + side] = hzVis(e.t4a || 0, 165, 3);
-      r["T4b" + side] = hzVis(e.t4b || 0, 165, 3);
-      r["T4c" + side] = hzVis(e.t4c || 0, 165, 3);
-      r["T4d" + side] = hzVis(e.t4d || 0, 165, 3);
-      r["T5a" + side] = hzVis(e.t5a || 0, 165, 3);
-      r["T5b" + side] = hzVis(e.t5b || 0, 165, 3);
-      r["T5c" + side] = hzVis(e.t5c || 0, 165, 3);
-      r["T5d" + side] = hzVis(e.t5d || 0, 165, 3);
+      r["T4a" + side] = hzVis(e.t4a || 0, 120, 2);
+      r["T4b" + side] = hzVis(e.t4b || 0, 120, 2);
+      r["T4c" + side] = hzVis(e.t4c || 0, 120, 2);
+      r["T4d" + side] = hzVis(e.t4d || 0, 120, 2);
+      r["T5a" + side] = hzVis(e.t5a || 0, 120, 2);
+      r["T5b" + side] = hzVis(e.t5b || 0, 120, 2);
+      r["T5c" + side] = hzVis(e.t5c || 0, 120, 2);
+      r["T5d" + side] = hzVis(e.t5d || 0, 120, 2);
       // Wide-field HS/VS lobula plate — signed motion magnitude into Hz.
-      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.0 + (e.salFly || 0) * 0.55, 145, 3);
-      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.0 + on * 0.35, 145, 3);
+      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 0.9 + (e.salFly || 0) * 0.45, 110, 2);
+      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 0.9 + on * 0.3, 110, 2);
     }
     return r;
   }

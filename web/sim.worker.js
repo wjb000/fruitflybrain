@@ -22,7 +22,7 @@ let params = {
   // Calm regime: enough network drive for MN readout, not seizure/spastic.
   wScale: 0.012,
   inhibGain: 2.15,
-  stimAmp: 0.145,
+  stimAmp: 0.11,
   // Keep STD; quiet resting tone without silencing the network.
   stdUse: 0.12,
   // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.

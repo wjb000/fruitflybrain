@@ -3,13 +3,13 @@ import * as THREE from "three";
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
   // Moderate spans: body follows MNs without extreme thrashing.
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.95],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.70],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.65],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 1.05],
-  "trochanterfemur-roll": ["feRed", null, 0.42],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.90],
-  "tarsus1-pitch": ["taLev", "taDep", 0.55],
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.78],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.58],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.52],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.88],
+  "trochanterfemur-roll": ["feRed", null, 0.35],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.75],
+  "tarsus1-pitch": ["taLev", "taDep", 0.45],
 };
 const GROUND_Y = 0.05;
 const MUSCLE_TAU = 0.05;
@@ -279,11 +279,10 @@ function applyMuscleFk(leg, nodes) {
 function antagonist(pos, neg) {
   const p = pos || 0, n = neg || 0;
   const mag = p + n;
-  // Quiet pools stay limp (Dan bar). Modest real asymmetries get sharpened
-  // so flex/ext contrast from connectome rates can step without a CPG.
+  // Quiet pools stay limp. Mild flex/ext contrast — no seizure thrash.
   if (mag < 0.01) return 0;
-  const raw = (p - n) / (mag + 0.045);
-  return Math.tanh(raw * 2.55);
+  const raw = (p - n) / (mag + 0.06);
+  return Math.tanh(raw * 1.75);
 }
 
 function follow(cur, target, dt) {
@@ -343,7 +342,7 @@ export function stepLife(fly, dt, t, cmd) {
     leg.foot.x = _foot.x;
     leg.foot.y = _foot.y;
     leg.foot.z = _foot.z;
-    leg.foot.stance = flyA < 0.28 && _foot.y < GROUND_Y + 0.18;
+    leg.foot.stance = flyA < 0.40 && _foot.y < GROUND_Y + 0.18;
     leg.foot.vx = dx * idt;
     leg.foot.vy = dy * idt;
     leg.foot.vz = dz * idt;
@@ -369,9 +368,10 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   const dlm = wing.dlm != null ? wing.dlm : flyA;
   const dvm = wing.dvm != null ? wing.dvm : flyA;
   const admn = wing.admn != null ? wing.admn : flyA * 0.7;
-  const power = Math.max(0, Math.min(1, 0.45 * dlm + 0.4 * dvm + 0.25 * admn));
-  const flapHz = power > 0.02 ? 12 + power * 170 : 0;
-  const flapAmp = power * 1.05; // zero when MNs quiet
+  const power = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
+  // Gate noise flaps — only clear wing-MN drive moves wings.
+  const flapHz = power > 0.08 ? 10 + power * 140 : 0;
+  const flapAmp = power * 0.85; // zero when MNs quiet
   const flap = flapHz > 0 ? Math.sin(t * flapHz) * flapAmp : 0;
   for (let i = 0; i < d.wings.length; i++) {
     const w = d.wings[i];
@@ -379,12 +379,12 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
     w.quaternion.copy(rest);
-    if (power > 0.02) {
-      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.35 + power * 0.55));
+    if (power > 0.08) {
+      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.28 + power * 0.45));
       w.quaternion.multiply(_flapQ);
-      w.rotateZ(s * (0.02 + power * 0.28 + admn * 0.12));
+      w.rotateZ(s * (0.015 + power * 0.22 + admn * 0.1));
       // Slight stroke asymmetry from DLM vs DVM (still MN-derived).
-      w.rotateX((dlm - dvm) * 0.12 * s);
+      w.rotateX((dlm - dvm) * 0.1 * s);
     }
   }
   if (d.abdomen) {

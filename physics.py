@@ -41,14 +41,14 @@ OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 # Promotor/remotor swing the coxa (pitch). Adductor vs remotor/abductor
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
 DOF_MAP = [
-    # Moderate spans: body follows MNs with calm actuation; MN-only, no cheats.
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.72, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.55, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.52, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.92, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.34, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.72, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.48, 0.0),
+    # Quieter spans post-densify: MN-only, no cheats, less seizure thrash.
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.62, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.48, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.45, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.78, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.28, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.62, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.40, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.
@@ -78,11 +78,11 @@ def antagonist(pos: float, neg: float) -> float:
     p = float(pos or 0.0)
     n = float(neg or 0.0)
     mag = p + n
-    # Quiet pools stay limp. Mild flex/ext contrast — no overdriven thrash.
+    # Quiet pools stay limp. Milder flex/ext — densified MN map must not thrash.
     if mag < 0.01:
         return 0.0
-    raw = (p - n) / (mag + 0.06)
-    return float(math.tanh(raw * 1.55))
+    raw = (p - n) / (mag + 0.08)
+    return float(math.tanh(raw * 1.25))
 
 
 def three_to_mj(x: float, z: float, y: float = SPAWN_Z) -> tuple[float, float, float]:
@@ -432,10 +432,10 @@ class Plant:
             dlm = float(cmd.get("dlm") or 0.0)
             dvm = float(cmd.get("dvm") or 0.0)
             admn = float(cmd.get("admn") or 0.0)
-            fly_a = max(0.0, min(1.0, dlm * 2.0 + dvm * 1.8 + admn * 1.4))
-        # Flight threshold not hair-trigger from wing-MN noise.
+            fly_a = max(0.0, min(1.0, dlm * 1.6 + dvm * 1.45 + admn * 1.15))
+        # Flight threshold not hair-trigger from wing-MN noise (raised post-densify).
         # Still hard-gated on MN drive; no walk/turn free-joint cheats.
-        if fly_a < 0.38:
+        if fly_a < 0.48:
             fly_a = 0.0
         adh = np.zeros(6, dtype=float) if fly_a else np.ones(6, dtype=float)
         if not fly_a:
@@ -443,15 +443,15 @@ class Plant:
                 our = NMF_TO_OUR[nmf]
                 m = muscle.get(our) or {}
                 # Clear swing vs stance before peeling adhesion.
-                lifting = float(m.get("trFlex") or 0) > float(m.get("trExt") or 0) + 0.22
+                lifting = float(m.get("trFlex") or 0) > float(m.get("trExt") or 0) + 0.28
                 adh[i] = 0.35 if lifting else 1.0
         sim.set_leg_adhesion_states(body.fly_id, adh)
 
         model, data = sim.mj_model, sim.mj_data
         weight = body.mass * 9810.0
         # Modest wing-only free-joint force; legs alone move the body on the ground.
-        thrust = body.mass * 16000.0 * fly_a
-        hover = body.stand_z + 0.35 + fly_a * 3.4
+        thrust = body.mass * 12000.0 * fly_a
+        hover = body.stand_z + 0.35 + fly_a * 2.6
         for _ in range(n_steps):
             data.qfrc_applied[:] = 0
             if fly_a:
@@ -463,7 +463,7 @@ class Plant:
                 mz = float(data.xpos[body.thorax_bodyid][2])
                 vz = float(data.qvel[body.free_dofadr + 2])
                 data.qfrc_applied[body.free_dofadr + 2] = (
-                    weight + body.mass * (14000.0 * (hover - mz) - 2800.0 * vz)
+                    weight + body.mass * (11000.0 * (hover - mz) - 2600.0 * vz)
                 )
             sim.step()
 
