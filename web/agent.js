@@ -48,6 +48,14 @@ function hzVis(v, gain = 120, base = 6) {
   return Math.max(0, Math.min(180, base + v * gain));
 }
 
+/** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
+ *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
+ */
+function softDrive(v, gain = 5.2) {
+  const x = Math.max(0, v || 0);
+  return Math.tanh(x * gain);
+}
+
 
 function parseNeurons(buf) {
   const v = new DataView(buf);
@@ -376,25 +384,47 @@ export class EmbodiedFly {
     const motHz = rates[12] || 0;
     const legs = (e.T1L + e.T1R + e.T2L + e.T2R + e.T3L + e.T3R) / 6;
     const cmd = this.cmd;
-    // Body commands are ONLY connectome motor readout. No odor/vision shortcuts.
-    cmd.walk = THREE.MathUtils.clamp((dnHz + motHz) / 22 + e.DNa * 1.1 + legs * 0.9, 0, 1);
-    const lrTurn = (walkR - walkL) * 8 + (rEff - lEff) / (rEff + lEff + 8);
-    cmd.turn = THREE.MathUtils.clamp(lrTurn * 1.8, -1, 1);
-    cmd.fly = THREE.MathUtils.clamp(e.DLM * 2 + e.DVM * 1.8 + e.ADMN * 1.4, 0, 1);
-    cmd.feed = THREE.MathUtils.clamp(e.MN9 * 3 + e.proboscis * 2.2, 0, 1);
-    cmd.court = THREE.MathUtils.clamp(
-      this.sex === "female" ? e.fru * 1.8 + e.abdomen * 0.5
-        : e.aIPg * 2 + e.pIP1 * 2.2 + e.DNg02 * 1.6,
-      0, 1
+    // Body commands are ONLY connectome motor readout. No odor/vision shortcuts,
+    // no scripted gait clocks — quiet MNs → quiet body.
+    cmd.walk = THREE.MathUtils.clamp(
+      softDrive((dnHz + motHz) / 40 + e.DNa * 0.55 + legs * 0.45, 4.2), 0, 1
     );
-    cmd.groom = THREE.MathUtils.clamp((e.T1L + e.T1R) * 1.3, 0, 1);
-    cmd.escape = THREE.MathUtils.clamp(e.DNp01 * (this.sex === "female" ? 1.1 : 6), 0, 1);
+    const lrTurn = (walkR - walkL) * 8 + (rEff - lEff) / (rEff + lEff + 8);
+    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 2.4), -1, 1);
+    // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
+    const wingRaw = e.DLM * 1.15 + e.DVM * 1.05 + e.ADMN * 0.85;
+    cmd.fly = softDrive(wingRaw, 4.8);
+    cmd.wing = {
+      dlm: softDrive(e.DLM, 5.5),
+      dvm: softDrive(e.DVM, 5.5),
+      admn: softDrive(e.ADMN, 5.0),
+    };
+    cmd.feed = softDrive(e.MN9 * 1.2 + e.proboscis * 0.95, 5.0);
+    cmd.court = softDrive(
+      this.sex === "female" ? e.fru * 0.9 + e.abdomen * 0.35
+        : e.aIPg * 1.05 + e.pIP1 * 1.15 + e.DNg02 * 0.9,
+      4.6
+    );
+    cmd.groom = softDrive((e.T1L + e.T1R) * 0.7, 4.4);
+    cmd.escape = softDrive(e.DNp01 * (this.sex === "female" ? 0.7 : 2.8), 5.5);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
-    cmd.head = e.neck * 2.4;
-    cmd.abdomen = e.abdomen;
+    cmd.head = softDrive(e.neck, 5.5);
+    cmd.abdomen = softDrive(e.abdomen * 0.9 + e.aIPg * 0.25 + cmd.court * 0.15, 4.8);
+    // Weak ipsilateral neuromere MN bias when a specific muscle pool is empty
+    // (e.g. L2/L3 coxaProm) — still brain-derived, not a CPG clock.
+    const nmBias = {
+      L1: e.T1L || 0, R1: e.T1R || 0,
+      L2: e.T2L || 0, R2: e.T2R || 0,
+      L3: e.T3L || 0, R3: e.T3R || 0,
+    };
     cmd.muscle = {};
     for (const name of LEG_NAMES) {
-      const pick = (muscle) => THREE.MathUtils.clamp((e[`${name}_${muscle}`] || 0) * 2.4, 0, 1);
+      const bias = (nmBias[name] || 0) * 0.22;
+      const pick = (muscle) => {
+        const raw = e[`${name}_${muscle}`] || 0;
+        const v = raw > 1e-5 ? raw : bias;
+        return softDrive(v, 5.5);
+      };
       cmd.muscle[name] = {
         coxaProm: pick("coxaProm"),
         coxaRem: pick("coxaRem"),
@@ -437,9 +467,9 @@ export class EmbodiedFly {
       // walk/turn are UI mode labels only — never free-joint plant cheats.
       setCommand(this.physId, {
         muscle: cmd.muscle,
-        dlm: e.DLM || 0,
-        dvm: e.DVM || 0,
-        admn: e.ADMN || 0,
+        dlm: cmd.wing?.dlm ?? (e.DLM || 0),
+        dvm: cmd.wing?.dvm ?? (e.DVM || 0),
+        admn: cmd.wing?.admn ?? (e.ADMN || 0),
         fly: cmd.fly || 0,
         x: this.body.position.x,
         z: this.body.position.z,
@@ -468,9 +498,12 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 2.2 * dt;
       } else if (slip && slip.n > 0) {
-        this.body.position.x += slip.x / slip.n;
-        this.body.position.z += slip.z / slip.n;
-        this.heading += (slip.yawR - slip.yawL) * 0.9;
+        // Amplify MN-posed stance slip so foot motion actually translates the body.
+        // Still brain-derived — no free-joint walk thruster / CPG gait.
+        const slipGain = 2.6;
+        this.body.position.x += (slip.x / slip.n) * slipGain;
+        this.body.position.z += (slip.z / slip.n) * slipGain;
+        this.heading += (slip.yawR - slip.yawL) * 1.55;
       }
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04

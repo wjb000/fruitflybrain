@@ -382,7 +382,9 @@ class Plant:
             dvm = float(cmd.get("dvm") or 0.0)
             admn = float(cmd.get("admn") or 0.0)
             fly_a = max(0.0, min(1.0, dlm * 2.0 + dvm * 1.8 + admn * 1.4))
-        if fly_a < 0.38:
+        # Engage flight when wing MNs are clearly active (was 0.38 — often never fired).
+        # Still hard-gated on MN drive; no walk/turn free-joint cheats.
+        if fly_a < 0.22:
             fly_a = 0.0
         adh = np.zeros(6, dtype=float) if fly_a else np.ones(6, dtype=float)
         if not fly_a:

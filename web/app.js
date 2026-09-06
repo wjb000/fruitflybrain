@@ -235,8 +235,10 @@ await loadNmf();
 setLoad(0.92, "MuJoCo flesh");
 await connectPhysics();
 if ($("flesh")) $("flesh").textContent = physics.ok ? "MuJoCo" : "kinematic";
-if ($("info") && physics.ok) {
-  $("info").textContent = "Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Clock cells are not force-fed daylight (only l-LNv CRY). Motor neurons command NeuroMechFly actuators. MuJoCo is the flesh — no slip walk, no planted jump.";
+if ($("info")) {
+  $("info").textContent = physics.ok
+    ? "Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Motor neurons command NeuroMechFly actuators. MuJoCo is the flesh — no free-joint walk thrusters."
+    : "Static host: MuJoCo plant offline. Flesh is kinematic — MN rates pose legs/wings/head/abdomen; ground motion is stance slip from MN-posed feet. Quiet MNs → quiet body (no scripted gait / cosmetic flaps).";
 }
 
 spawn("male");
@@ -313,15 +315,23 @@ function onAny() {
   if ($("gaitF")) $("gaitF").textContent = fems[0] ? "♀ " + fems[0].life.mode : "—";
   $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
-  const flesh = physics.ok ? "MuJoCo" : "kinematic";
+  const flesh = physics.ok ? "MuJoCo" : "kinematic MN";
   if ($("flesh")) $("flesh").textContent = flesh;
-  $("lifeHint").textContent = flesh + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+  $("lifeHint").textContent = flesh + " · MN-driven · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
   setW("slow-sleep", focus.life.sleep);
   setW("slow-pdf", (e.sLNv || 0) * 0.65 + (e.lLNv || 0) * 0.35);
   setW("slow-da", e.DAN || 0);
   setW("slow-oa", e.OA || 0);
+  // Live MN cause→effect (Hz-decoded EMAs). Quiet bars → quiet body.
+  setW("mn-dlm", e.DLM || 0);
+  setW("mn-dvm", e.DVM || 0);
+  setW("mn-admn", e.ADMN || 0);
+  setW("mn-legs", ((e.T1L || 0) + (e.T1R || 0) + (e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 6);
+  setW("mn-neck", e.neck || 0);
+  setW("mn-abd", e.abdomen || 0);
+  setW("mn-mn9", Math.max(e.MN9 || 0, e.proboscis || 0));
   const o = focus.lastOdor;
   if (o && $("odorFL")) {
     $("odorFL").style.width = Math.min(100, o.foodL).toFixed(1) + "%";

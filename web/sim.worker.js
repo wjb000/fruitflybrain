@@ -15,9 +15,11 @@ let params = {
   vReset: 0,
   vThresh: 1,
   refractory: 2,
-  wScale: 0.0095,
+  // Throughput: raised carefully so sparse MN pools still recruit downstream
+  // without saturating the LIF (was wScale 0.0095 / stimAmp 0.13 / steps 8).
+  wScale: 0.0115,
   inhibGain: 2.4,
-  stimAmp: 0.13,
+  stimAmp: 0.155,
 };
 let t = 0;
 let synDecay = Math.exp(-params.dt / params.tauSyn);
@@ -26,7 +28,7 @@ let modDecay = Math.exp(-params.dt / params.tauMod);
 let sleepBias = 0;
 let arousalGain = 1;
 let running = false;
-let stepsPerFrame = 8;
+let stepsPerFrame = 10;
 
 function rebuildSign() {
   sign = new Float32Array(n);
@@ -116,14 +118,29 @@ function tallyEffectors() {
   }
 }
 
+/** Decode effector pools as mean spike rate (Hz) over the frame window,
+ *  then map to a 0–1 `eff` the UI expects. Raw hits/(sz*steps) is ~0.01 and
+ *  leaves muscles limp; 0–40 Hz → 0–1 (with soft exp) keeps sparse MN pools useful.
+ */
 function effectorFractions(steps) {
   const out = {};
+  const hzOut = {};
   const s = Math.max(1, steps);
+  const sec = (s * params.dt) / 1000;
+  const HZ_SCALE = 40; // ~40 Hz mean → full drive
   for (const name in effectorIds) {
     const sz = effectorSize[name] || 0;
-    out[name] = sz > 0 ? effectorHits[name] / (sz * s) : 0;
+    const hits = effectorHits[name] || 0;
+    const hz = sz > 0 && sec > 0 ? hits / (sz * sec) : 0;
+    // Soft map: 1 - exp(-hz/18) ≈ linear near 0, ~0.89 at 40 Hz
+    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 18));
+    // Also expose linear 0–40 Hz scale as a floor so mid rates stay visible
+    const lin = Math.min(1, hz / HZ_SCALE);
+    out[name] = Math.max(norm, lin * 0.85);
+    hzOut[name] = hz;
     effectorHits[name] = 0;
   }
+  out._hz = hzOut;
   return out;
 }
 
@@ -329,9 +346,11 @@ function frame() {
     }
     const rates = groupRates(recent, NGROUPS);
     const eff = effectorFractions(stepsPerFrame);
+    const effHz = eff._hz || {};
+    delete eff._hz;
     const spikeArr = new Uint32Array(last);
     postMessage(
-      { type: "frame", t, nSpikes, spikes: spikeArr, rates, eff },
+      { type: "frame", t, nSpikes, spikes: spikeArr, rates, eff, effHz },
       [spikeArr.buffer]
     );
   }

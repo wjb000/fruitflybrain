@@ -2,13 +2,14 @@ import * as THREE from "three";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.55],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.40],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.40],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.70],
-  "trochanterfemur-roll": ["feRed", null, 0.25],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.55],
-  "tarsus1-pitch": ["taLev", "taDep", 0.35],
+  // Spans sized so mid–high MN drive (softDrive ~0.5–0.9) yields obvious joint motion.
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.85],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.62],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.58],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.95],
+  "trochanterfemur-roll": ["feRed", null, 0.38],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.80],
+  "tarsus1-pitch": ["taLev", "taDep", 0.50],
 };
 const GROUND_Y = 0.05;
 const MUSCLE_TAU = 0.05;
@@ -350,8 +351,8 @@ export function stepLife(fly, dt, t, cmd) {
       n += 1;
       // Tank-steer from body-longitudinal foot slip (rearward push drives that side).
       const back = -(dx * sy + dz * cy);
-      if (leg.side < 0) yawL += back * 0.55;
-      else yawR += back * 0.55;
+      if (leg.side < 0) yawL += back * 0.85;
+      else yawR += back * 0.85;
     }
   });
   d.slip = { x: slipX, z: slipZ, n, yawL, yawR };
@@ -359,38 +360,57 @@ export function stepLife(fly, dt, t, cmd) {
 }
 
 function poseSoftParts(d, t, cmd, flyA, feed) {
-  const flapHz = 8 + flyA * 150;
-  const flap = Math.sin(t * flapHz) * (0.04 + flyA * 0.85);
+  // Wings move ONLY from wing-MN drive (cmd.fly ← DLM/DVM/ADMN). Quiet MNs → rest pose.
+  // No always-on idle flap / cosmetic CPG.
+  const wing = cmd.wing || {};
+  const dlm = wing.dlm != null ? wing.dlm : flyA;
+  const dvm = wing.dvm != null ? wing.dvm : flyA;
+  const admn = wing.admn != null ? wing.admn : flyA * 0.7;
+  const power = Math.max(0, Math.min(1, 0.45 * dlm + 0.4 * dvm + 0.25 * admn));
+  const flapHz = power > 0.02 ? 12 + power * 170 : 0;
+  const flapAmp = power * 1.05; // zero when MNs quiet
+  const flap = flapHz > 0 ? Math.sin(t * flapHz) * flapAmp : 0;
   for (let i = 0; i < d.wings.length; i++) {
     const w = d.wings[i];
     const rest = w.userData.restQuat;
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
-    _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.3 + flyA * 0.5));
-    w.quaternion.copy(rest).multiply(_flapQ);
-    w.rotateZ(s * (0.04 + flyA * 0.18));
+    w.quaternion.copy(rest);
+    if (power > 0.02) {
+      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.35 + power * 0.55));
+      w.quaternion.multiply(_flapQ);
+      w.rotateZ(s * (0.02 + power * 0.28 + admn * 0.12));
+      // Slight stroke asymmetry from DLM vs DVM (still MN-derived).
+      w.rotateX((dlm - dvm) * 0.12 * s);
+    }
   }
   if (d.abdomen) {
     const rest = d.abdomen.userData.restQuat;
     if (rest) {
-      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), -0.06 + (cmd.abdomen || 0) * 0.35);
+      const curl = (cmd.abdomen || 0) * 0.72 + (cmd.court || 0) * 0.28;
+      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), -0.02 + curl);
       d.abdomen.quaternion.copy(rest).multiply(_flapQ);
     }
   }
   if (d.head) {
     const rest = d.head.userData.restQuat;
     if (rest) {
+      const hy = THREE.MathUtils.clamp((cmd.head || 0) * 0.95, -0.85, 0.85);
       d.head.quaternion.copy(rest);
-      d.head.rotateY(THREE.MathUtils.clamp(cmd.head || 0, -0.5, 0.5));
-      d.head.rotateX(feed * 0.45 - flyA * 0.25);
+      d.head.rotateY(hy);
+      d.head.rotateX(feed * 0.55 - power * 0.2);
     }
   }
   if (d.proboscis) {
-    const pe = 1 + feed * 0.55;
+    const pe = 1 + feed * 0.85;
     d.proboscis.scale.set(1, pe, 1);
-    d.proboscis.rotation.x = feed * 0.4;
+    d.proboscis.rotation.x = feed * 0.55;
   }
-  const glow = 0.08 + flyA * 0.5 + (cmd.walk || 0) * 0.25 + feed * 0.15 + (cmd.court || 0) * 0.2;
+  if (d.haustellum) {
+    d.haustellum.rotation.x = feed * 0.35;
+  }
+  // Eye glow tracks MN/behavior cmds only (no fake activity).
+  const glow = 0.08 + power * 0.45 + (cmd.walk || 0) * 0.2 + feed * 0.15 + (cmd.court || 0) * 0.18;
   for (const e of d.eyes) if (e.material) e.material.emissiveIntensity = glow;
 }
 
