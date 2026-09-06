@@ -6,3 +6,5 @@ data/connectome-weights.feather
 data/skeletons/
 data/banc/
 data/*.feather
+sweeps/
+MUJOCO_LOG.TXT

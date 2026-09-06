@@ -41,6 +41,146 @@ let arousalGain = 1;
 let running = false;
 let stepsPerFrame = 10;
 
+// --- Lesion harness (connectome path only; never joint hacks) ---
+let gainOut = null;       // per-neuron outgoing synapse scale (silence/boost)
+let edgeScale = null;     // per-edge scale (cut bundles); null = all 1
+let delaySteps = null;    // per-neuron extra synaptic delay in steps
+let delayQueues = null;   // Map-like: neuron -> queue of {left, targets packed}
+let delayRing = null;     // ring buffer of pending spike deliveries
+let delayRingPos = 0;
+let delayRingLen = 0;
+const DELAY_RING_MAX = 64;
+let swapLR = null;        // Int32Array remap: i -> partner, or -1
+let hungerMod = 1;        // neuromod hunger dial (scales DA deposit + arousal bias)
+let lesionMeta = { id: "none", applied: [] };
+
+function ensureLesionBuffers() {
+  if (!n) return;
+  if (!gainOut || gainOut.length !== n) {
+    gainOut = new Float32Array(n);
+    gainOut.fill(1);
+  }
+  if (!delaySteps || delaySteps.length !== n) {
+    delaySteps = new Int16Array(n);
+  }
+  if (!swapLR || swapLR.length !== n) {
+    swapLR = new Int32Array(n);
+    swapLR.fill(-1);
+  }
+  if (!edgeScale || edgeScale.length !== weight.length) {
+    edgeScale = new Float32Array(weight.length);
+    edgeScale.fill(1);
+  }
+  if (!delayRing) {
+    delayRing = Array.from({ length: DELAY_RING_MAX }, () => []);
+    delayRingPos = 0;
+    delayRingLen = DELAY_RING_MAX;
+  }
+}
+
+function clearLesion() {
+  lesionMeta = { id: "none", applied: [] };
+  hungerMod = 1;
+  if (!n) return;
+  ensureLesionBuffers();
+  gainOut.fill(1);
+  delaySteps.fill(0);
+  swapLR.fill(-1);
+  edgeScale.fill(1);
+  for (let i = 0; i < delayRing.length; i++) delayRing[i] = [];
+}
+
+function buildSwapLR(ids, xyz) {
+  // Pair each selected neuron with nearest opposite-x partner in the same set.
+  const arr = Array.from(ids);
+  const unused = new Set(arr);
+  for (const i of arr) {
+    if (!unused.has(i)) continue;
+    const xi = xyz[i * 3];
+    let best = -1, bestD = 1e9;
+    for (const j of unused) {
+      if (j === i) continue;
+      const xj = xyz[j * 3];
+      if (xi * xj >= 0) continue; // need opposite side
+      const dy = xyz[i * 3 + 1] - xyz[j * 3 + 1];
+      const dz = xyz[i * 3 + 2] - xyz[j * 3 + 2];
+      const d = Math.abs(Math.abs(xi) - Math.abs(xj)) + Math.abs(dy) + Math.abs(dz);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    if (best >= 0) {
+      swapLR[i] = best;
+      swapLR[best] = i;
+      unused.delete(i);
+      unused.delete(best);
+    }
+  }
+}
+
+function applyLesionMessage(m) {
+  ensureLesionBuffers();
+  if (m.clear) clearLesion();
+  const cfg = m.lesion || m;
+  const ops = cfg.ops || [];
+  lesionMeta = { id: cfg.id || "lesion", applied: [] };
+  const xyz = m.xyz || null; // optional Float32Array for swapLR
+  for (const op of ops) {
+    if (op.op === "silence") {
+      const ids = op.ids || [];
+      for (let k = 0; k < ids.length; k++) {
+        const i = ids[k];
+        if (i >= 0 && i < n) gainOut[i] = 0;
+      }
+      lesionMeta.applied.push("silence:" + ids.length);
+    } else if (op.op === "boost") {
+      const g = op.gain != null ? op.gain : 2;
+      const ids = op.ids || [];
+      for (let k = 0; k < ids.length; k++) {
+        const i = ids[k];
+        if (i >= 0 && i < n) gainOut[i] = g;
+      }
+      lesionMeta.applied.push("boost:" + ids.length + "x" + g);
+    } else if (op.op === "cut") {
+      const fromSet = new Uint8Array(n);
+      const toSet = new Uint8Array(n);
+      for (const i of op.fromIds || []) if (i < n) fromSet[i] = 1;
+      for (const i of op.toIds || []) if (i < n) toSet[i] = 1;
+      let cutN = 0;
+      for (let i = 0; i < n; i++) {
+        if (!fromSet[i]) continue;
+        const a = indptr[i], b = indptr[i + 1];
+        for (let k = a; k < b; k++) {
+          if (toSet[indices[k]]) {
+            edgeScale[k] = 0;
+            cutN++;
+          }
+        }
+      }
+      lesionMeta.applied.push("cut:" + cutN);
+    } else if (op.op === "swapLR") {
+      const ids = op.ids || [];
+      if (xyz && xyz.length >= n * 3) buildSwapLR(ids, xyz);
+      else {
+        // Fallback: pairwise sort by |x| within pool using group only — no-op without xyz
+        lesionMeta.applied.push("swapLR:need-xyz");
+      }
+      lesionMeta.applied.push("swapLR:" + ids.length);
+    } else if (op.op === "delay") {
+      const ms = op.ms != null ? op.ms : 40;
+      const steps = Math.max(1, Math.round(ms / params.dt));
+      const ids = op.ids || [];
+      for (let k = 0; k < ids.length; k++) {
+        const i = ids[k];
+        if (i >= 0 && i < n) delaySteps[i] = steps;
+      }
+      lesionMeta.applied.push("delay:" + ids.length + "@" + ms + "ms");
+    } else if (op.op === "hunger") {
+      hungerMod = op.level != null ? op.level : 1;
+      lesionMeta.applied.push("hunger:" + hungerMod);
+    }
+  }
+  postMessage({ type: "lesionApplied", meta: lesionMeta, hungerMod });
+}
+
 function rebuildSign() {
   sign = new Float32Array(n);
   const g = params.inhibGain;
@@ -99,6 +239,9 @@ function init(bufNeurons, bufCsr) {
   uStd.fill(1);
   rngs = mulberry32(0xC0FFEE);
   rebuildSign();
+  // Neuron xyz lives in neurons.bin; keep a view for swapLR lesions.
+  self._xyz = new Float32Array(bufNeurons, 12, n * 3);
+  clearLesion();
   synDecayFast = Math.exp(-params.dt / params.tauSynFast);
   synDecayInhib = Math.exp(-params.dt / params.tauSynInhib);
   adaptDecay = Math.exp(-params.dt / params.tauAdapt);
@@ -215,34 +358,68 @@ function step() {
     const u = uStd[i];
     // Consume resources on spike (depression); OA gets mild facilitation bias via mOA.
     uStd[i] = Math.max(0.05, u * (1 - stdUse));
+    const gOut = gainOut ? gainOut[i] : 1;
+    if (gOut <= 0) continue; // silenced — no outgoing transmission
+    const src = (swapLR && swapLR[i] >= 0) ? swapLR[i] : i;
+    const a2 = indptr[src], b2 = indptr[src + 1];
+    const dly = delaySteps ? delaySteps[i] : 0;
     if (knt === 5) {
-      // Dopamine: slow gain / threshold modulate — stronger deposit than before.
-      for (let k = a; k < b; k++) {
+      // Dopamine: slow gain / threshold modulate — hunger dial scales deposit.
+      const h = 0.55 + 0.9 * hungerMod;
+      for (let k = a2; k < b2; k++) {
+        const esc = edgeScale ? edgeScale[k] : 1;
+        if (esc <= 0) continue;
         const j = indices[k];
-        const v = mDA[j] + 0.012 * Math.sqrt(weight[k]) * u;
+        const v = mDA[j] + 0.012 * Math.sqrt(weight[k]) * u * gOut * esc * h;
         mDA[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 6) {
-      for (let k = a; k < b; k++) {
+      for (let k = a2; k < b2; k++) {
+        const esc = edgeScale ? edgeScale[k] : 1;
+        if (esc <= 0) continue;
         const j = indices[k];
-        const v = m5[j] + 0.010 * Math.sqrt(weight[k]) * u;
+        const v = m5[j] + 0.010 * Math.sqrt(weight[k]) * u * gOut * esc;
         m5[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 7) {
-      for (let k = a; k < b; k++) {
+      const h = 0.65 + 0.7 * hungerMod;
+      for (let k = a2; k < b2; k++) {
+        const esc = edgeScale ? edgeScale[k] : 1;
+        if (esc <= 0) continue;
         const j = indices[k];
-        const v = mOA[j] + 0.014 * Math.sqrt(weight[k]) * u;
+        const v = mOA[j] + 0.014 * Math.sqrt(weight[k]) * u * gOut * esc * h;
         mOA[j] = v > 1.5 ? 1.5 : v;
       }
+    } else if (dly > 0) {
+      // Queue fast chemical delivery for later steps (synaptic delay lesion).
+      const slot = (delayRingPos + dly) % delayRingLen;
+      const s = sign[i] * wScale * u * gOut;
+      const payload = { s, a: a2, b: b2 };
+      delayRing[slot].push(payload);
     } else {
-      // Fast chemical: sqrt-compress huge synapse counts so mid-weight edges
-      // stay expressive; STD resource u still gates reliability.
-      const s = sign[i] * wScale * u;
-      for (let k = a; k < b; k++) {
-        const w = weight[k];
-        I[indices[k]] += s * Math.sqrt(w);
+      // Fast chemical: sqrt-compress; STD + lesion scales.
+      const s = sign[i] * wScale * u * gOut;
+      for (let k = a2; k < b2; k++) {
+        const esc = edgeScale ? edgeScale[k] : 1;
+        if (esc <= 0) continue;
+        I[indices[k]] += s * Math.sqrt(weight[k]) * esc;
       }
     }
+  }
+
+  // Deliver delayed synaptic events due this step.
+  if (delayRing) {
+    const due = delayRing[delayRingPos];
+    for (let p = 0; p < due.length; p++) {
+      const { s, a: aa, b: bb } = due[p];
+      for (let k = aa; k < bb; k++) {
+        const esc = edgeScale ? edgeScale[k] : 1;
+        if (esc <= 0) continue;
+        I[indices[k]] += s * Math.sqrt(weight[k]) * esc;
+      }
+    }
+    delayRing[delayRingPos] = [];
+    delayRingPos = (delayRingPos + 1) % delayRingLen;
   }
 
   const pScale = dt / 1000;
@@ -265,6 +442,11 @@ function step() {
     const g = (1 + 0.55 * mDA[i] + (0.65 + facOA) * mOA[i] - 0.42 * m5[i]) * gAro;
     // Adaptive threshold: serotonin raises, OA lowers; denser drive → slightly stronger adapt.
     const thr = thr0 + 0.32 * m5[i] - 0.20 * mOA[i] + 0.12 * adapt[i];
+    // Silenced cells cannot spike (ablation-like).
+    if (gainOut && gainOut[i] <= 0) {
+      V[i] = rest;
+      continue;
+    }
     V[i] += leak * (rest - V[i]) + g * I[i] - adapt[i];
     if (V[i] >= thr) {
       V[i] = reset;
@@ -357,12 +539,25 @@ onmessage = (ev) => {
     applyDrive();
     return;
   }
+  if (m.type === "lesion") {
+    if (!m.xyz && self._xyz) m.xyz = self._xyz;
+    applyLesionMessage(m);
+    return;
+  }
+  if (m.type === "clearLesion") {
+    clearLesion();
+    postMessage({ type: "lesionApplied", meta: lesionMeta, hungerMod });
+    return;
+  }
   if (m.type === "reset") {
     V.fill(0); I.fill(0); refrac.fill(0); spikes.fill(0); t = 0;
     if (adapt) { adapt.fill(0); mDA.fill(0); mOA.fill(0); m5.fill(0); }
     if (uStd) uStd.fill(1);
     sleepBias = 0; arousalGain = 1;
     recent.length = 0;
+    if (delayRing) for (let i = 0; i < delayRing.length; i++) delayRing[i] = [];
+    // Lesions persist across reset unless m.clearLesion
+    if (m.clearLesion) clearLesion();
     return;
   }
   if (m.type === "run") running = !!m.on;
@@ -392,7 +587,7 @@ function frame() {
     delete eff._hz;
     const spikeArr = new Uint32Array(last);
     postMessage(
-      { type: "frame", t, nSpikes, spikes: spikeArr, rates, eff, effHz },
+      { type: "frame", t, nSpikes, spikes: spikeArr, rates, eff, effHz, hungerMod, lesion: lesionMeta },
       [spikeArr.buffer]
     );
   }

@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { stepLife, applyPhysicsPose } from "./fly.js";
 import { CompoundEye } from "./eye.js";
 import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js";
+import { portableControls, stubRobotDriver } from "./controller/portable.js";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -143,12 +145,18 @@ function gradedContact(dist, reach, peak = 100) {
 }
 
 const ARENA_R = 17.4;
+const READOUT_POOLS = [
+  // Optic / descending readouts for assay + portable controller (not muscles).
+  "HS", "VS", "R16", "L1", "L2", "L3",
+  "T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d",
+];
 const POOL_KEYS = [
   "T1L", "T1R", "T2L", "T2R", "T3L", "T3R",
   "DLM", "DVM", "ADMN", "MN9", "proboscis", "neck", "neckL", "neckR",
   "DNa", "DNg02", "DNp01", "DNp", "aIPg", "pIP1", "fru", "abdomen",
   ...CLOCK_KEYS,
   ...JOINT_POOLS,
+  ...READOUT_POOLS,
 ];
 
 export class EmbodiedFly {
@@ -174,6 +182,11 @@ export class EmbodiedFly {
     this.life = { hunger: 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
     this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, abdomen: 0, muscle: {} };
     this.motEma = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
+    this.opticEma = { HS_L: 0, HS_R: 0, VS_L: 0, VS_R: 0 };
+    this.poolMap = mergePoolMaps(effectors, stim);
+    this._stim = stim;
+    this._effectors = effectors;
+    this.lesionMeta = { id: "none", applied: [] };
     this.world = { food: { x: 6.5, z: 4.2 }, water: { x: -5.5, z: -3.8 }, other: null };
 
     body.position.set(x, this.y, z);
@@ -184,7 +197,10 @@ export class EmbodiedFly {
     this.activity = new Float32Array(this.neu.n);
     const P = effectors.pools || {};
     this.poolSets = {};
-    for (const k of POOL_KEYS) this.poolSets[k] = new Set(P[k] || []);
+    for (const k of POOL_KEYS) {
+      const ids = P[k] || stim[k] || [];
+      this.poolSets[k] = new Set(ids);
+    }
     this.stim = stim;
     this.smell = splitLR(stim.smell || [], this.neu.xyz);
     this.visionLR = splitLR(stim.vision || [], this.neu.xyz);
@@ -365,6 +381,58 @@ export class EmbodiedFly {
   }
 
   setRun(on) { this.worker.postMessage({ type: "run", on }); }
+
+  /**
+   * Apply a lesion config on the LIF connectome path (not joints).
+   * Resolves named pools via effectors/stim maps, then posts to the worker.
+   */
+  applyLesion(cfg) {
+    const lesion = normalizeLesion(cfg);
+    const ops = [];
+    for (const op of lesion.ops) {
+      if (op.op === "silence" || op.op === "boost" || op.op === "swapLR" || op.op === "delay") {
+        const { ids, missing } = resolvePools(this.poolMap, op.pools || []);
+        if (missing.length) console.warn("[lesion] missing pools", missing);
+        ops.push({ ...op, ids: Array.from(ids) });
+      } else if (op.op === "cut") {
+        const fr = resolvePools(this.poolMap, op.from || []);
+        const to = resolvePools(this.poolMap, op.to || []);
+        if (fr.missing.length || to.missing.length) {
+          console.warn("[lesion] cut missing", fr.missing, to.missing);
+        }
+        ops.push({
+          ...op,
+          fromIds: Array.from(fr.ids),
+          toIds: Array.from(to.ids),
+        });
+      } else if (op.op === "hunger") {
+        ops.push({ ...op });
+        // Also nudge life hunger so agent-side sampling matches dial.
+        if (op.level != null) this.life.hunger = Math.max(0, Math.min(1.5, op.level));
+      } else {
+        ops.push({ ...op });
+      }
+    }
+    const payload = { type: "lesion", lesion: { id: lesion.id, ops }, clear: true };
+    this.worker.postMessage(payload);
+    this.lesionMeta = { id: lesion.id, applied: ops.map((o) => o.op) };
+    return lesion;
+  }
+
+  clearLesion() {
+    this.worker.postMessage({ type: "clearLesion" });
+    this.lesionMeta = { id: "none", applied: [] };
+  }
+
+  /** Robot-facing vision→steering snapshot (+ stub chassis setpoints). */
+  getPortableControls() {
+    return portableControls(this);
+  }
+
+  getRobotStub() {
+    return stubRobotDriver(portableControls(this));
+  }
+
   resetPose(x, z, yaw) {
     this.worker.postMessage({ type: "reset" });
     this.heading = yaw != null ? yaw : Math.random() * Math.PI * 2;
@@ -392,6 +460,17 @@ export class EmbodiedFly {
       const f = raw[name] != null ? raw[name] : 0;
       this.motEma[name] = this.motEma[name] * 0.15 + f * 0.85;
     }
+    // Portable controller optic channels (HS/VS are small pools — use EMA as L/R proxy).
+    const hs = this.motEma.HS || 0, vs = this.motEma.VS || 0;
+    this.opticEma.HS_L = this.opticEma.HS_L * 0.2 + hs * 0.8;
+    this.opticEma.HS_R = this.opticEma.HS_R * 0.2 + hs * 0.8;
+    this.opticEma.VS_L = this.opticEma.VS_L * 0.2 + vs * 0.8;
+    this.opticEma.VS_R = this.opticEma.VS_R * 0.2 + vs * 0.8;
+    if (m.hungerMod != null && this.life) {
+      // Worker neuromod hunger dial — blend into life.hunger gently.
+      this.life.hunger = this.life.hunger * 0.85 + Math.max(0, Math.min(1.5, m.hungerMod)) * 0.15;
+    }
+    if (m.lesion) this.lesionMeta = m.lesion;
     if (this.xray) {
       this.actAttr.set(this.activity);
       this.points.geometry.attributes.act.needsUpdate = true;

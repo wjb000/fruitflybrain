@@ -53,3 +53,15 @@ Closed loop:
 **x-ray CNS** makes the cuticle transparent so you can see the reconstructed brain inside. Stim buttons bias sensory channels — body motion still only emerges if MNs fire.
 
 See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN→actuator map and the honest gap list (empty annotation pools stay empty).
+
+## Lesion assay + portable controller
+
+Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a visual approach-after-rotate assay, and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
+
+```bash
+# browser: one trial + silence HS
+# http://127.0.0.1:8787/?assay=1&lesion=silence:HS
+
+# headless sweep
+node tools/sweep_lesions.mjs --lesion 'silence:HS'
+```

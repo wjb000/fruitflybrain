@@ -5,6 +5,9 @@ import { EmbodiedFly } from "./agent.js";
 import { drawOmmatidia } from "./eye.js";
 import { OdorWorld } from "./plume.js";
 import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js";
+import { parseLesionFlag } from "./lesion.js";
+import { mountAssayPanel } from "./assay/panel.js";
+import { portableControls, stubRobotDriver } from "./controller/portable.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c");
@@ -652,6 +655,7 @@ function loop() {
       bitter: arena.userData.bitter.position,
       flies,
     });
+    if (assayPanel) assayPanel.tick(dt);
   }
   if (!userDriving && followMode === "selected" && selected) {
     const h = selected.heading;
@@ -698,6 +702,50 @@ function loop() {
   controls.update();
   renderer.render(scene, camera);
 }
+// --- Assay / lesion scaffolding (URL: ?assay=1&lesion=silence:HS) ---
+const _params = new URLSearchParams(location.search);
+const wantAssay = _params.get("assay") === "1" || _params.has("lesion") || _params.get("dev") === "1";
+let assayPanel = null;
+if (wantAssay) {
+  const host = document.querySelector(".hud") || document.body;
+  assayPanel = mountAssayPanel({
+    getFly: () => selected || flies[0],
+    arena,
+    keyLight: key,
+    applyLesion: async (fly, lesion) => { fly.applyLesion(lesion); },
+    clearLesion: (fly) => fly.clearLesion(),
+  });
+  host.appendChild(assayPanel.el);
+  const lesionFlag = _params.get("lesion");
+  if (lesionFlag) {
+    const waitReady = () => {
+      const f = selected || flies[0];
+      if (f && f.ready) {
+        f.applyLesion(parseLesionFlag(lesionFlag));
+        if (_params.get("assay") === "1") assayPanel.runTrial(parseLesionFlag(lesionFlag));
+      } else setTimeout(waitReady, 200);
+    };
+    waitReady();
+  }
+}
+window.ffbPortable = {
+  snapshot: () => {
+    const f = selected || flies[0];
+    return f ? portableControls(f) : null;
+  },
+  stub: () => {
+    const f = selected || flies[0];
+    return f ? stubRobotDriver(portableControls(f)) : null;
+  },
+  applyLesion: (flagOrCfg) => {
+    const f = selected || flies[0];
+    if (!f) return null;
+    const cfg = typeof flagOrCfg === "string" ? parseLesionFlag(flagOrCfg) : flagOrCfg;
+    return f.applyLesion(cfg);
+  },
+  clearLesion: () => { const f = selected || flies[0]; if (f) f.clearLesion(); },
+};
+
 setLoad(1, "starting brains");
 paintFlock();
 syncFollow();
