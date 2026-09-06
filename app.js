@@ -1,14 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=walkfix1";
-import { createOpenWorld } from "./world/procgen.js?v=walkfix1";
-import { EmbodiedFly } from "./agent.js?v=walkfix1";
-import { drawOmmatidia } from "./eye.js?v=walkfix1";
-import { OdorWorld } from "./plume.js?v=walkfix1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=walkfix1";
+import { loadNmf, createMaleFly } from "./fly.js?v=cube1";
+import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=cube1";
+import { createOpenWorld } from "./world/procgen.js?v=cube1";
+import { EmbodiedFly } from "./agent.js?v=cube1";
+import { drawOmmatidia } from "./eye.js?v=cube1";
+import { OdorWorld } from "./plume.js?v=cube1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cube1";
 import { parseLesionFlag } from "./lesion.js";
 import { mountAssayPanel } from "./assay/panel.js";
-import { portableControls, stubRobotDriver } from "./controller/portable.js";
+import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=cube1";
+
+const BODY_MODE = bodyModeFromUrl(); // default "cube"; ?body=fly for NeuroMechFly
 
 /** Local flight URL gate for HUD — do not import FLIGHT_ENABLED (stale module cache). Default OFF. */
 function flightEnabled() {
@@ -167,9 +170,10 @@ function spawn(sex, x, z, yaw) {
     x = s.x; z = s.z; if (yaw == null) yaw = s.yaw;
   }
   if (yaw == null) yaw = Math.random() * Math.PI * 2;
+  const body = BODY_MODE === "fly" ? createMaleFly() : createCubeChassis();
   const fly = new EmbodiedFly({
     sex,
-    body: createMaleFly(),
+    body,
     neuBuf: mNeu,
     csrBuf: mCsr,
     stim: mStim,
@@ -241,27 +245,41 @@ function fillJoints(el) {
 }
 fillJoints($("joints"));
 
-setLoad(0.88, "NeuroMechFly body");
-await loadNmf();
-setLoad(0.92, "MuJoCo flesh");
-await connectPhysics();
-// Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
-if (physics.ok) {
-  try { await clearPhysics(); } catch (_) {}
+if (BODY_MODE === "fly") {
+  setLoad(0.88, "NeuroMechFly body");
+  await loadNmf();
+  setLoad(0.92, "MuJoCo flesh");
+  await connectPhysics();
+  // Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
+  if (physics.ok) {
+    try { await clearPhysics(); } catch (_) {}
+  }
+} else {
+  setLoad(0.88, "cube chassis");
+  setLoad(0.92, "brain → portable steering");
+  // Cube mode: no MuJoCo plant, no nmf mesh load (avoids seize).
 }
 if ($("flesh")) {
-  const origin = physics.plantOrigin || "";
-  $("flesh").textContent = physics.ok
-    ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
-    : "kinematic";
+  if (BODY_MODE === "cube") {
+    $("flesh").textContent = "cube chassis";
+  } else {
+    const origin = physics.plantOrigin || "";
+    $("flesh").textContent = physics.ok
+      ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
+      : "kinematic";
+  }
 }
 if ($("info")) {
-  const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
-    ? (" Plant @ " + physics.plantOrigin + ".")
-    : "";
-  $("info").textContent = physics.ok
-    ? ("Vision→walk: compound eye → optic/visionL/R pools → connectome → leg MNs → MuJoCo contact. Flight free-joint lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "OFF (add ?flight=1 to enable)") + ". No walk thrusters." + plantHint)
-    : ("Static host: kinematic MN→pose→stance-slip. Vision→walk via optic write-in (landmarks+salience→LIF→leg MNs). Flight translation " + (FLIGHT_ENABLED ? "ON" : "OFF") + ". Set ?plant=https://… for remote plant; ?flight=1 to allow wing-MN lift." + plantHint);
+  if (BODY_MODE === "cube") {
+    $("info").textContent = "Default cube chassis: male CNS + vision/odor → LIF → leg/descending MNs → portable forward/yawRate → kinematic box on small pad. No MuJoCo / no nmf posing (add ?body=fly to restore). No thrusters that bypass brain.";
+  } else {
+    const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
+      ? (" Plant @ " + physics.plantOrigin + ".")
+      : "";
+    $("info").textContent = physics.ok
+      ? ("Vision→walk: compound eye → optic/visionL/R pools → connectome → leg MNs → MuJoCo contact. Flight free-joint lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "OFF (add ?flight=1 to enable)") + ". No walk thrusters." + plantHint)
+      : ("Static host: kinematic MN→pose→stance-slip. Vision→walk via optic write-in (landmarks+salience→LIF→leg MNs). Flight translation " + (FLIGHT_ENABLED ? "ON" : "OFF") + ". Set ?plant=https://… for remote plant; ?flight=1 to allow wing-MN lift." + plantHint);
+  }
 }
 
 spawn("male");
@@ -337,21 +355,38 @@ function onAny() {
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;
   if ($("hunger")) $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
-  const flesh = physics.ok
-    ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
-    : "kinematic MN";
+  const flesh = (focus.bodyMode === "cube" || BODY_MODE === "cube")
+    ? "cube chassis"
+    : (physics.ok
+      ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
+      : "kinematic MN");
   if ($("flesh")) $("flesh").textContent = flesh;
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
+  const steer = focus.lastSteering || chassisSetpoints(portableControls(focus));
+  if ($("steerHint")) {
+    $("steerHint").textContent =
+      "fwd " + (steer.forward ?? 0).toFixed(2) +
+      "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
+      "  | v=" + (steer.v ?? 0).toFixed(2) +
+      " ω=" + (steer.omega ?? 0).toFixed(2);
+  }
   if ($("lifeHint")) {
     const ps = procWorld.stats();
-    const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
-    const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
-    const plantBit = physics.ok
-      ? ("legs↓" + nLeg + (focus.planted ? " planted" : ""))
-      : ("|slip|=" + Number(slip).toFixed(3));
-    $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+    let plantBit;
+    if (focus.bodyMode === "cube" || BODY_MODE === "cube") {
+      plantBit = "plant=cube chassis · MN→portable";
+    } else {
+      const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
+      const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
+      plantBit = physics.ok
+        ? ("legs↓" + nLeg + (focus.planted ? " planted" : ""))
+        : ("|slip|=" + Number(slip).toFixed(3));
+    }
+    $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs +
+      " · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2) +
+      " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   }
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
@@ -675,7 +710,7 @@ function loop() {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   if (!paused) {
-    flushPhysics(dt);
+    if (BODY_MODE === "fly") flushPhysics(dt);
     const focusPos = (selected || flies[0])?.body?.position;
     const wx = focusPos?.x ?? 0, wz = focusPos?.z ?? 0;
     procWorld.update(wx, wz);
