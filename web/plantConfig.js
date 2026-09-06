@@ -1,12 +1,16 @@
-/** Remote MuJoCo plant origin for static hosts (GitHub Pages → Fly.io, etc.).
+/** Remote MuJoCo plant origin.
+ *
+ * Pages UI + connectome data stay on GitHub Pages.
+ * Physics runs on the lab Mac and is exposed via Cloudflare tunnel.
  *
  * Resolution order:
- *   1. `?plant=` query (absolute URL, e.g. https://ffb-plant.fly.dev)
+ *   1.  query (absolute URL)
  *   2. localStorage.ffbPlant
- *   3. "" → same-origin `/physics/*` (local serve.py)
- *
- * serve.py already sends Access-Control-Allow-Origin: *.
+ *   3. DEFAULT_PLANT (Mac tunnel)
+ *   4. "" → same-origin  (local serve.py)
  */
+export const DEFAULT_PLANT = "https://targeted-hebrew-chapter-forgotten.trycloudflare.com";
+
 export function plantBase() {
   try {
     const q = new URLSearchParams(location.search).get("plant");
@@ -20,6 +24,7 @@ export function plantBase() {
     const ls = localStorage.getItem("ffbPlant");
     if (ls != null && String(ls).trim() !== "") return String(ls).trim().replace(/\/$/, "");
   } catch (_) {}
+  if (DEFAULT_PLANT) return DEFAULT_PLANT.replace(/\/$/, "");
   return "";
 }
 
