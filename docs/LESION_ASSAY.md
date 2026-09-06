@@ -4,7 +4,7 @@
 
 Grok (or any worker) runs mass virtual surgeries on the **LIF connectome path** — silence a cell type, boost, cut a bundle, swap L/R, add synaptic delay, hunger via neuromod. Keep only **weird specific deficits** (still walks + sees but lost memory/heading), not "falls over."
 
-Later: email the fly lab; encore = port vision→steering to a robot. **Now:** assay + lesion harness + portable controller interface.
+Encore = **robot controller** (`web/controller/portable.js`): vision→steering → `{v, omega}` for cube or hardware. **Now:** assay + lesion harness + that API.
 
 Constraints for this scaffolding: **male-only, MN-only body drive, calm gains, no thrusters / cosmetics / invented MNs.**
 
@@ -61,19 +61,29 @@ node tools/sweep_lesions.mjs --out sweeps/run.jsonl --ticks 80
 
 Writes JSONL scores + a `.ranked.json` (interesting first). Full overnight grids can reuse the same schema.
 
-## Portable controller (robot-facing)
+## Robot controller (portable API)
 
-Module: `web/controller/portable.js`
+Module: `web/controller/portable.js` — the clean robot-facing surface.
 
 | Signal | Meaning |
 |---|---|
-| `vision.HS_L/R`, `VS_L/R` | Lobula-plate wide-field pools |
+| `vision.HS_L/R`, `VS_L/R` | Lobula-plate wide-field pools (eye→LIF) |
+| `vision.salTarget` / `asymFood` | Beacon salience diagnostics (not actuators) |
 | `descending.DNa/DNp/…` | Descending EMAs |
 | `motor.walk/turn/fly` | MN-derived labels (not thrusters) |
-| `steering.forward` / `yawRate` | Clean chassis commands |
+| `steering.forward` / `yawRate` | Clean chassis commands (−1…1 yaw) |
 | `neuromod.hunger/OA/DAN` | Slow dials |
 
-`stubRobotDriver(snapshot)` returns `{ v, omega, source, t }` — no hardware yet.
+```js
+ffbPortable.snapshot(); // full vision + MN snapshot
+ffbPortable.stub();     // conservative { v, omega } for hardware
+ffbPortable.chassis();  // same mapping the cube plant uses
+ffbPortable.howto;      // control-law text
+```
+
+`stubRobotDriver(snapshot)` / `chassisSetpoints(snapshot)` return
+`{ v, omega, forward, yawRate, salTarget, source, t }`. A real robot publishes
+`v` / `omega` to its base; quiet MNs ⇒ near-zero command.
 
 ## Files
 

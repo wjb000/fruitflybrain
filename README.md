@@ -1,10 +1,10 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is **brain + cube chassis**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → kinematic box (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=fly` to restore the NeuroMechFly / MuJoCo path. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is a **robot controller**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → `{v, ω}` **cube chassis** (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=fly` to restore the NeuroMechFly / MuJoCo path. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
 
-Honest MN→body coupling: cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain. Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
+Honest MN→body coupling: cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
-**Vision→steer:** compound eye (incl. landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → `web/controller/portable.js` (`steering.forward` / `yawRate`). Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
+**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` / `yawRate` → `v` / `omega`). Hard-refresh with `?v=robot1`. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -56,9 +56,16 @@ Closed loop:
 
 See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actuator map, cube steering math, and annotation gaps.
 
-## Lesion assay + portable controller
+## Lesion assay + robot controller
 
-Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw animal → dark-retrieve** assay (bright beacon; memory, not reacquisition), and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
+Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw animal → dark-retrieve** assay (bright beacon; memory, not reacquisition), and the **robot controller** API (`portableControls` → `{v, omega}`). See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md) and [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md).
+
+```js
+// In the browser console after load:
+ffbPortable.snapshot(); // vision + MN steering
+ffbPortable.stub();     // { v, omega } for a robot driver
+ffbPortable.howto;      // control-law text
+```
 
 Calm closed-loop: MN-only body drive (no thrusters). Flight translation gated off unless `?flight=1`. `calm2` keeps softDrive / joint spans modest.
 

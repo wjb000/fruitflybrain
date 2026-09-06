@@ -19,20 +19,38 @@ Dish (light, odor, contact, proprio)
           → ?body=fly: MuJoCo plant (physics.py) OR kinematic NMF (fly.js)
 ```
 
-## Cube chassis mode (Pages default)
+## Robot controller — cube chassis (Pages default)
 
 Embodiment is a box+arrow on the small pad (`web/chassis.js`). The male
-connectome, compound eye, and optional odor still run. Plant motion:
+connectome, compound eye, and optional odor still run. This **is** the robot
+controller: the same `v` / `omega` a hardware driver would consume.
+
+**Control law (connectome-only):**
+
+```
+eye L/R salience (beacon)
+  → visionL/R + optic pools (Hz write-in, klinotaxis contrast)
+    → LIF connectome
+      → descending + leg MN EMAs
+        → cmd.walk / cmd.turn
+          → portableControls → steering.forward / yawRate
+            → chassisSetpoints → { v, omega }
+              → cube integrate (or your robot base)
+```
 
 1. `cmd.walk` / `cmd.turn` from neuromere MN EMAs (`T1L…T3R`) + `DNa` (walk)
-   in `agent.js` — same as fly mode UI labels.
-2. `portableControls()` → `steering.forward` / `steering.yawRate` (optional
-   mild descending nudge when turn is near 0).
-3. `chassisSetpoints()` scales to `v` / `omega` (readability gains only).
+   in `agent.js` — same as fly mode UI labels. **No** bearing-to-food thruster.
+2. `portableControls()` → `steering.forward` / `steering.yawRate` (+ vision
+   salience diagnostics for HUD / logging).
+3. `chassisSetpoints()` scales to `v` / `omega` (readability / hardware gains).
 4. `EmbodiedFly.stepCubeChassis`: integrate heading and XY with soft rim;
    **no** MuJoCo, **no** nmf mesh FK, **no** free-joint thrusters.
 
-Restore fly body: `?body=fly`. Cache-bust: `?v=cube1`.
+Restore fly body: `?body=fly`. Cache-bust: `?v=robot1`.
+
+**Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
+`ffbPortable.howto` in the browser. Publish `v` / `omega` each tick; silence
+optic pools (`?lesion=silence:HS`) should weaken beacon-directed yaw.
 
 Plant URL: `web/plantConfig.js` (Pages → Mac tunnel by default).
 Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load; soft rim bounce
@@ -77,10 +95,11 @@ they are **not** sent as free-joint thrusters.
 
 ### Vision → walking (sensory write-in)
 
-Compound eye (`eye.js`, including procgen `landmarks`) → Hz on `visionL/R`
-and optic channels (`R16*`, `L1–L3`, `T4*/T5*`, `HS`/`VS`) with mild L/R
-klinotaxis contrast → LIF (`sim.worker.js`) → descending/leg MN pools →
-`cmd.muscle` → body. No bypass that sets turn/walk from food bearing.
+Compound eye (`eye.js`, including procgen food **beacon** + `landmarks`) →
+stronger Hz on `visionL/R` and optic channels (`R16*`, `L1–L3`, `T4*/T5*`,
+`HS`/`VS`) with L/R klinotaxis contrast → LIF (`sim.worker.js`) →
+descending/leg MN pools → `cmd.walk`/`cmd.turn` → portable robot steering.
+No bypass that sets turn/walk from food bearing.
 
 ## Mapped vs unmapped (annotation limits)
 

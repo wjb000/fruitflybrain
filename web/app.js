@@ -1,15 +1,15 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=cube1";
-import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=cube1";
-import { createOpenWorld } from "./world/procgen.js?v=cube1";
-import { EmbodiedFly } from "./agent.js?v=cube1";
-import { drawOmmatidia } from "./eye.js?v=cube1";
-import { OdorWorld } from "./plume.js?v=cube1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cube1";
+import { loadNmf, createMaleFly } from "./fly.js?v=robot1";
+import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=robot1";
+import { createOpenWorld } from "./world/procgen.js?v=robot1";
+import { EmbodiedFly } from "./agent.js?v=robot1";
+import { drawOmmatidia } from "./eye.js?v=robot1";
+import { OdorWorld } from "./plume.js?v=robot1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=robot1";
 import { parseLesionFlag } from "./lesion.js";
 import { mountAssayPanel } from "./assay/panel.js";
-import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=cube1";
+import { portableControls, stubRobotDriver, chassisSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=robot1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "cube"; ?body=fly for NeuroMechFly
 
@@ -256,7 +256,7 @@ if (BODY_MODE === "fly") {
   }
 } else {
   setLoad(0.88, "cube chassis");
-  setLoad(0.92, "brain → portable steering");
+  setLoad(0.92, "brain → robot controller");
   // Cube mode: no MuJoCo plant, no nmf mesh load (avoids seize).
 }
 if ($("flesh")) {
@@ -271,7 +271,7 @@ if ($("flesh")) {
 }
 if ($("info")) {
   if (BODY_MODE === "cube") {
-    $("info").textContent = "Default cube chassis: male CNS + vision/odor → LIF → leg/descending MNs → portable forward/yawRate → kinematic box on small pad. No MuJoCo / no nmf posing (add ?body=fly to restore). No thrusters that bypass brain.";
+    $("info").textContent = "Robot controller (cube default): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → {v,ω} cube on small pad. No food-bearing thruster; no MuJoCo/nmf (?body=fly to restore). See web/controller/portable.js.";
   } else {
     const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
       ? (" Plant @ " + physics.plantOrigin + ".")
@@ -366,17 +366,21 @@ function onAny() {
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
   const steer = focus.lastSteering || chassisSetpoints(portableControls(focus));
   if ($("steerHint")) {
+    const salT = steer.salTarget ?? focus.lastVisionSal?.salTarget ?? focus.eye?.lastSummary?.salTarget ?? 0;
+    const asym = steer.asymFood ?? focus.lastVisionSal?.asymFood ?? focus.eye?.lastSummary?.asymFood ?? 0;
     $("steerHint").textContent =
       "fwd " + (steer.forward ?? 0).toFixed(2) +
       "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
       "  | v=" + (steer.v ?? 0).toFixed(2) +
-      " ω=" + (steer.omega ?? 0).toFixed(2);
+      " ω=" + (steer.omega ?? 0).toFixed(2) +
+      "  sal " + Number(salT).toFixed(2) +
+      " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
   }
   if ($("lifeHint")) {
     const ps = procWorld.stats();
     let plantBit;
     if (focus.bodyMode === "cube" || BODY_MODE === "cube") {
-      plantBit = "plant=cube chassis · MN→portable";
+      plantBit = "plant=cube · robot controller MN→v/ω";
     } else {
       const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
       const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
@@ -817,6 +821,12 @@ window.ffbPortable = {
     const f = selected || flies[0];
     return f ? stubRobotDriver(portableControls(f)) : null;
   },
+  chassis: () => {
+    const f = selected || flies[0];
+    return f ? chassisSetpoints(portableControls(f)) : null;
+  },
+  howto: ROBOT_HOWTO,
+  signals: PORTABLE_SIGNAL_DOC,
   applyLesion: (flagOrCfg) => {
     const f = selected || flies[0];
     if (!f) return null;
