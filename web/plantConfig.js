@@ -1,13 +1,12 @@
 /** Remote MuJoCo plant origin.
  *
- * Pages UI + connectome data stay on GitHub Pages.
- * Physics runs on the lab Mac and is exposed via Cloudflare tunnel.
+ * Pages serves UI + connectome data. Physics runs on the lab Mac via Cloudflare tunnel.
  *
  * Resolution order:
- *   1.  query (absolute URL)
+ *   1. ?plant= query (absolute URL)
  *   2. localStorage.ffbPlant
  *   3. DEFAULT_PLANT (Mac tunnel)
- *   4. "" → same-origin  (local serve.py)
+ *   4. empty = same-origin /physics (local serve.py)
  */
 export const DEFAULT_PLANT = "https://targeted-hebrew-chapter-forgotten.trycloudflare.com";
 
