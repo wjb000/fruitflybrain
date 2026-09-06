@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase } from "./plantConfig.js";
+import { plantUrl, plantBase, DEFAULT_PLANT } from "./plantConfig.js";
 
 export const physics = {
   ok: false,
@@ -12,37 +12,86 @@ export const physics = {
 };
 
 let busy = false;
+let reconnectAt = 0;
+
+async function probe(url) {
+  const r = await fetch(url + "/physics/health", { mode: "cors" });
+  if (!r.ok) throw new Error("health " + r.status);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || "plant not ok");
+  return j;
+}
 
 export async function connectPhysics() {
-  physics.plantOrigin = plantBase() || "(same-origin)";
-  try {
-    const r = await fetch(plantUrl("/physics/health"));
-    const j = await r.json();
-    physics.ok = !!j.ok;
-    physics.err = j.error || "";
-    physics.last = j;
-    return physics.ok;
-  } catch (e) {
-    physics.ok = false;
-    physics.err = String(e);
-    return false;
+  const tried = [];
+  const candidates = [];
+  const base = plantBase();
+  if (base) candidates.push(base);
+  if (DEFAULT_PLANT) {
+    const d = DEFAULT_PLANT.replace(/\/$/, "");
+    if (!candidates.includes(d)) candidates.push(d);
   }
+  // same-origin last (Pages has no /physics)
+  candidates.push("");
+
+  for (const c of candidates) {
+    const origin = c || "(same-origin)";
+    tried.push(origin);
+    try {
+      const healthUrl = c ? (c + "/physics/health") : "/physics/health";
+      const r = await fetch(healthUrl, { mode: "cors" });
+      const j = await r.json();
+      if (!j.ok) continue;
+      physics.ok = true;
+      physics.err = "";
+      physics.last = j;
+      physics.plantOrigin = origin;
+      // Persist working tunnel so next load skips a dead localStorage value.
+      if (c) {
+        try { localStorage.setItem("ffbPlant", c); } catch (_) {}
+      }
+      return true;
+    } catch (e) {
+      physics.err = String(e);
+    }
+  }
+  physics.ok = false;
+  physics.plantOrigin = tried[0] || "";
+  physics.err = physics.err || ("no plant among " + tried.join(", "));
+  reconnectAt = performance.now() + 4000;
+  return false;
+}
+
+/** If plant dropped (tunnel blip), retry without reloading the page. */
+export function maybeReconnectPhysics() {
+  if (physics.ok) return;
+  if (performance.now() < reconnectAt) return;
+  reconnectAt = performance.now() + 8000;
+  connectPhysics().catch(() => {});
 }
 
 export async function spawnPhysics(id, x, z, yaw) {
   if (!physics.ok) return null;
-  const r = await fetch(plantUrl("/physics/spawn"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, x, z, yaw }),
-  });
-  const j = await r.json();
-  if (j.pose) physics.poses.set(id, j.pose);
-  if (j.ok === false) {
+  try {
+    const r = await fetch(plantUrl("/physics/spawn"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, x, z, yaw }),
+    });
+    const j = await r.json();
+    if (j.pose) physics.poses.set(id, j.pose);
+    if (j.ok === false) {
+      physics.ok = false;
+      physics.err = j.error || "spawn failed";
+      reconnectAt = performance.now() + 3000;
+    }
+    return j.pose || null;
+  } catch (e) {
     physics.ok = false;
-    physics.err = j.error || "spawn failed";
+    physics.err = String(e);
+    reconnectAt = performance.now() + 3000;
+    return null;
   }
-  return j.pose || null;
 }
 
 export function despawnPhysics(id) {
@@ -58,14 +107,21 @@ export function despawnPhysics(id) {
 
 export async function resetPhysics(id, x, z, yaw) {
   if (!physics.ok) return null;
-  const r = await fetch(plantUrl("/physics/reset"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, x, z, yaw }),
-  });
-  const j = await r.json();
-  if (j.pose) physics.poses.set(id, j.pose);
-  return j.pose || null;
+  try {
+    const r = await fetch(plantUrl("/physics/reset"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, x, z, yaw }),
+    });
+    const j = await r.json();
+    if (j.pose) physics.poses.set(id, j.pose);
+    return j.pose || null;
+  } catch (e) {
+    physics.ok = false;
+    physics.err = String(e);
+    reconnectAt = performance.now() + 3000;
+    return null;
+  }
 }
 
 export function setCommand(id, cmd) {
@@ -79,6 +135,7 @@ if (typeof window !== "undefined") {
 }
 
 export function flushPhysics(dt) {
+  maybeReconnectPhysics();
   if (busy || !physics.ok) return;
   if (physics.pending.size === 0 && physics.poses.size === 0) return;
   busy = true;
@@ -96,6 +153,7 @@ export function flushPhysics(dt) {
       if (j.ok === false) {
         physics.ok = false;
         physics.err = j.error || "step failed";
+        reconnectAt = performance.now() + 3000;
         return;
       }
       physics.last = j;
@@ -106,6 +164,7 @@ export function flushPhysics(dt) {
     .catch((e) => {
       physics.ok = false;
       physics.err = String(e);
+      reconnectAt = performance.now() + 3000;
     })
     .finally(() => { busy = false; });
 }

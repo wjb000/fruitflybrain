@@ -3,16 +3,16 @@ import * as THREE from "three";
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
   // Wider spans so mid MN softDrive (~0.5) still translates into stance slip.
-  "coxa-pitch": ["coxaProm", "coxaRem", 1.05],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.78],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.72],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 1.18],
-  "trochanterfemur-roll": ["feRed", null, 0.48],
-  "tibia-pitch": ["tiExt", "tiFlex", 1.00],
-  "tarsus1-pitch": ["taLev", "taDep", 0.62],
+  "coxa-pitch": ["coxaProm", "coxaRem", 1.28],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.92],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.85],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 1.38],
+  "trochanterfemur-roll": ["feRed", null, 0.58],
+  "tibia-pitch": ["tiExt", "tiFlex", 1.18],
+  "tarsus1-pitch": ["taLev", "taDep", 0.78],
 };
 const GROUND_Y = 0.05;
-const MUSCLE_TAU = 0.05;
+const MUSCLE_TAU = 0.038;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();
@@ -279,8 +279,11 @@ function applyMuscleFk(leg, nodes) {
 function antagonist(pos, neg) {
   const p = pos || 0, n = neg || 0;
   const mag = p + n;
-  if (mag < 0.005) return 0;
-  return (p - n) / (mag + 0.08);
+  // Quiet pools stay limp (Dan bar). Modest real asymmetries get sharpened
+  // so flex/ext contrast from connectome rates can step without a CPG.
+  if (mag < 0.01) return 0;
+  const raw = (p - n) / (mag + 0.045);
+  return Math.tanh(raw * 2.55);
 }
 
 function follow(cur, target, dt) {

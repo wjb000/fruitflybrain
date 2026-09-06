@@ -20,11 +20,11 @@ let params = {
   refractory: 2,
   // Sqrt-compressed synapse weights (see step): mid edges matter more vs hubs.
   // Retuned so mean drive is slightly stronger than prior linear regime.
-  wScale: 0.044,
+  wScale: 0.055,
   inhibGain: 2.15,
-  stimAmp: 0.155,
+  stimAmp: 0.22,
   // Milder STD use → more reliable transmission while depression still present.
-  stdUse: 0.14,
+  stdUse: 0.11,
   // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
   facOA: 0.08,
 };
@@ -142,16 +142,16 @@ function effectorFractions(steps) {
   const hzOut = {};
   const s = Math.max(1, steps);
   const sec = (s * params.dt) / 1000;
-  const HZ_SCALE = 40; // ~40 Hz mean → full drive
+  const HZ_SCALE = 26; // ~26 Hz mean → full drive (sparse MN pools)
   for (const name in effectorIds) {
     const sz = effectorSize[name] || 0;
     const hits = effectorHits[name] || 0;
     const hz = sz > 0 && sec > 0 ? hits / (sz * sec) : 0;
-    // Soft map: 1 - exp(-hz/18) ≈ linear near 0, ~0.89 at 40 Hz
-    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 18));
+    // Soft map: 1 - exp(-hz/12) ≈ linear near 0, saturates ~30–40 Hz
+    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 12));
     // Also expose linear 0–40 Hz scale as a floor so mid rates stay visible
     const lin = Math.min(1, hz / HZ_SCALE);
-    out[name] = Math.max(norm, lin * 0.85);
+    out[name] = Math.max(norm, lin * 0.92);
     hzOut[name] = hz;
     effectorHits[name] = 0;
   }

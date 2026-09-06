@@ -42,13 +42,13 @@ OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
 DOF_MAP = [
     # Wider spans: mid MN softDrive still saturates actuators; MN-only, no cheats.
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.72, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.55, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.52, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.92, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.34, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.72, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.48, 0.0),
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.95, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.70, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.65, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 1.15, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.42, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.92, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.62, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.
@@ -78,9 +78,12 @@ def antagonist(pos: float, neg: float) -> float:
     p = float(pos or 0.0)
     n = float(neg or 0.0)
     mag = p + n
-    if mag < 0.005:
+    # Quiet pools stay limp. Sharpen modest real flex/ext asymmetries
+    # so NeuroMechFly DoFs articulate from connectome rates (no CPG).
+    if mag < 0.01:
         return 0.0
-    return (p - n) / (mag + 0.08)
+    raw = (p - n) / (mag + 0.045)
+    return float(math.tanh(raw * 2.55))
 
 
 def three_to_mj(x: float, z: float, y: float = SPAWN_Z) -> tuple[float, float, float]:

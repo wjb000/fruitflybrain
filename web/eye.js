@@ -275,7 +275,7 @@ export class CompoundEye {
       this.prevOn[sideName].set(onArr);
       const inv = 1 / N;
       // Stronger Hassenstein–Reichardt gain so sparse motion still drives T4/T5 hard.
-      const mot = 1 / Math.max(1, N * 0.045);
+      const mot = 1 / Math.max(1, N * 0.032);
       const sectors = secL.map((v, i) => (secN[i] ? v / secN[i] : 0));
       const sectorsUV = secUV.map((v, i) => (secN[i] ? v / secN[i] : 0));
       // Opponency: preferred minus null direction (not just raw correlator sums).
