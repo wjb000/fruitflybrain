@@ -145,7 +145,7 @@ function gradedContact(dist, reach, peak = 100) {
 const ARENA_R = 17.4;
 const POOL_KEYS = [
   "T1L", "T1R", "T2L", "T2R", "T3L", "T3R",
-  "DLM", "DVM", "ADMN", "MN9", "proboscis", "neck",
+  "DLM", "DVM", "ADMN", "MN9", "proboscis", "neck", "neckL", "neckR",
   "DNa", "DNg02", "DNp01", "DNp", "aIPg", "pIP1", "fru", "abdomen",
   ...CLOCK_KEYS,
   ...JOINT_POOLS,
@@ -172,7 +172,7 @@ export class EmbodiedFly {
     this.lastSmellL = 0;
     this.lastSmellR = 0;
     this.life = { hunger: sex === "female" ? 0.45 : 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
-    this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, abdomen: 0, muscle: {} };
+    this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, abdomen: 0, muscle: {} };
     this.motEma = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
     this.world = { food: { x: 6.5, z: 4.2 }, water: { x: -5.5, z: -3.8 }, other: null };
 
@@ -189,6 +189,8 @@ export class EmbodiedFly {
     this.smell = splitLR(stim.smell || [], this.neu.xyz);
     this.visionLR = splitLR(stim.vision || [], this.neu.xyz);
     this.ppk = splitLR(stim.ppk23 || P.ppk23 || [], this.neu.xyz);
+    this.ppk25 = splitLR(stim.ppk25 || P.ppk25 || [], this.neu.xyz);
+    this.ir52b = splitLR(stim.IR52b || P.IR52b || [], this.neu.xyz);
     this.optic = {};
     for (const k of OPTIC_TYPES) {
       this.optic[k] = sectorize(stim[k] || P[k] || [], this.neu.xyz);
@@ -214,14 +216,6 @@ export class EmbodiedFly {
     }
     this.lastOdor = { foodL: 0, foodR: 0, pherL: 0, pherR: 0 };
     this.prevDistO = 99;
-    this.walkL = [];
-    this.walkR = [];
-    for (let i = 0; i < this.neu.n; i++) {
-      const g = this.neu.group[i];
-      if (g !== 8 && g !== 12 && g !== 6) continue;
-      if (this.neu.xyz[i * 3] < 0) this.walkL.push(i);
-      else this.walkR.push(i);
-    }
 
     this.cns = new THREE.Group();
     // neurons.bin / meshes are µm: X=LR, Y=brain-up/VNC-down, Z=dorsal.
@@ -302,6 +296,10 @@ export class EmbodiedFly {
           escape: stim.escape || [],
           ppkL: this.ppk.L,
           ppkR: this.ppk.R,
+          ppk25L: this.ppk25.L,
+          ppk25R: this.ppk25.R,
+          IR52bL: this.ir52b.L,
+          IR52bR: this.ir52b.R,
           hygro: stim.hygro || P.hygrosensory || [],
         };
         for (const k of PROPRIO_KEYS) channels[k] = stim[k] || P[k] || [];
@@ -327,8 +325,7 @@ export class EmbodiedFly {
         this.worker.postMessage({ type: "bind", channels });
         const pools = {};
         for (const k of POOL_KEYS) pools[k] = [...this.poolSets[k]];
-        pools.walkL = this.walkL;
-        pools.walkR = this.walkR;
+        // No walkL/walkR aggregate effectors — locomotion from annotated MN pools only.
         this.worker.postMessage({ type: "bindEffectors", pools });
         this.worker.postMessage({ type: "run", on: true });
         if (this.onReady) this.onReady();
@@ -384,26 +381,17 @@ export class EmbodiedFly {
   }
 
   applyFrame(m) {
-    const neu = this.neu;
     const sp = m.spikes;
-    const hits = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
-    let lEff = 0, rEff = 0;
     for (let i = 0; i < this.activity.length; i++) this.activity[i] *= 0.78;
     for (let k = 0; k < sp.length; k++) {
       const i = sp[k];
       this.activity[i] = 1;
-      const g = neu.group[i];
-      if (g === 8 || g === 12 || g === 6) {
-        if (neu.xyz[i * 3] < 0) lEff++; else rEff++;
-      }
     }
     const raw = m.eff || {};
     for (const name of POOL_KEYS) {
       const f = raw[name] != null ? raw[name] : 0;
       this.motEma[name] = this.motEma[name] * 0.15 + f * 0.85;
     }
-    const walkL = raw.walkL != null ? raw.walkL : 0;
-    const walkR = raw.walkR != null ? raw.walkR : 0;
     if (this.xray) {
       this.actAttr.set(this.activity);
       this.points.geometry.attributes.act.needsUpdate = true;
@@ -427,15 +415,15 @@ export class EmbodiedFly {
     const e = this.motEma;
     const legs = (e.T1L + e.T1R + e.T2L + e.T2R + e.T3L + e.T3R) / 6;
     const cmd = this.cmd;
-    // Body commands are ONLY connectome effector / MN readout.
-    // walk/turn are UI mode labels derived from MNs — never free-joint thrusters.
+    // Body commands are ONLY annotated MN / effector readout.
+    // walk/turn are UI mode labels — never free-joint thrusters or class-aggregate cheats.
     const legL = (e.T1L + e.T2L + e.T3L) / 3;
     const legR = (e.T1R + e.T2R + e.T3R) / 3;
     cmd.walk = THREE.MathUtils.clamp(
-      softDrive(legs * 1.0 + e.DNa * 0.55 + (walkL + walkR) * 0.35, 3.8), 0, 1
+      softDrive(legs * 1.15 + e.DNa * 0.65, 3.8), 0, 1
     );
-    const lrTurn = (legR - legL) * 2.0 + (walkR - walkL) * 3.5
-      + (rEff - lEff) / (rEff + lEff + 10);
+    // Turn from bilateral leg MN pools only (no walkL/R / descending-class spike thruster).
+    const lrTurn = (legR - legL) * 2.4;
     cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.6), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
     const wingRaw = e.DLM * 1.15 + e.DVM * 1.05 + e.ADMN * 0.9;
@@ -454,7 +442,12 @@ export class EmbodiedFly {
     cmd.groom = softDrive((e.T1L + e.T1R) * 0.75, 3.4);
     cmd.escape = softDrive(e.DNp01 * (this.sex === "female" ? 0.85 : 2.4), 3.8);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
-    cmd.head = softDrive(e.neck, 3.8);
+    const neckMag = Math.max(e.neck || 0, 0.5 * ((e.neckL || 0) + (e.neckR || 0)));
+    cmd.head = softDrive(neckMag, 3.8);
+    // Neck L/R asymmetry → yaw (annotated CvN sides); quiet → 0.
+    cmd.headYaw = THREE.MathUtils.clamp(
+      Math.tanh(((e.neckR || 0) - (e.neckL || 0)) * 3.2), -1, 1
+    );
     cmd.abdomen = softDrive(e.abdomen * 1.0 + e.aIPg * 0.25 + cmd.court * 0.12, 3.6);
     // Honest MN→muscle: empty annotation pools stay quiet (no neuromere fill-in).
     // Male T2/T3 coxaProm & Ta* are absent in FlyEM type labels — leave them 0.
@@ -711,9 +704,23 @@ export class EmbodiedFly {
         color: o.sex === "female" ? [1.0, 0.43, 0.71] : [0.23, 0.47, 0.91],
       })),
     });
+    // Annotated clock / neuromod pools — calm world→Hz (day, hunger, arousal, sleep).
+    // Quiet life state → near-baseline rates; never invented neurons.
+    const night = 1 - day;
+    const aro = this.life.arousal || 0;
+    const hung = this.life.hunger || 0;
+    const slp = this.life.sleep || 0;
+    const esc = this.cmd.escape || 0;
     const clockRates = {
-      lLNv: 4 + day * 35,
-      pep: 3 + this.life.hunger * 14,
+      lLNv: 4 + day * 32,
+      sLNv: 4 + day * 26 + Math.max(0, Math.sin(t * 0.012)) * 8,
+      LNd: 3 + day * 16 + night * 10,
+      DN1a: 3 + night * 20,
+      DN1p: 3 + night * 24 + slp * 14,
+      DAN: 4 + aro * 16 + (1 - hung) * 6,
+      OA: 4 + aro * 24 + esc * 18,
+      HT: 3 + slp * 14 + night * 8,
+      pep: 3 + hung * 14,
     };
     const extraV = (this.extra && this.extra.vision) || 0;
     const opticRates = this.opticRates(eye, extraV);
@@ -734,6 +741,12 @@ export class EmbodiedFly {
     const ppkBase = gradedContact(distQ, 1.55, 75);
     const ppkL = Math.min(120, ppkBase * (1 + Math.max(0, -bOth) * 0.28));
     const ppkR = Math.min(120, ppkBase * (1 + Math.max(0, bOth) * 0.28));
+    // ppk25: contact pheromone; IR52b: food/leg contact — annotated receptor pools.
+    const foodContact = nearFloor ? gradedContact(distF, 1.4, 55) : 0;
+    const ppk25L = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, -bOth) * 0.22));
+    const ppk25R = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, bOth) * 0.22));
+    const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
+    const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const radial = Math.hypot(x, z);
     const grounded = this.y < stand + 0.18 || this.onPerch;
     // Soft wall contact: earlier onset, lower peak — avoid constant scream into escape MNs.
@@ -765,6 +778,9 @@ export class EmbodiedFly {
         touch: Math.max(touch, extra.touch || 0),
         hygro,
         ppkL, ppkR,
+        ppk25L, ppk25R,
+        IR52bL: irL,
+        IR52bR: irR,
         courtship: extra.courtship || 0,
         escape: extra.escape || 0,
         ...clockRates,

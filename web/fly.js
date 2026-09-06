@@ -398,7 +398,11 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   if (d.head) {
     const rest = d.head.userData.restQuat;
     if (rest) {
-      const hy = THREE.MathUtils.clamp((cmd.head || 0) * 0.95, -0.85, 0.85);
+      // Magnitude from neck MN pool; yaw from annotated neckL/neckR asymmetry.
+      const hy = THREE.MathUtils.clamp(
+        (cmd.headYaw != null ? cmd.headYaw : 0) * 0.85 + (cmd.head || 0) * 0.12,
+        -0.85, 0.85
+      );
       d.head.quaternion.copy(rest);
       d.head.rotateY(hy);
       d.head.rotateX(feed * 0.55 - power * 0.2);
@@ -447,13 +451,14 @@ export function applyPhysicsPose(fly, pose, dt, t, cmd) {
 }
 
 export function wanderFemale(female, dt, t) {
+  // Demo helper only — quiet MN pose (no scripted walk thruster).
   const r = 7.5;
   const w = 0.18;
   female.position.x = Math.cos(t * w) * r;
   female.position.z = Math.sin(t * w) * r * 0.7;
   female.position.y = female.userData.standZ || 1.3;
   female.rotation.y = t * w + Math.PI / 2;
-  stepLife(female, dt, t, { mode: "walk", walk: 0.35, turn: 0.15 });
+  stepLife(female, dt, t, { mode: "rest", walk: 0, turn: 0, muscle: {} });
 }
 
 export function createArena() {

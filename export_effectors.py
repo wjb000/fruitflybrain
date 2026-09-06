@@ -88,6 +88,9 @@ def proprio_stim(pools: dict) -> dict:
         "propT1", "propT2", "propT3",
         "choT1L", "choT1R", "choT2L", "choT2R", "choT3L", "choT3R",
         "tactT1L", "tactT1R", "tactT2L", "tactT2R", "tactT3L", "tactT3R",
+        # Contact / pheromone receptors (annotated pools → stim channels).
+        "ppk23", "ppk25", "IR52b",
+        "neckL", "neckR",
     ]
     out = {}
     for k in keys:
@@ -162,6 +165,8 @@ def export_male() -> None:
         "MN9": take(typ == "MN9"),
         "proboscis": take(nerve == "PhN"),
         "neck": take(nerve == "CvN"),
+        "neckL": take((nerve == "CvN") & (side == "L")),
+        "neckR": take((nerve == "CvN") & (side == "R")),
         "DNa": take(typ.str.match(r"DNa")),
         "DNg02": take(typ.str.startswith("DNg02")),
         "DNp01": take(typ == "DNp01"),
@@ -285,6 +290,8 @@ def export_female() -> None:
         "MN9": take(typ == "MN9"),
         "proboscis": take((beff == "proboscis") | (cfun == "proboscis_motor") | (cfun == "pharynx_motor")),
         "neck": take((beff == "neck") | (cfun == "neck_motor")),
+        "neckL": take(((beff == "neck") | (cfun == "neck_motor")) & (side == "left")),
+        "neckR": take(((beff == "neck") | (cfun == "neck_motor")) & (side == "right")),
         "DNa": take(typ.str.match(r"DNa")),
         "DNg02": take(typ.str.startswith("DNg02")),
         "DNp01": take(typ == "DNp01"),

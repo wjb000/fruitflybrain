@@ -51,3 +51,5 @@ Closed loop:
 4. Locally **MuJoCo** (NeuroMechFly) is the flesh; on static hosts the flesh is kinematic MN→pose→stance-slip.
 
 **x-ray CNS** makes the cuticle transparent so you can see the reconstructed brain inside. Stim buttons bias sensory channels — body motion still only emerges if MNs fire.
+
+See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN→actuator map and the honest gap list (empty annotation pools stay empty).
