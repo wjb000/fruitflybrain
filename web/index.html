@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Living flies — Male CNS + BANC</title>
+  <title>Living flies — Male CNS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
@@ -20,9 +20,9 @@
 <body>
   <canvas id="c"></canvas>
   <div class="loader" id="loader">
-    <div class="kicker">FlyEM · Janelia · Princeton · BANC</div>
-    <h2>Male and female fruit flies</h2>
-    <p>Loading two complete central nervous systems — Male CNS v1.0 and the female BANC connectome — each driving its own body. You can add more.</p>
+    <div class="kicker">FlyEM · Janelia · Princeton</div>
+    <h2>Male fruit fly CNS</h2>
+    <p>Loading the complete adult male central nervous system — Male CNS v1.0 — driving a NeuroMechFly body. You can add more males.</p>
     <div class="progress"><i id="bar"></i></div>
     <p id="loadmsg">fetching maps…</p>
   </div>
@@ -35,10 +35,8 @@
         <div class="sub">World → sensors → connectome → motor neurons → body. Legs, wings, head, abdomen, and proboscis move only from measured MN rates (quiet MNs → quiet body). Locally MuJoCo is the plant; on this static host the flesh is kinematic MN→pose→stance-slip — not a scripted gait or cosmetic flap.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
-          <div><b id="nFemale">—</b><span>♀ map</span></div>
-          <div><b id="nFlock">2</b><span>living flies</span></div>
-          <div><b id="gait">♂ …</b><span>male</span></div>
-          <div><b id="gaitF">♀ …</b><span>female</span></div>
+          <div><b id="nFlock">1</b><span>living flies</span></div>
+          <div><b id="gait">♂ …</b><span>mode</span></div>
           <div><b id="hunger">—</b><span>selected hunger</span></div>
           <div><b id="flesh">…</b><span>body plant</span></div>
         </div>
@@ -46,7 +44,6 @@
         <div class="row" id="flock"></div>
         <div class="row">
           <button id="addM">+ male</button>
-          <button id="addF" class="pink">+ female</button>
         </div>
         <div class="row" id="stims"></div>
         <div class="row">

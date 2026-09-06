@@ -1,5 +1,7 @@
 # Brain → body mapping
 
+> **Public runtime:** male CNS only. Female BANC notes below are historical / offline export notes — the UI does not spawn or select females.
+
 Honest closed loop: **sensory → connectome LIF → motor neurons → body**.
 Quiet annotated pools → quiet actuators. Empty annotation pools stay empty
 (no invented MNs, no neuromere fill-in, no cosmetic wing idle / CPG gait /
@@ -92,7 +94,7 @@ Do **not** invent MNs for these:
 ## Regenerating maps
 
 ```bash
-python export_effectors.py   # → web/data[/female]/{effectors,stim}.json
+python export_effectors.py   # → web/data/{effectors,stim}.json (male public path)
 ```
 
-Requires `data/body-annotations.feather` (male) and BANC meta (female).
+Requires `data/body-annotations.feather` (male). Female BANC export remains available in the same script for offline comparison but is not used by the public UI.

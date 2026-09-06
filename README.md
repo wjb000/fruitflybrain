@@ -1,6 +1,6 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) and the female **BANC** map, each driving a NeuroMechFly body in a dish.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) driving a NeuroMechFly body in a dish. The public sim is **male CNS only** (the more complete map). Female BANC data may still exist under `web/data/female/` / `prepare_banc.py` as a historical offline path — it is not loaded or offered in the UI.
 
 Honest MN→body coupling (Dan Robinson bar): legs, wings, head, abdomen, and proboscis move **only** from measured motor-neuron rates. Quiet pools → quiet body. No cosmetic wing flapping, no scripted CPG gait, no free-joint walk/turn thrusters.
 

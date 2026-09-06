@@ -156,7 +156,7 @@ export class EmbodiedFly {
     sex, body, neuBuf, csrBuf, stim, effectors, brainBuf, vncBuf, skelJson, scene, x, z, yaw,
     onReady, onFrame,
   }) {
-    this.sex = sex;
+    this.sex = "male"; // public sim: male CNS only
     this.body = body;
     this.onReady = onReady;
     this.onFrame = onFrame;
@@ -171,7 +171,7 @@ export class EmbodiedFly {
     this.extra = {};
     this.lastSmellL = 0;
     this.lastSmellR = 0;
-    this.life = { hunger: sex === "female" ? 0.45 : 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
+    this.life = { hunger: 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
     this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, abdomen: 0, muscle: {} };
     this.motEma = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
     this.world = { food: { x: 6.5, z: 4.2 }, water: { x: -5.5, z: -3.8 }, other: null };
@@ -231,7 +231,7 @@ export class EmbodiedFly {
     this.brainMesh = new THREE.Mesh(
       parseMesh(brainBuf),
       new THREE.MeshPhysicalMaterial({
-        color: sex === "female" ? 0xff6eb4 : 0x3a78e8,
+        color: 0x3a78e8,
         transparent: true, opacity: 0.14, roughness: 0.35, side: THREE.DoubleSide, depthWrite: false,
       })
     );
@@ -248,7 +248,7 @@ export class EmbodiedFly {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(this.neu.xyz, 3));
     const col = new Float32Array(n * 3);
-    const hue = sex === "female" ? [1.0, 0.43, 0.71] : [0.23, 0.47, 0.91];
+    const hue = [0.23, 0.47, 0.91];
     for (let i = 0; i < n; i++) {
       col[i * 3] = hue[0]; col[i * 3 + 1] = hue[1]; col[i * 3 + 2] = hue[2];
     }
@@ -371,7 +371,7 @@ export class EmbodiedFly {
     this.y = this.body.userData.standZ || 1.3; this.vy = 0;
     this.body.position.set(x, this.y, z);
     this.body.rotation.set(0, this.heading, 0);
-    this.life.hunger = this.sex === "female" ? 0.45 : 0.7;
+    this.life.hunger = 0.7;
     this.life.crop = 0.2; this.life.energy = 1; this.life.sleep = 0.1;
     if (physics.ok) {
       resetPhysics(this.physId, x, z, this.heading).then((pose) => {
@@ -435,12 +435,11 @@ export class EmbodiedFly {
     };
     cmd.feed = softDrive(e.MN9 * 1.2 + e.proboscis * 1.0, 3.8);
     cmd.court = softDrive(
-      this.sex === "female" ? e.fru * 1.0 + e.abdomen * 0.4
-        : e.aIPg * 1.05 + e.pIP1 * 1.1 + e.DNg02 * 0.9,
+      e.aIPg * 1.05 + e.pIP1 * 1.1 + e.DNg02 * 0.9,
       3.5
     );
     cmd.groom = softDrive((e.T1L + e.T1R) * 0.75, 3.4);
-    cmd.escape = softDrive(e.DNp01 * (this.sex === "female" ? 0.85 : 2.4), 3.8);
+    cmd.escape = softDrive(e.DNp01 * 2.4, 3.8);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
     const neckMag = Math.max(e.neck || 0, 0.5 * ((e.neckL || 0) + (e.neckR || 0)));
     cmd.head = softDrive(neckMag, 3.8);
@@ -697,11 +696,11 @@ export class EmbodiedFly {
       perch: this.world.perch,
       bomb: bombPos,
       other: other ? { pos: other.body.position, heading: other.heading } : null,
-      otherColor: other && other.sex === "female" ? [1.0, 0.43, 0.71] : [0.23, 0.47, 0.91],
+      otherColor: [0.23, 0.47, 0.91],
       others: (this.world.others || []).map((o) => ({
         pos: o.body.position,
         heading: o.heading,
-        color: o.sex === "female" ? [1.0, 0.43, 0.71] : [0.23, 0.47, 0.91],
+        color: [0.23, 0.47, 0.91],
       })),
     });
     // Annotated clock / neuromod pools — calm world→Hz (day, hunger, arousal, sleep).

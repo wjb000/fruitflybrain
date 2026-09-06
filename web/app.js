@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly, createFemaleFly, createArena } from "./fly.js";
+import { loadNmf, createMaleFly, createArena } from "./fly.js";
 import { EmbodiedFly } from "./agent.js";
 import { drawOmmatidia } from "./eye.js";
 import { OdorWorld } from "./plume.js";
@@ -24,11 +24,10 @@ async function fetchBuf(url) {
 }
 async function fetchJson(url) { return (await fetch(url)).json(); }
 
-setLoad(0.04, "male + female connectomes");
+setLoad(0.04, "male CNS connectome");
 
 const [
   mNeu, mCsr, mBrain, mVnc, mStim, mEff, mMeta,
-  fNeu, fCsr, fBrain, fVnc, fStim, fEff, fMeta,
 ] = await Promise.all([
   fetchBuf("data/neurons.bin"),
   fetchBuf("data/connectome.bin"),
@@ -37,18 +36,10 @@ const [
   fetchJson("data/stim.json"),
   fetchJson("data/effectors.json"),
   fetchJson("data/meta.json"),
-  fetchBuf("data/female/neurons.bin"),
-  fetchBuf("data/female/connectome.bin"),
-  fetchBuf("data/female/brain.mesh"),
-  fetchBuf("data/female/vnc.mesh"),
-  fetchJson("data/female/stim.json"),
-  fetchJson("data/female/effectors.json"),
-  fetchJson("data/female/meta.json"),
 ]);
 
 $("nNeurons").textContent = mMeta.n.toLocaleString();
-$("nFemale").textContent = fMeta.n.toLocaleString();
-if ($("nEdges")) $("nEdges").textContent = (mMeta.nEdges + fMeta.nEdges).toLocaleString();
+if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -118,9 +109,9 @@ let followMode = "flock";
 let userDriving = false;
 let xrayOn = false;
 let paused = false;
-let nMale = 0, nFemale = 0;
+let nMale = 0;
 let readyN = 0;
-let expectedReady = 2;
+let expectedReady = 1;
 
 function spawnSpot(occupied) {
   const pts = occupied || flies.map((f) => ({ x: f.body.position.x, z: f.body.position.z }));
@@ -150,7 +141,8 @@ function wireWorld(fly) {
 
 function spawn(sex, x, z, yaw) {
   if (flies.length >= MAX_FLIES) return null;
-  const male = sex === "male";
+  // Public sim is male CNS only — ignore any non-male request.
+  sex = "male";
   if (x == null || z == null) {
     const s = spawnSpot();
     x = s.x; z = s.z; if (yaw == null) yaw = s.yaw;
@@ -158,19 +150,19 @@ function spawn(sex, x, z, yaw) {
   if (yaw == null) yaw = Math.random() * Math.PI * 2;
   const fly = new EmbodiedFly({
     sex,
-    body: male ? createMaleFly() : createFemaleFly(),
-    neuBuf: male ? mNeu : fNeu,
-    csrBuf: male ? mCsr : fCsr,
-    stim: male ? mStim : fStim,
-    effectors: male ? mEff : fEff,
-    brainBuf: male ? mBrain : fBrain,
-    vncBuf: male ? mVnc : fVnc,
+    body: createMaleFly(),
+    neuBuf: mNeu,
+    csrBuf: mCsr,
+    stim: mStim,
+    effectors: mEff,
+    brainBuf: mBrain,
+    vncBuf: mVnc,
     scene, x, z, yaw,
     onReady: onFlyReady,
     onFrame: onAny,
   });
-  if (male) { nMale++; fly.name = "♂" + nMale; }
-  else { nFemale++; fly.name = "♀" + nFemale; }
+  nMale++;
+  fly.name = "♂" + nMale;
   fly.setRun(!paused);
   fly.setCnsVisible(xrayOn);
   wireWorld(fly);
@@ -254,7 +246,6 @@ if ($("info")) {
 }
 
 spawn("male");
-spawn("female");
 
 function paintActs(fly, prefix) {
   if (!fly) return;
@@ -287,7 +278,7 @@ function paintFlock() {
   for (const f of flies) {
     const b = document.createElement("button");
     b.textContent = f.name + " " + (f.life?.mode || "…");
-    b.className = "flychip" + (f === selected ? " on" : "") + (f.sex === "female" ? " pink" : "");
+    b.className = "flychip" + (f === selected ? " on" : "");
     b.onclick = () => {
       selectFly(f);
       followMode = "selected";
@@ -298,7 +289,6 @@ function paintFlock() {
   }
   if ($("nFlock")) $("nFlock").textContent = flies.length;
   if ($("addM")) $("addM").disabled = flies.length >= MAX_FLIES;
-  if ($("addF")) $("addF").disabled = flies.length >= MAX_FLIES;
 }
 
 let worldTick = 0;
@@ -321,10 +311,8 @@ function onAny() {
     key.position.set(Math.sin(day * Math.PI) * 14, 3 + day * 14, Math.cos(day * Math.PI) * 8);
     renderer.setClearColor(0x0b0d12, 1);
   }
-  const males = flies.filter((f) => f.sex === "male");
-  const fems = flies.filter((f) => f.sex === "female");
-  $("gait").textContent = males[0] ? "♂ " + males[0].life.mode : "—";
-  if ($("gaitF")) $("gaitF").textContent = fems[0] ? "♀ " + fems[0].life.mode : "—";
+  const focusMode = focus.life?.mode || "…";
+  $("gait").textContent = "♂ " + focusMode;
   $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
   const flesh = physics.ok
@@ -446,10 +434,6 @@ if ($("sensoryBomb")) {
 $("addM").onclick = () => {
   expectedReady = readyN + 1;
   spawn("male");
-};
-$("addF").onclick = () => {
-  expectedReady = readyN + 1;
-  spawn("female");
 };
 
 const raycaster = new THREE.Raycaster();
@@ -620,9 +604,7 @@ function applyStim(id) {
   if (id === "taste") extra.taste = 90;
   if (id === "escape") extra.escape = 180;
   for (const f of flies) {
-    f.extra = f.sex === "female"
-      ? { vision: extra.vision, smellL: extra.smellL, smellR: extra.smellR, taste: extra.taste, escape: extra.escape }
-      : { ...extra };
+    f.extra = { ...extra };
   }
   $("stimHint").textContent = id === "loop" ? "every fly closed-loop" : id;
 }

@@ -229,7 +229,7 @@ export class OdorWorld {
     const food = world.food;
     const water = world.water;
     const bitter = world.bitter;
-    const flock = world.flies || [world.male, world.female].filter(Boolean);
+    const flock = world.flies || [];
     this.wind = windAt(0, 0, t);
     this.food.acc += dt * this.food.emitHz;
     while (this.food.acc >= 1) {
@@ -250,14 +250,7 @@ export class OdorWorld {
     }
     for (const fly of flock) {
       if (!fly || !fly.body) continue;
-      if (fly.sex === "female") {
-        this.pher.acc += dt * this.pher.emitHz / Math.max(1, flock.filter((f) => f.sex === "female").length);
-        if (this.pher.acc >= 1) {
-          this.pher.acc -= 1;
-          const p = fly.body.position;
-          this.pher.emit(p.x, p.y + 1.15, p.z, this.wind, 1);
-        }
-      }
+      // Male-only public sim: no female pheromone emitters. Scent bomb can still seed pher.
       this.co2.acc += dt * this.co2.emitHz * 0.45;
       if (this.co2.acc >= 1) {
         this.co2.acc -= 1;
