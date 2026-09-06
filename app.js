@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=small1";
-import { createOpenWorld } from "./world/procgen.js?v=small1";
-import { EmbodiedFly } from "./agent.js?v=small1";
-import { drawOmmatidia } from "./eye.js?v=small1";
-import { OdorWorld } from "./plume.js?v=small1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=small1";
+import { loadNmf, createMaleFly } from "./fly.js?v=walkfix1";
+import { createOpenWorld } from "./world/procgen.js?v=walkfix1";
+import { EmbodiedFly } from "./agent.js?v=walkfix1";
+import { drawOmmatidia } from "./eye.js?v=walkfix1";
+import { OdorWorld } from "./plume.js?v=walkfix1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=walkfix1";
 import { parseLesionFlag } from "./lesion.js";
 import { mountAssayPanel } from "./assay/panel.js";
 import { portableControls, stubRobotDriver } from "./controller/portable.js";
@@ -346,7 +346,12 @@ function onAny() {
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
   if ($("lifeHint")) {
     const ps = procWorld.stats();
-    $("lifeHint").textContent = flesh + " · open world chunks " + ps.chunks + " @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+    const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
+    const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
+    const plantBit = physics.ok
+      ? ("legs↓" + nLeg + (focus.planted ? " planted" : ""))
+      : ("|slip|=" + Number(slip).toFixed(3));
+    $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   }
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
