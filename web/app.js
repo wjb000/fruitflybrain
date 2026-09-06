@@ -38,7 +38,7 @@ const [
   fetchJson("data/meta.json"),
 ]);
 
-$("nNeurons").textContent = mMeta.n.toLocaleString();
+if ($("nNeurons")) $("nNeurons").textContent = mMeta.n.toLocaleString();
 if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -312,8 +312,8 @@ function onAny() {
     renderer.setClearColor(0x0b0d12, 1);
   }
   const focusMode = focus.life?.mode || "…";
-  $("gait").textContent = "♂ " + focusMode;
-  $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
+  if ($("gait")) $("gait").textContent = "♂ " + focusMode;
+  if ($("hunger")) $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
   const flesh = physics.ok
     ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
@@ -322,7 +322,7 @@ function onAny() {
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
-  $("lifeHint").textContent = flesh + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+  if ($("lifeHint")) $("lifeHint").textContent = flesh + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
   setW("slow-sleep", focus.life.sleep);
@@ -346,12 +346,15 @@ function onAny() {
   }
 }
 
-$("pause").onclick = () => {
-  paused = !paused;
-  for (const f of flies) f.setRun(!paused);
-  $("pause").textContent = paused ? "resume" : "pause";
-  $("pause").classList.toggle("on", paused);
-};
+const pauseBtn = $("pause");
+if (pauseBtn) {
+  pauseBtn.onclick = () => {
+    paused = !paused;
+    for (const f of flies) f.setRun(!paused);
+    pauseBtn.textContent = paused ? "resume" : "pause";
+    pauseBtn.classList.toggle("on", paused);
+  };
+}
 $("reset").onclick = () => {
   const taken = [];
   for (const f of flies) {
@@ -606,7 +609,7 @@ function applyStim(id) {
   for (const f of flies) {
     f.extra = { ...extra };
   }
-  $("stimHint").textContent = id === "loop" ? "every fly closed-loop" : id;
+  if ($("stimHint")) $("stimHint").textContent = id === "loop" ? "every fly closed-loop" : id;
 }
 
 function wireCollapse(panelId, key, defaultCollapsed = false) {
