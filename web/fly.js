@@ -2,17 +2,17 @@ import * as THREE from "three";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
-  // Wider spans so mid MN softDrive (~0.5) still translates into stance slip.
-  "coxa-pitch": ["coxaProm", "coxaRem", 1.28],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.92],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.85],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 1.38],
-  "trochanterfemur-roll": ["feRed", null, 0.58],
-  "tibia-pitch": ["tiExt", "tiFlex", 1.18],
-  "tarsus1-pitch": ["taLev", "taDep", 0.78],
+  // Moderate spans: body follows MNs without extreme thrashing.
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.95],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.70],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.65],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 1.05],
+  "trochanterfemur-roll": ["feRed", null, 0.42],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.90],
+  "tarsus1-pitch": ["taLev", "taDep", 0.55],
 };
 const GROUND_Y = 0.05;
-const MUSCLE_TAU = 0.038;
+const MUSCLE_TAU = 0.05;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();

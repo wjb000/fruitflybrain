@@ -19,12 +19,12 @@ let params = {
   vThresh: 1,
   refractory: 2,
   // Sqrt-compressed synapse weights (see step): mid edges matter more vs hubs.
-  // Retuned so mean drive is slightly stronger than prior linear regime.
-  wScale: 0.055,
+  // Calm regime: enough network drive for MN readout, not seizure/spastic.
+  wScale: 0.012,
   inhibGain: 2.15,
-  stimAmp: 0.30,
-  // Milder STD use → more reliable transmission while depression still present.
-  stdUse: 0.11,
+  stimAmp: 0.145,
+  // Keep STD; quiet resting tone without silencing the network.
+  stdUse: 0.12,
   // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
   facOA: 0.08,
 };
@@ -135,23 +135,24 @@ function tallyEffectors() {
 
 /** Decode effector pools as mean spike rate (Hz) over the frame window,
  *  then map to a 0–1 `eff` the UI expects. Raw hits/(sz*steps) is ~0.01 and
- *  leaves muscles limp; 0–40 Hz → 0–1 (with soft exp) keeps sparse MN pools useful.
+ *  leaves muscles limp; ~40 Hz → 0–1 (with soft exp) keeps sparse MN pools useful
+ *  without saturating every effector every frame.
  */
 function effectorFractions(steps) {
   const out = {};
   const hzOut = {};
   const s = Math.max(1, steps);
   const sec = (s * params.dt) / 1000;
-  const HZ_SCALE = 26; // ~26 Hz mean → full drive (sparse MN pools)
+  const HZ_SCALE = 40; // ~40 Hz mean → full drive (less saturated effectors)
   for (const name in effectorIds) {
     const sz = effectorSize[name] || 0;
     const hits = effectorHits[name] || 0;
     const hz = sz > 0 && sec > 0 ? hits / (sz * sec) : 0;
-    // Soft map: 1 - exp(-hz/12) ≈ linear near 0, saturates ~30–40 Hz
-    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 12));
-    // Also expose linear 0–40 Hz scale as a floor so mid rates stay visible
+    // Soft map: 1 - exp(-hz/18) ≈ linear near 0, saturates ~50–60 Hz
+    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 18));
+    // Linear 0–HZ_SCALE floor so mid rates stay visible without pegging
     const lin = Math.min(1, hz / HZ_SCALE);
-    out[name] = Math.max(norm, lin * 0.92);
+    out[name] = Math.max(norm, lin * 0.85);
     hzOut[name] = hz;
     effectorHits[name] = 0;
   }
