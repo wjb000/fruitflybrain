@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=walk2";
-import { createOpenWorld } from "./world/procgen.js?v=walk2";
-import { EmbodiedFly } from "./agent.js?v=walk2";
-import { drawOmmatidia } from "./eye.js?v=walk2";
-import { OdorWorld } from "./plume.js?v=walk2";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=walk2";
+import { loadNmf, createMaleFly } from "./fly.js?v=walk3";
+import { createOpenWorld } from "./world/procgen.js?v=walk3";
+import { EmbodiedFly } from "./agent.js?v=walk3";
+import { drawOmmatidia } from "./eye.js?v=walk3";
+import { OdorWorld } from "./plume.js?v=walk3";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=walk3";
 import { parseLesionFlag } from "./lesion.js";
 import { mountAssayPanel } from "./assay/panel.js";
 import { portableControls, stubRobotDriver } from "./controller/portable.js";

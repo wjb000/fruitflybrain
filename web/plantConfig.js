@@ -8,7 +8,7 @@
  *   3. DEFAULT_PLANT (Mac tunnel)
  *   4. empty = same-origin /physics (local serve.py)
  */
-export const DEFAULT_PLANT = "https://targeted-hebrew-chapter-forgotten.trycloudflare.com";
+export const DEFAULT_PLANT = "https://candidate-however-bishop-promoted.trycloudflare.com";
 
 export function plantBase() {
   try {
