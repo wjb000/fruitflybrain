@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=walk3";
-import { createOpenWorld } from "./world/procgen.js?v=walk3";
-import { EmbodiedFly } from "./agent.js?v=walk3";
-import { drawOmmatidia } from "./eye.js?v=walk3";
-import { OdorWorld } from "./plume.js?v=walk3";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=walk3";
+import { loadNmf, createMaleFly } from "./fly.js?v=small1";
+import { createOpenWorld } from "./world/procgen.js?v=small1";
+import { EmbodiedFly } from "./agent.js?v=small1";
+import { drawOmmatidia } from "./eye.js?v=small1";
+import { OdorWorld } from "./plume.js?v=small1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=small1";
 import { parseLesionFlag } from "./lesion.js";
 import { mountAssayPanel } from "./assay/panel.js";
 import { portableControls, stubRobotDriver } from "./controller/portable.js";
@@ -64,8 +64,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 2500);
-camera.position.set(0, 8.5, 16);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 120);
+camera.position.set(0, 6.2, 11.5);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -73,9 +73,9 @@ controls.rotateSpeed = 0.55;
 controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.8;
-controls.maxDistance = 180;
-controls.target.set(0, 0.7, 0);
+controls.minDistance = 0.6;
+controls.maxDistance = 36;
+controls.target.set(0, 0.55, 0);
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN,
@@ -100,9 +100,9 @@ key.position.set(8, 16, 10);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.camera.near = 1;
-key.shadow.camera.far = 120;
-key.shadow.camera.left = key.shadow.camera.bottom = -40;
-key.shadow.camera.right = key.shadow.camera.top = 40;
+key.shadow.camera.far = 60;
+key.shadow.camera.left = key.shadow.camera.bottom = -22;
+key.shadow.camera.right = key.shadow.camera.top = 22;
 scene.add(key);
 
 const procWorld = createOpenWorld();
@@ -515,8 +515,8 @@ function overviewCamera() {
   userDriving = false;
   followMode = "off";
   syncFollow();
-  controls.target.set(0, 0.7, 0);
-  camera.position.set(0, 8.5, 16);
+  controls.target.set(0, 0.55, 0);
+  camera.position.set(0, 6.2, 11.5);
   controls.update();
 }
 

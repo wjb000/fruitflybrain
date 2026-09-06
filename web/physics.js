@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase, DEFAULT_PLANT } from "./plantConfig.js?v=walk3";
+import { plantUrl, plantBase, DEFAULT_PLANT } from "./plantConfig.js?v=small1";
 
 export const physics = {
   ok: false,

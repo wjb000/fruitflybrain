@@ -2,14 +2,14 @@ import * as THREE from "three";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
-  // Moderate spans: body follows MNs without extreme thrashing.
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.68],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.50],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.45],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.78],
-  "trochanterfemur-roll": ["feRed", null, 0.35],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.75],
-  "tarsus1-pitch": ["taLev", "taDep", 0.45],
+  // Walkable spans: enough foot travel for stance-slip XY (not seizure).
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.82],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.58],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.52],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.95],
+  "trochanterfemur-roll": ["feRed", null, 0.40],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.88],
+  "tarsus1-pitch": ["taLev", "taDep", 0.52],
 };
 const GROUND_Y = 0.05;
 const MUSCLE_TAU = 0.05;
@@ -279,10 +279,10 @@ function applyMuscleFk(leg, nodes) {
 function antagonist(pos, neg) {
   const p = pos || 0, n = neg || 0;
   const mag = p + n;
-  // Quiet pools stay limp. Mild flex/ext contrast — no seizure thrash.
+  // Quiet pools stay limp. Stronger flex/ext contrast so feet push, not twitch.
   if (mag < 0.01) return 0;
-  const raw = (p - n) / (mag + 0.06);
-  return Math.tanh(raw * 1.55);
+  const raw = (p - n) / (mag + 0.04);
+  return Math.tanh(raw * 1.85);
 }
 
 function follow(cur, target, dt) {

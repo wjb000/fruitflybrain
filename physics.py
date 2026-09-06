@@ -25,9 +25,9 @@ import mujoco as mj
 
 # Three.js dish: x right, y up, z forward. MuJoCo NeuroMechFly: x forward, y left, z up.
 # three (x, y, z) <-> mujoco (z, -x, y)
-ARENA_R = 17.4  # legacy dish; walls omitted in open world
-OPEN_WORLD = True
-WORLD_SOFT_LIMIT = 2400.0  # sanity only — not a playable rim
+ARENA_R = 18.0  # small pad (matches web/world/procgen.js)
+OPEN_WORLD = True  # no hard ring walls; soft XY clamp at WORLD_SOFT_LIMIT
+WORLD_SOFT_LIMIT = 15.8  # soft pad rim (~ARENA_R - 2.2)
 FLY_CEILING = 5.8
 SPAWN_Z = 0.55
 VISUAL_THORAX_Y = 1.18  # fly.js body.position.y inside the outer group
@@ -43,14 +43,14 @@ OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 # Promotor/remotor swing the coxa (pitch). Adductor vs remotor/abductor
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
 DOF_MAP = [
-    # Quieter spans post-densify: MN-only, no cheats, less seizure thrash.
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.62, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.48, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.45, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.78, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.28, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.62, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.40, 0.0),
+    # Walkable spans: MN-only contact locomotion (restore after calm2 twitch).
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.78, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.58, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.55, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.98, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.36, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.78, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.50, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.
@@ -63,7 +63,7 @@ CARTOON = {
     "tibiaX": -0.62,
     "tarsusX": 0.22,
 }
-CARTOON_GAIN = 0.48
+CARTOON_GAIN = 0.58
 
 AXIS_TO_CARTOON = {
     ("coxa", "yaw"): "coxaYaw",
@@ -80,11 +80,11 @@ def antagonist(pos: float, neg: float) -> float:
     p = float(pos or 0.0)
     n = float(neg or 0.0)
     mag = p + n
-    # Quiet pools stay limp. Milder flex/ext — densified MN map must not thrash.
+    # Quiet pools stay limp. Stronger flex/ext so contact can push the body.
     if mag < 0.01:
         return 0.0
-    raw = (p - n) / (mag + 0.08)
-    return float(math.tanh(raw * 1.25))
+    raw = (p - n) / (mag + 0.045)
+    return float(math.tanh(raw * 1.75))
 
 
 def three_to_mj(x: float, z: float, y: float = SPAWN_Z) -> tuple[float, float, float]:
@@ -453,9 +453,14 @@ class Plant:
             for i, nmf in enumerate(NMF_LEGS):
                 our = NMF_TO_OUR[nmf]
                 m = muscle.get(our) or {}
-                # Clear swing vs stance before peeling adhesion.
-                lifting = float(m.get("trFlex") or 0) > float(m.get("trExt") or 0) + 0.28
-                adh[i] = 0.35 if lifting else 1.0
+                # Peel adhesion on swing so planted feet can push (was too sticky → twitch).
+                tr_f = float(m.get("trFlex") or 0)
+                tr_e = float(m.get("trExt") or 0)
+                cox_p = float(m.get("coxaProm") or 0)
+                cox_r = float(m.get("coxaRem") or 0)
+                lifting = tr_f > tr_e + 0.10
+                swinging = abs(cox_p - cox_r) > 0.18 and (cox_p + cox_r) > 0.25
+                adh[i] = 0.12 if lifting else (0.45 if swinging else 1.0)
         sim.set_leg_adhesion_states(body.fly_id, adh)
 
         model, data = sim.mj_model, sim.mj_data

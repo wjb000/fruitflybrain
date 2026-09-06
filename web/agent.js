@@ -56,21 +56,26 @@ function hzVis(v, gain = 70, base = 3) {
 /** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
  *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
  */
-function softDrive(v, gain = 2.55) {
+function softDrive(v, gain = 3.25) {
   const x = Math.max(0, v || 0);
   return Math.tanh(x * gain);
 }
 
-/** Antagonist pair from real pool EMAs. Quiet×quiet → 0. Mild asymmetry
- *  so flex/ext can step without saturating; never invents a CPG clock.
+/** Antagonist pair from real pool EMAs. Quiet×quiet → 0.
+ *  Winner-take-more breaks co-contraction so stance-slip can translate
+ *  (calm2 left both sides mid-fire → net DoF≈0 twitch). No CPG clock.
  */
-function antagPair(posEma, negEma, gain = 2.55) {
+function antagPair(posEma, negEma, gain = 3.25) {
   const p = softDrive(posEma, gain);
   const n = softDrive(negEma, gain);
-  const d = Math.tanh((p - n) * 1.35);
+  const mag = p + n;
+  if (mag < 1e-4) return { pos: 0, neg: 0 };
+  const raw = (p - n) / (mag + 0.045);
+  const d = Math.tanh(raw * 2.15);
+  const lose = 0.48; // suppress loser so flex/ext do not cancel
   return {
-    pos: Math.max(0, Math.min(1, p + Math.max(0, d) * 0.16)),
-    neg: Math.max(0, Math.min(1, n + Math.max(0, -d) * 0.16)),
+    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.32)),
+    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.32)),
   };
 }
 
@@ -144,9 +149,9 @@ function gradedContact(dist, reach, peak = 100) {
   return peak * u * u;
 }
 
-const ARENA_R = 17.4; // legacy dish radius — rim disabled for open world
-const OPEN_WORLD = true;
-const WORLD_SOFT_LIMIT = 2400; // sanity clip only
+const ARENA_R = 18; // small pad radius (matches world/procgen.js)
+const OPEN_WORLD = true; // soft XY clamp only — no hard cage walls
+const WORLD_SOFT_LIMIT = 15.8; // soft pad rim (~ARENA_R - 2.2)
 /** Flight translation OFF by default — walking-focused. Re-enable with ?flight=1 */
 function flightEnabledFromUrl() {
   try {
@@ -546,12 +551,12 @@ export class EmbodiedFly {
     cmd.muscle = {};
     for (const name of LEG_NAMES) {
       const ema = (muscle) => e[`${name}_${muscle}`] || 0;
-      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 2.7);
-      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 2.6);
-      const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 2.8);
-      const tr = antagPair(ema("trFlex"), ema("trExt"), 2.85);
-      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 2.85);
-      const ta = antagPair(ema("taDep"), ema("taLev"), 2.9);
+      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 3.35);
+      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 3.2);
+      const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 3.3);
+      const tr = antagPair(ema("trFlex"), ema("trExt"), 3.45);
+      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 3.45);
+      const ta = antagPair(ema("taDep"), ema("taLev"), 3.4);
       cmd.muscle[name] = {
         coxaProm: coxa.pos,
         coxaRem: Math.max(coxa.neg, add.neg * 0.35),
@@ -629,12 +634,12 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Quiet stance-slip — feet still translate body; no thrashing.
-        // Still brain-derived — no free-joint walk thruster / CPG gait.
-        const slipGain = 0.95;
+        // Stance-slip translates body from MN foot motion (no thruster / CPG).
+        // Raised after calm2 left XY≈0 with visible joint twitch.
+        const slipGain = 2.45;
         this.body.position.x += (slip.x / slip.n) * slipGain;
         this.body.position.z += (slip.z / slip.n) * slipGain;
-        this.heading += (slip.yawR - slip.yawL) * 1.15;
+        this.heading += (slip.yawR - slip.yawL) * 1.55;
       }
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
