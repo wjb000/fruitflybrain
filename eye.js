@@ -183,9 +183,10 @@ export class CompoundEye {
           const wy = oy + dy * tw;
           if (wy > 0 && wy < 2.4) { best = tw; hit = "wall"; }
         }
-        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.35, food.z, 0.85);
+        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.35, food.z, 0.95);
         if (tFood < best) { best = tFood; hit = "food"; }
-        const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 2.15, food.z, 0.42);
+        // Tall beacon ball — slightly larger so L/R eyes get clear salience asymmetry.
+        const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 2.15, food.z, 0.55);
         if (tBeacon < best) { best = tBeacon; hit = "food"; }
         // Procedural extras (other chunk landmarks within eye range).
         const extras = world.landmarks || [];
@@ -222,7 +223,7 @@ export class CompoundEye {
         }
 
         // Distance falloff keeps near objects punchier than far arena clutter.
-        const near = Math.max(0.12, Math.min(1, 2.8 / (0.55 + best)));
+        const near = Math.max(0.14, Math.min(1, 3.4 / (0.45 + best)));
         let r, g, b, uv, sal = 0;
         if (hit === "sky") {
           const el = Math.max(0, dy);
@@ -242,10 +243,10 @@ export class CompoundEye {
           uv = w * 0.2;
           sal = 0.08 * near;
         } else if (hit === "food") {
-          // Warm sugar drop + beacon — high luminance + chromatic pop for assay.
-          r = 1.45 * day * near; g = 0.95 * day * near; b = 0.12 * day * near;
-          uv = 0.08 * day;
-          sal = 1.55 * near;
+          // Warm sugar drop + beacon — high luminance + chromatic pop for robot/assay.
+          r = 1.85 * day * near; g = 1.15 * day * near; b = 0.10 * day * near;
+          uv = 0.10 * day;
+          sal = 2.15 * near;
         } else if (hit === "bitter") {
           r = 0.18 * day * near; g = 0.48 * day * near; b = 0.10 * day * near;
           uv = 0.22 * day * near;
@@ -405,6 +406,17 @@ export class CompoundEye {
       };
     }
     this.last = out;
+    // Compact L/R salience summary for portable robot controller / HUD.
+    this.lastSummary = {
+      salL: out.L?.sal || 0,
+      salR: out.R?.sal || 0,
+      salFoodL: out.L?.salFood || 0,
+      salFoodR: out.R?.salFood || 0,
+      salTarget: 0.5 * ((out.L?.salFood || 0) + (out.R?.salFood || 0)),
+      asymFood: (out.R?.salFood || 0) - (out.L?.salFood || 0),
+      lumL: out.L?.lum || 0,
+      lumR: out.R?.lum || 0,
+    };
     return out;
   }
 }
