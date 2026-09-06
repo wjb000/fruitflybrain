@@ -147,6 +147,16 @@ function gradedContact(dist, reach, peak = 100) {
 const ARENA_R = 17.4; // legacy dish radius — rim disabled for open world
 const OPEN_WORLD = true;
 const WORLD_SOFT_LIMIT = 2400; // sanity clip only
+/** Flight translation OFF by default — walking-focused. Re-enable with ?flight=1 */
+function flightEnabledFromUrl() {
+  try {
+    const q = new URLSearchParams(location.search).get("flight");
+    return q === "1" || q === "true" || q === "on";
+  } catch (_) {
+    return false;
+  }
+}
+export const FLIGHT_ENABLED = typeof location !== "undefined" && flightEnabledFromUrl();
 const READOUT_POOLS = [
   // Optic / descending readouts for assay + portable controller (not muscles).
   "HS", "VS", "R16", "L1", "L2", "L3",
@@ -462,12 +472,13 @@ export class EmbodiedFly {
       const f = raw[name] != null ? raw[name] : 0;
       this.motEma[name] = this.motEma[name] * 0.15 + f * 0.85;
     }
-    // Portable controller optic channels (HS/VS are small pools — use EMA as L/R proxy).
-    const hs = this.motEma.HS || 0, vs = this.motEma.VS || 0;
-    this.opticEma.HS_L = this.opticEma.HS_L * 0.2 + hs * 0.8;
-    this.opticEma.HS_R = this.opticEma.HS_R * 0.2 + hs * 0.8;
-    this.opticEma.VS_L = this.opticEma.VS_L * 0.2 + vs * 0.8;
-    this.opticEma.VS_R = this.opticEma.VS_R * 0.2 + vs * 0.8;
+    // Portable controller optic channels — true L/R from eye write-in (Hz→0–1), not collapsed pool.
+    const o = this.lastOptic || {};
+    const nHz = (hz) => Math.max(0, Math.min(1, (hz || 0) / 110));
+    this.opticEma.HS_L = this.opticEma.HS_L * 0.25 + nHz(o.HSL) * 0.75;
+    this.opticEma.HS_R = this.opticEma.HS_R * 0.25 + nHz(o.HSR) * 0.75;
+    this.opticEma.VS_L = this.opticEma.VS_L * 0.25 + nHz(o.VSL) * 0.75;
+    this.opticEma.VS_R = this.opticEma.VS_R * 0.25 + nHz(o.VSR) * 0.75;
     if (m.hungerMod != null && this.life) {
       // Worker neuromod hunger dial — blend into life.hunger gently.
       this.life.hunger = this.life.hunger * 0.85 + Math.max(0, Math.min(1.5, m.hungerMod)) * 0.15;
@@ -586,7 +597,9 @@ export class EmbodiedFly {
         dlm: cmd.wing?.dlm ?? (e.DLM || 0),
         dvm: cmd.wing?.dvm ?? (e.DVM || 0),
         admn: cmd.wing?.admn ?? (e.ADMN || 0),
-        fly: cmd.fly || 0,
+        // allow_flight gates free-joint lift/thrust in physics.py (default off).
+        allow_flight: FLIGHT_ENABLED,
+        fly: FLIGHT_ENABLED ? (cmd.fly || 0) : 0,
         x: this.body.position.x,
         z: this.body.position.z,
         yaw: this.heading,
@@ -596,20 +609,21 @@ export class EmbodiedFly {
       else stepLife(this.body, dt, this.clock, cmd);
     } else {
       // Kinematic fallback if the plant is down: MN → leg pose → stance slip.
-      // No cmd.walk thruster — ground motion from foot slip only; flight from wing MNs.
+      // No cmd.walk thruster — ground motion from foot slip only.
+      // Flight translation gated (default OFF); wing mesh still follows wing MNs in poseSoftParts.
       const stand = this.body.userData.standZ || 1.3;
       const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
       if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
-      // Flight threshold not hair-trigger from MN noise (raised post-densify).
-      if (cmd.fly > 0.58) {
+      const flying = FLIGHT_ENABLED && cmd.fly > 0.58;
+      if (flying) {
         this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
       } else this.vy -= 18 * dt;
       this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && cmd.fly < 0.58) this.vy = 0;
+      if (this.y === stand && !flying) this.vy = 0;
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
-      if (cmd.fly > 0.58) {
+      if (flying) {
         const step = 4.2 * cmd.fly * dt;
         this.body.position.x += Math.sin(this.heading) * step;
         this.body.position.z += Math.cos(this.heading) * step;
@@ -769,6 +783,8 @@ export class EmbodiedFly {
       bitter: this.world.bitter,
       perch: this.world.perch,
       bomb: bombPos,
+      // Procgen landmarks — required for vision→walk toward chunk targets.
+      landmarks: this.world.landmarks || [],
       other: other ? { pos: other.body.position, heading: other.heading } : null,
       otherColor: [0.23, 0.47, 0.91],
       others: (this.world.others || []).map((o) => ({
@@ -798,6 +814,17 @@ export class EmbodiedFly {
     const extraV = (this.extra && this.extra.vision) || 0;
     const opticRates = this.opticRates(eye, extraV);
     this.lastOptic = opticRates;
+    // Broad visionL/R pools were bound but never eye-driven (only UI `vision` button).
+    // Fill them from compound-eye salience so connectome sees L/R visual asymmetry.
+    const visFromEye = (side) => {
+      const e = eye[side] || {};
+      const sal = (e.sal || 0) + (e.salFood || 0) * 1.35 + (e.salFly || 0) * 0.9 + (e.salWater || 0) * 0.7;
+      const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
+      return hzVis((e.lum || 0) * 0.45 + sal * 1.15 + mot * 0.55 + (e.on || 0) * 1.2, 100, 4);
+    };
+    let visionL = visFromEye("L") + extraV;
+    let visionR = visFromEye("R") + extraV;
+    ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.40));
     const stand = this.body.userData.standZ || 1.3;
     const nearFloor = this.y < stand + 0.36;
     // Graded GRN / ppk contact — not binary on/off.
@@ -830,7 +857,10 @@ export class EmbodiedFly {
     this.worker.postMessage({
       type: "rates",
       rates: {
+        // Keep symmetric `vision` for UI stim button only — L/R eye goes through visionL/R.
         vision: extraV,
+        visionL,
+        visionR,
         smellL: Math.max(smellL, extra.smellL || 0),
         smellR: Math.max(smellR, extra.smellR || 0),
         foodORNL: smellL,
@@ -866,7 +896,7 @@ export class EmbodiedFly {
     for (const side of ["L", "R"]) {
       const e = eye[side];
       // Sector photoreceptors: R1–R6 = luminance, R7 = UV, R8 = mixed.
-      // Keep eye/plume structure but lower gain so receptors aren't pegged.
+      // Object/salience gain raised so static landmarks still write into lamina/LP.
       const meanL = e.lum || 0.001;
       const meanU = e.uv || 0.001;
       const sFood = e.sectorsFood || [0, 0, 0, 0];
@@ -877,36 +907,51 @@ export class EmbodiedFly {
         const cU = (e.sectorsUV[s] - meanU) / (meanU + 0.06);
         const contrast = Math.max(0, Math.abs(cL));
         const uvContrast = Math.max(0, Math.abs(cU));
-        const obj = (sFood[s] || 0) * 0.7 + (sWater[s] || 0) * 0.55 + (sFly[s] || 0) * 0.8;
-        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.35 + obj * 0.2, 105, 4) + extraV * 0.6;
+        // Front-ish sectors (1–2) get a touch more object weight for approach.
+        const frontBias = (s === 1 || s === 2) ? 1.15 : 1.0;
+        const obj = ((sFood[s] || 0) * 1.15 + (sWater[s] || 0) * 0.7 + (sFly[s] || 0) * 0.95) * frontBias;
+        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.4 + obj * 0.55, 110, 4) + extraV * 0.6;
         r["R7" + side + s] = hzVis(
-          e.sectorsUV[s] + uvContrast * 0.4 + (sWater[s] || 0) * 0.35, 110, 3
+          e.sectorsUV[s] + uvContrast * 0.4 + (sWater[s] || 0) * 0.45, 110, 3
         ) + extraV * 0.35;
         r["R8" + side + s] = hzVis(
-          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.18 + obj * 0.12, 100, 3
+          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.2 + obj * 0.35, 105, 3
         ) + extraV * 0.3;
       }
-      // L1 ON / L2 OFF / L3 — temporal contrast + object motion salience.
+      // L1 ON / L2 OFF / L3 — temporal contrast + object salience (static targets matter).
       const on = e.on || 0, off = e.off || 0;
       const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
-      const sal = (e.sal || 0) + (e.salFood || 0) + (e.salFly || 0) * 0.9;
+      const sal = (e.sal || 0) + (e.salFood || 0) * 1.25 + (e.salFly || 0) * 0.95;
+      const salObj = sal + (e.salWater || 0) * 0.6;
       const t4 = (e.t4a || 0) + (e.t4b || 0) + (e.t4c || 0) + (e.t4d || 0);
       const t5 = (e.t5a || 0) + (e.t5b || 0) + (e.t5c || 0) + (e.t5d || 0);
-      r["L1" + side] = hzVis(on * 2.2 + t4 * 1.25 + mot * 0.45 + sal * 0.25, 115, 3);
-      r["L2" + side] = hzVis(off * 2.2 + t5 * 1.25 + mot * 0.4 + sal * 0.2, 115, 3);
-      r["L3" + side] = hzVis(e.uv * 1.0 + on * 0.8 + (e.salWater || 0) * 0.95, 100, 3);
-      // Direction-selective T4/T5 pools — map Hassenstein–Reichardt arms 1:1.
-      r["T4a" + side] = hzVis(e.t4a || 0, 120, 2);
-      r["T4b" + side] = hzVis(e.t4b || 0, 120, 2);
-      r["T4c" + side] = hzVis(e.t4c || 0, 120, 2);
-      r["T4d" + side] = hzVis(e.t4d || 0, 120, 2);
-      r["T5a" + side] = hzVis(e.t5a || 0, 120, 2);
-      r["T5b" + side] = hzVis(e.t5b || 0, 120, 2);
-      r["T5c" + side] = hzVis(e.t5c || 0, 120, 2);
-      r["T5d" + side] = hzVis(e.t5d || 0, 120, 2);
-      // Wide-field HS/VS lobula plate — signed motion magnitude into Hz.
-      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 0.9 + (e.salFly || 0) * 0.45, 110, 2);
-      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 0.9 + on * 0.3, 110, 2);
+      r["L1" + side] = hzVis(on * 2.35 + t4 * 1.3 + mot * 0.55 + salObj * 0.85, 125, 3);
+      r["L2" + side] = hzVis(off * 2.35 + t5 * 1.3 + mot * 0.5 + salObj * 0.7, 125, 3);
+      r["L3" + side] = hzVis(e.uv * 1.0 + on * 0.85 + (e.salWater || 0) * 1.05 + sal * 0.2, 105, 3);
+      // Direction-selective T4/T5 — HR arms + mild salience so loom/object edges couple.
+      const salT = salObj * 0.35;
+      r["T4a" + side] = hzVis((e.t4a || 0) + salT * 0.25, 125, 2);
+      r["T4b" + side] = hzVis((e.t4b || 0) + salT * 0.25, 125, 2);
+      r["T4c" + side] = hzVis((e.t4c || 0) + salT * 0.2, 125, 2);
+      r["T4d" + side] = hzVis((e.t4d || 0) + salT * 0.2, 125, 2);
+      r["T5a" + side] = hzVis((e.t5a || 0) + salT * 0.25, 125, 2);
+      r["T5b" + side] = hzVis((e.t5b || 0) + salT * 0.25, 125, 2);
+      r["T5c" + side] = hzVis((e.t5c || 0) + salT * 0.2, 125, 2);
+      r["T5d" + side] = hzVis((e.t5d || 0) + salT * 0.2, 125, 2);
+      // Wide-field HS/VS — motion + object presence (fixation still drives LP via connectome).
+      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.2 + salObj * 0.75 + (e.salFly || 0) * 0.4, 125, 2);
+      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.15 + on * 0.35 + salObj * 0.4, 125, 2);
+    }
+    // Sensory L/R contrast (same idea as odor klinotaxis) — not a body thruster.
+    // Lets optic flow / landmark asymmetry reach descending→leg paths via the connectome.
+    const pairKeys = [
+      "L1", "L2", "L3", "HS", "VS",
+      "T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d",
+    ];
+    for (const base of pairKeys) {
+      const pair = lrKlinotaxis(r[base + "L"] || 0, r[base + "R"] || 0, 0.38);
+      r[base + "L"] = pair.L;
+      r[base + "R"] = pair.R;
     }
     return r;
   }

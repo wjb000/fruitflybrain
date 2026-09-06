@@ -423,8 +423,9 @@ class Plant:
         """Drive leg position actuators + adhesion from MNs.
 
         Walking/turning/jumping must emerge from leg DoFs and contact — no
-        free-joint walk/turn forces. Flight lift/thrust (if any) comes only
-        from wing MN activity (`fly` / dlm / dvm / admn).
+        free-joint walk/turn forces. Flight lift/thrust is OFF unless
+        `allow_flight` is set (browser `?flight=1`); then wing MN activity
+        (`fly` / dlm / dvm / admn) may apply free-joint thrust/hover.
         """
         sim = body.sim
         n_steps = int(max(1, min(240, round(dt / self.timestep))))
@@ -433,16 +434,20 @@ class Plant:
 
         muscle = cmd.get("muscle") or {}
         # Wing power from explicit fly fraction or raw wing MN rates.
-        fly_a = max(0.0, min(1.0, float(cmd.get("fly") or 0.0)))
-        if fly_a < 0.01:
-            dlm = float(cmd.get("dlm") or 0.0)
-            dvm = float(cmd.get("dvm") or 0.0)
-            admn = float(cmd.get("admn") or 0.0)
-            fly_a = max(0.0, min(1.0, dlm * 1.6 + dvm * 1.45 + admn * 1.15))
-        # Flight threshold not hair-trigger from wing-MN noise (raised post-densify).
-        # Still hard-gated on MN drive; no walk/turn free-joint cheats.
-        if fly_a < 0.48:
-            fly_a = 0.0
+        # allow_flight defaults False — walking-focused; UI passes True only with ?flight=1.
+        allow_flight = bool(cmd.get("allow_flight"))
+        fly_a = 0.0
+        if allow_flight:
+            fly_a = max(0.0, min(1.0, float(cmd.get("fly") or 0.0)))
+            if fly_a < 0.01:
+                dlm = float(cmd.get("dlm") or 0.0)
+                dvm = float(cmd.get("dvm") or 0.0)
+                admn = float(cmd.get("admn") or 0.0)
+                fly_a = max(0.0, min(1.0, dlm * 1.6 + dvm * 1.45 + admn * 1.15))
+            # Flight threshold not hair-trigger from wing-MN noise (raised post-densify).
+            # Still hard-gated on MN drive; no walk/turn free-joint cheats.
+            if fly_a < 0.48:
+                fly_a = 0.0
         adh = np.zeros(6, dtype=float) if fly_a else np.ones(6, dtype=float)
         if not fly_a:
             for i, nmf in enumerate(NMF_LEGS):

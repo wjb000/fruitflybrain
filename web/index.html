@@ -33,7 +33,7 @@
       <div class="kicker">Flock · live</div>
       <div class="panel-body">
         <h1>They run themselves</h1>
-        <div class="sub">World → sensors → connectome → motor neurons → body. Legs, wings, head, abdomen, and proboscis move only from measured MN rates (quiet MNs → quiet body). Open world (streaming chunks). Locally MuJoCo is the plant; on this static host the flesh is kinematic MN→pose→stance-slip — not a scripted gait or cosmetic flap.</div>
+        <div class="sub">World → sensors → connectome → motor neurons → body. Vision→walk via optic pools → LIF → leg MNs (no thrusters). Flight translation off by default (<code>?flight=1</code> to re-enable). Open procedural world; male CNS; calm MN-only gains.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
@@ -114,6 +114,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=procgen1"></script>
+  <script type="module" src="app.js?v=walk1"></script>
 </body>
 </html>

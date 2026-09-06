@@ -363,7 +363,8 @@ export function stepLife(fly, dt, t, cmd) {
 
 function poseSoftParts(d, t, cmd, flyA, feed) {
   // Wings move ONLY from wing-MN drive (cmd.fly ← DLM/DVM/ADMN). Quiet MNs → rest pose.
-  // No always-on idle flap / cosmetic CPG.
+  // No always-on idle flap / cosmetic CPG. Mesh pose only — body translation/lift
+  // is gated separately in agent.js / physics.py (flight default OFF).
   const wing = cmd.wing || {};
   const dlm = wing.dlm != null ? wing.dlm : flyA;
   const dvm = wing.dvm != null ? wing.dvm : flyA;

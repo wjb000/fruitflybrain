@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadNmf, createMaleFly } from "./fly.js";
 import { createOpenWorld } from "./world/procgen.js";
-import { EmbodiedFly } from "./agent.js";
+import { EmbodiedFly, FLIGHT_ENABLED } from "./agent.js";
 import { drawOmmatidia } from "./eye.js";
 import { OdorWorld } from "./plume.js";
 import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js";
@@ -249,8 +249,8 @@ if ($("info")) {
     ? (" Plant @ " + physics.plantOrigin + ".")
     : "";
   $("info").textContent = physics.ok
-    ? ("Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Motor neurons command NeuroMechFly actuators. MuJoCo is the flesh — no free-joint walk thrusters." + plantHint)
-    : ("Static host: MuJoCo plant offline. Flesh is kinematic — MN rates pose legs/wings/head/abdomen; ground motion is stance slip from MN-posed feet. Quiet MNs → quiet body (no scripted gait / cosmetic flaps). Set ?plant=https://… for a remote plant." + plantHint);
+    ? ("Vision→walk: compound eye → optic/visionL/R pools → connectome → leg MNs → MuJoCo contact. Flight free-joint lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "OFF (add ?flight=1 to enable)") + ". No walk thrusters." + plantHint)
+    : ("Static host: kinematic MN→pose→stance-slip. Vision→walk via optic write-in (landmarks+salience→LIF→leg MNs). Flight translation " + (FLIGHT_ENABLED ? "ON" : "OFF") + ". Set ?plant=https://… for remote plant; ?flight=1 to allow wing-MN lift." + plantHint);
 }
 
 spawn("male");

@@ -4,6 +4,8 @@ The **complete adult male *Drosophila* central nervous system** (brain + ventral
 
 Honest MN→body coupling (Dan Robinson bar): legs, wings, head, abdomen, and proboscis move **only** from measured motor-neuron rates. Quiet pools → quiet body. No cosmetic wing flapping, no scripted CPG gait, no free-joint walk/turn thrusters.
 
+**Walking-focused (default):** flight free-joint lift/thrust is **off** (kinematic + MuJoCo). Re-enable with `?flight=1`. Vision→walk is sensory write-in only: compound eye (incl. procgen landmarks) → `visionL/R` + optic pools (R16/L1–L3/T4–T5/HS/VS) → connectome LIF → leg MNs → stance slip / contact — not a hand-coded “steer to food” thruster.
+
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
 > Berg et al. *Sexual dimorphism in the complete connectome of the Drosophila male central nervous system.* Cell (2026).
@@ -58,7 +60,7 @@ See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN�
 
 Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw animal → dark-retrieve** assay (bright beacon; memory, not reacquisition), and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
 
-Calm closed-loop: MN-only body drive (no thrusters). `calm2` lowers softDrive / joint spans / plant cartoon gain and raises flight gates.
+Calm closed-loop: MN-only body drive (no thrusters). Flight translation gated off unless `?flight=1`. `calm2` keeps softDrive / joint spans modest.
 
 ```bash
 python serve.py

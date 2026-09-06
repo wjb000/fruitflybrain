@@ -54,9 +54,17 @@ preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 | `DNp01` | Escape mode label (arousal path) |
 
 Ground translation: **stance slip from MN-posed feet** (kinematic) or
-**MuJoCo contact** (plant). Flight translation: wing-MN–gated only.
+**MuJoCo contact** (plant). Flight translation: **off by default**; with
+`?flight=1` / `allow_flight`, wing-MN–gated free-joint lift/thrust only.
 `cmd.walk` / `cmd.turn` are UI labels derived from bilateral leg MN pools —
 they are **not** sent as free-joint thrusters.
+
+### Vision → walking (sensory write-in)
+
+Compound eye (`eye.js`, including procgen `landmarks`) → Hz on `visionL/R`
+and optic channels (`R16*`, `L1–L3`, `T4*/T5*`, `HS`/`VS`) with mild L/R
+klinotaxis contrast → LIF (`sim.worker.js`) → descending/leg MN pools →
+`cmd.muscle` → body. No bypass that sets turn/walk from food bearing.
 
 ## Mapped vs unmapped (annotation limits)
 
@@ -85,7 +93,7 @@ Do **not** invent MNs for these:
 
 - NeuroMechFly plant position-actuates **42 leg DoFs** only; head / abdomen /
   proboscis / wing mesh motion is MN-driven in the browser (`poseSoftParts`)
-  while the plant applies wing-MN–gated free-joint flight forces.
+  while the plant may apply wing-MN–gated free-joint flight forces only when `allow_flight` is set.
 - No muscle-level neck joint in the plant — head yaw/pitch is visual from
   `neck*` MN rates.
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
