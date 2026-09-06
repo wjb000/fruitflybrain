@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=robot1";
-import { CompoundEye } from "./eye.js?v=robot1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=robot1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=robot1";
-import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=robot1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=stimmap1";
+import { CompoundEye } from "./eye.js?v=stimmap1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=stimmap1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=stimmap1";
+import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=stimmap1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -27,6 +27,14 @@ const OPTIC_TYPES = [
 const OPTIC_SECTOR_TYPES = ["R16", "R7", "R8"];
 const ODOR_TYPES = ["foodORN", "pherORN", "co2ORN", "JO", "aversiveORN"];
 const CLOCK_KEYS = ["sLNv", "lLNv", "LNd", "DN1a", "DN1p", "DAN", "OA", "HT", "pep"];
+/** Pools exposed in stim-map UI (effectors + stim). Inject Hz → LIF drive. */
+export const STIM_MAP_POOLS = [
+  "T1L", "T1R", "T2L", "T2R", "T3L", "T3R",
+  "DNa", "DNp", "DNp01", "DNg02",
+  "HS", "VS", "visionL", "visionR",
+  "DLM", "DVM", "ADMN",
+];
+export const DEFAULT_STIM_HZ = 90;
 const _head = new THREE.Vector3();
 const _antL = new THREE.Vector3();
 const _antR = new THREE.Vector3();
@@ -218,6 +226,8 @@ export class EmbodiedFly {
     this._stim = stim;
     this._effectors = effectors;
     this.lesionMeta = { id: "none", applied: [] };
+    /** Manual stim-map inject: pool name → Hz (merged into worker rates each tick). */
+    this.stimInject = {};
     this.world = { food: { x: 6.5, z: 4.2 }, water: { x: -5.5, z: -3.8 }, other: null };
 
     body.position.set(x, this.y, z);
@@ -235,6 +245,8 @@ export class EmbodiedFly {
     this.stim = stim;
     this.smell = splitLR(stim.smell || [], this.neu.xyz);
     this.visionLR = splitLR(stim.vision || [], this.neu.xyz);
+    this.poolMap.visionL = this.visionLR.L;
+    this.poolMap.visionR = this.visionLR.R;
     this.ppk = splitLR(stim.ppk23 || P.ppk23 || [], this.neu.xyz);
     this.ppk25 = splitLR(stim.ppk25 || P.ppk25 || [], this.neu.xyz);
     this.ir52b = splitLR(stim.IR52b || P.IR52b || [], this.neu.xyz);
@@ -376,6 +388,15 @@ export class EmbodiedFly {
         for (const k of CLOCK_KEYS) channels[k] = stim[k] || P[k] || [];
         channels.sweet = stim.sweet || P.sweet || [];
         channels.bitter = stim.bitter || P.bitter || [];
+        // Stim-map / causal inject: bind effector+stim pools as drive channels.
+        for (const k of STIM_MAP_POOLS) {
+          if (channels[k]?.length) continue;
+          const ids = this.poolMap[k] || P[k] || stim[k] || [];
+          if (ids.length) channels[k] = ids;
+        }
+        // visionL/R already set from splitLR; keep aliases for stim UI.
+        if (!channels.visionL?.length) channels.visionL = this.visionLR.L;
+        if (!channels.visionR?.length) channels.visionR = this.visionLR.R;
         this.worker.postMessage({ type: "bind", channels });
         const pools = {};
         for (const k of POOL_KEYS) pools[k] = [...this.poolSets[k]];
@@ -464,6 +485,44 @@ export class EmbodiedFly {
     this.lesionMeta = { id: "none", applied: [] };
   }
 
+  /**
+   * Current-inject / boost-Hz named pools on the LIF path (stim-map).
+   * Merges into the next sensory rates message; neurons Poisson-fire → connectome
+   * (or MN readout if the pool itself is an effector). Does not set cube velocity.
+   * @param {Record<string, number>} rates pool → Hz (0 clears)
+   * @returns {boolean} false if any requested pool is missing from maps
+   */
+  setRates(rates) {
+    if (!rates || typeof rates !== "object") return false;
+    if (!this.stimInject) this.stimInject = {};
+    let ok = true;
+    for (const [name, hz] of Object.entries(rates)) {
+      const ids = this.poolMap?.[name]
+        || this._effectors?.pools?.[name]
+        || this._stim?.[name]
+        || (name === "visionL" ? this.visionLR?.L : null)
+        || (name === "visionR" ? this.visionLR?.R : null);
+      const n = ids?.length || 0;
+      if (!n && (hz == null || hz > 0)) {
+        console.warn("[stim] missing pool", name);
+        ok = false;
+        continue;
+      }
+      const v = hz == null ? 0 : Number(hz);
+      this.stimInject[name] = Number.isFinite(v) ? Math.max(0, v) : 0;
+      // Ensure worker has the channel bound (late bind ok).
+      if (n && this.worker && this.ready) {
+        this.worker.postMessage({ type: "bind", channels: { [name]: Array.from(ids) } });
+      }
+    }
+    return ok;
+  }
+
+  clearStimInject() {
+    if (!this.stimInject) this.stimInject = {};
+    for (const k of Object.keys(this.stimInject)) this.stimInject[k] = 0;
+  }
+
   /** Robot-facing vision→steering snapshot (+ stub chassis setpoints). */
   getPortableControls() {
     return portableControls(this);
@@ -539,13 +598,15 @@ export class EmbodiedFly {
     // walk/turn are UI mode labels — never free-joint thrusters or class-aggregate cheats.
     const legL = (e.T1L + e.T2L + e.T3L) / 3;
     const legR = (e.T1R + e.T2R + e.T3R) / 3;
+    // Temper mean-leg walk so bilateral idle does not peg forward cruise.
     cmd.walk = THREE.MathUtils.clamp(
-      softDrive(legs * 1.15 + e.DNa * 0.65, 3.15), 0, 1
+      softDrive(legs * 0.82 + e.DNa * 0.5, 2.65), 0, 1
     );
     // Turn from bilateral leg MN pools only (no bearing-to-food thruster).
-    // Gain tuned so optic→connectome→MN imbalance yields visible cube yaw.
-    const lrTurn = (legR - legL) * 2.55;
-    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.55), -1, 1);
+    // Normalize L/R contrast so small connectome imbalances still yaw clearly.
+    const legSum = legL + legR + 0.045;
+    const lrTurn = ((legR - legL) / legSum) * 4.8 + (legR - legL) * 3.4;
+    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.75), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
     const wingRaw = e.DLM * 1.05 + e.DVM * 0.95 + e.ADMN * 0.8;
     cmd.fly = softDrive(wingRaw, 2.7);
@@ -728,7 +789,8 @@ export class EmbodiedFly {
   stepCubeChassis(dt) {
     const snap = portableControls(this);
     // Readability gains — source remains MN portable steering (connectome path).
-    const drive = chassisSetpoints(snap, { vGain: 3.8, yawGain: 4.2 });
+    // Lower vGain / raise yawGain so MN L/R yaw is visible vs forward cruise.
+    const drive = chassisSetpoints(snap, { vGain: 2.35, yawGain: 9.4 });
     const forward = drive.forward || 0;
     const yawRate = drive.yawRate || 0;
     const v = drive.v || 0;
@@ -916,13 +978,13 @@ export class EmbodiedFly {
     const visFromEye = (side) => {
       const e = eye[side] || {};
       // Food/beacon salience dominates so L/R asymmetry reaches visionL/R pools hard.
-      const sal = (e.sal || 0) + (e.salFood || 0) * 2.05 + (e.salFly || 0) * 0.95 + (e.salWater || 0) * 0.65;
+      const sal = (e.sal || 0) + (e.salFood || 0) * 2.55 + (e.salFly || 0) * 0.95 + (e.salWater || 0) * 0.65;
       const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
       return hzVis((e.lum || 0) * 0.40 + sal * 1.55 + mot * 0.65 + (e.on || 0) * 1.35, 115, 3);
     };
     let visionL = visFromEye("L") + extraV;
     let visionR = visFromEye("R") + extraV;
-    ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.55));
+    ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.78));
     this.lastVisionSal = {
       L: visionL, R: visionR,
       salFoodL: eye.L?.salFood || 0,
@@ -992,6 +1054,8 @@ export class EmbodiedFly {
         ...clockRates,
         ...proprio,
         ...opticRates,
+        // Stim-map inject last so causal buttons override closed-loop write-in.
+        ...(this.stimInject || {}),
       },
     });
   }
@@ -1044,8 +1108,8 @@ export class EmbodiedFly {
       r["T5c" + side] = hzVis((e.t5c || 0) + salT * 0.32, 130, 2);
       r["T5d" + side] = hzVis((e.t5d || 0) + salT * 0.32, 130, 2);
       // Wide-field HS/VS — motion + beacon presence → descending→leg via connectome.
-      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.35 + salObj * 1.15 + (e.salFly || 0) * 0.4, 135, 2);
-      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.2 + on * 0.4 + salObj * 0.65, 130, 2);
+      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.45 + salObj * 1.45 + (e.salFly || 0) * 0.4, 140, 2);
+      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.25 + on * 0.4 + salObj * 0.9, 135, 2);
     }
     // Sensory L/R contrast (same idea as odor klinotaxis) — not a body thruster.
     // Stronger gain so beacon L/R asymmetry survives LIF → descending → leg MNs.
@@ -1054,7 +1118,7 @@ export class EmbodiedFly {
       "T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d",
     ];
     for (const base of pairKeys) {
-      const pair = lrKlinotaxis(r[base + "L"] || 0, r[base + "R"] || 0, 0.52);
+      const pair = lrKlinotaxis(r[base + "L"] || 0, r[base + "R"] || 0, 0.72);
       r[base + "L"] = pair.L;
       r[base + "R"] = pair.R;
     }

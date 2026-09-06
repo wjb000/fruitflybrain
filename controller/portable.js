@@ -39,8 +39,11 @@ export function portableControls(fly) {
   const dnp = e.DNp || 0;
   const dng = e.DNg02 || 0;
   // Chassis commands = MN-derived walk/turn only (no vision bypass).
-  const forward = walk;
-  const yawRate = turn;
+  // Amplify yaw from MN imbalance; gate forward while |yaw| high (turn-then-approach).
+  const yawRate = clamp(Math.tanh(turn * 1.55), -1, 1);
+  const mis = Math.abs(yawRate);
+  const align = Math.pow(Math.max(0, 1 - mis), 1.25);
+  const forward = clamp01(walk * (0.18 + 0.82 * align));
   const salFoodL = num(sal.salFoodL, 0);
   const salFoodR = num(sal.salFoodR, 0);
   const salTarget = num(sal.salTarget, 0.5 * (salFoodL + salFoodR));
@@ -105,7 +108,7 @@ export function portableControls(fly) {
  * via chassisSetpoints(..., { vGain, yawGain }) in agent.stepCubeChassis.
  */
 export function stubRobotDriver(controls) {
-  return chassisSetpoints(controls, { vGain: 0.15, yawGain: 0.9 });
+  return chassisSetpoints(controls, { vGain: 0.12, yawGain: 1.35 });
 }
 
 /**
@@ -118,7 +121,7 @@ export function stubRobotDriver(controls) {
  *   3. apply set.v to differential-drive base; set.omega to yaw
  *   4. If you silence optic pools (e.g. silence:HS), expect weaker yaw toward beacons
  */
-export function chassisSetpoints(controls, { vGain = 3.8, yawGain = 4.2 } = {}) {
+export function chassisSetpoints(controls, { vGain = 2.35, yawGain = 9.4 } = {}) {
   const c = controls || {};
   const forward = c.steering?.forward ?? 0;
   const yawRate = c.steering?.yawRate ?? 0;
@@ -161,7 +164,7 @@ Hardware:
   bypasses the brain.
 
 Sanity: silence:HS or silence optic pools should weaken beacon-directed yaw.
-Default embodiment: cube chassis (?body=cube). Cache-bust ?v=robot1.
+Default embodiment: cube chassis (?body=cube). Cache-bust ?v=stimmap1.
 `.trim();
 
 function num(a, b) {
