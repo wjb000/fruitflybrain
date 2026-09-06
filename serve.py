@@ -138,6 +138,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="bind address (0.0.0.0 for containers / public plant)")
     ap.add_argument("--port", type=int, default=8787)
     ap.add_argument("--no-open", action="store_true")
     args = ap.parse_args()
@@ -147,10 +149,12 @@ def main():
         sys.exit("Missing web/data/connectome.bin — run:  python prepare.py")
 
     handler = functools.partial(Handler, directory=WEB)
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    url = f"http://127.0.0.1:{args.port}/"
-    print(f"Male CNS simulation  {url}", flush=True)
-    print("MuJoCo plant          /physics/health", flush=True)
+    httpd = ThreadingHTTPServer((args.host, args.port), handler)
+    # Prefer a clickable loopback URL even when bound to 0.0.0.0
+    browse_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+    url = f"http://{browse_host}:{args.port}/"
+    print(f"Male CNS simulation  {url}  (bind {args.host})", flush=True)
+    print("MuJoCo plant          /physics/health  (CORS *)", flush=True)
     if not args.no_open:
         webbrowser.open(url)
     try:

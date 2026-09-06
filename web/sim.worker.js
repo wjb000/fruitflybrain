@@ -4,27 +4,37 @@ let n = 0;
 let indptr, indices, weight, group, nt;
 let V, I, refrac, spikes, drive, sign;
 let adapt, mDA, mOA, m5;
+let uStd; // per-neuron short-term synaptic resource (depression/facilitation)
 let rngs;
 let params = {
   dt: 0.5,
   tau: 20,
-  tauSyn: 5,
-  tauAdapt: 80,
-  tauMod: 1600,
+  tauSynFast: 4.5,   // ACh / fast EPSP
+  tauSynInhib: 7.0,  // GABA / GluCl / histamine
+  tauAdapt: 90,
+  tauMod: 1400,      // slow neuromod (DA/OA/5HT)
+  tauStd: 220,       // STD recovery (ms)
   vRest: 0,
   vReset: 0,
   vThresh: 1,
   refractory: 2,
-  // Throughput: raised carefully so sparse MN pools still recruit downstream
-  // without saturating the LIF (was wScale 0.0095 / stimAmp 0.13 / steps 8).
-  wScale: 0.0115,
-  inhibGain: 2.4,
-  stimAmp: 0.155,
+  // Throughput: denser MN drive + STD — slightly lower wScale vs prior to keep stable.
+  wScale: 0.0108,
+  inhibGain: 2.35,
+  stimAmp: 0.148,
+  // Per-neuron STD: release probability drop after spike; recovery with tauStd.
+  stdUse: 0.18,
+  // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
+  facOA: 0.08,
 };
+// Keep legacy tauSyn alias for params messages
+params.tauSyn = params.tauSynFast;
 let t = 0;
-let synDecay = Math.exp(-params.dt / params.tauSyn);
+let synDecayFast = Math.exp(-params.dt / params.tauSynFast);
+let synDecayInhib = Math.exp(-params.dt / params.tauSynInhib);
 let adaptDecay = Math.exp(-params.dt / params.tauAdapt);
 let modDecay = Math.exp(-params.dt / params.tauMod);
+let stdDecay = Math.exp(-params.dt / params.tauStd);
 let sleepBias = 0;
 let arousalGain = 1;
 let running = false;
@@ -84,11 +94,15 @@ function init(bufNeurons, bufCsr) {
   mDA = new Float32Array(n);
   mOA = new Float32Array(n);
   m5 = new Float32Array(n);
+  uStd = new Float32Array(n);
+  uStd.fill(1);
   rngs = mulberry32(0xC0FFEE);
   rebuildSign();
-  synDecay = Math.exp(-params.dt / params.tauSyn);
+  synDecayFast = Math.exp(-params.dt / params.tauSynFast);
+  synDecayInhib = Math.exp(-params.dt / params.tauSynInhib);
   adaptDecay = Math.exp(-params.dt / params.tauAdapt);
   modDecay = Math.exp(-params.dt / params.tauMod);
+  stdDecay = Math.exp(-params.dt / params.tauStd);
 }
 
 const channels = {};
@@ -175,39 +189,52 @@ function step() {
   const rest = params.vRest;
   const ref0 = params.refractory;
   const gAro = arousalGain;
+  const stdUse = params.stdUse;
+  const facOA = params.facOA;
 
+  // Dual synaptic current decay: fast EPSP vs slower inhibition, plus STD recover.
+  // I holds net current; we decay with a blend favoring fast (majority ACh edges).
+  // Lightweight: single I buffer, decay = weighted average of fast/inhib.
+  const synDecay = 0.72 * synDecayFast + 0.28 * synDecayInhib;
   for (let i = 0; i < n; i++) {
     I[i] *= synDecay;
     adapt[i] *= adaptDecay;
     mDA[i] *= modDecay;
     mOA[i] *= modDecay;
     m5[i] *= modDecay;
+    // Recover release probability toward 1
+    uStd[i] += (1 - uStd[i]) * (1 - stdDecay);
   }
 
   for (let i = 0; i < n; i++) {
     if (!spikes[i]) continue;
     const knt = nt[i];
     const a = indptr[i], b = indptr[i + 1];
+    const u = uStd[i];
+    // Consume resources on spike (depression); OA gets mild facilitation bias via mOA.
+    uStd[i] = Math.max(0.05, u * (1 - stdUse));
     if (knt === 5) {
+      // Dopamine: slow gain / threshold modulate — stronger deposit than before.
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = mDA[j] + 0.0022 * weight[k];
-        mDA[j] = v > 1.4 ? 1.4 : v;
+        const v = mDA[j] + 0.0030 * weight[k] * u;
+        mDA[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 6) {
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = m5[j] + 0.0020 * weight[k];
-        m5[j] = v > 1.4 ? 1.4 : v;
+        const v = m5[j] + 0.0026 * weight[k] * u;
+        m5[j] = v > 1.5 ? 1.5 : v;
       }
     } else if (knt === 7) {
       for (let k = a; k < b; k++) {
         const j = indices[k];
-        const v = mOA[j] + 0.0028 * weight[k];
-        mOA[j] = v > 1.4 ? 1.4 : v;
+        const v = mOA[j] + 0.0035 * weight[k] * u;
+        mOA[j] = v > 1.5 ? 1.5 : v;
       }
     } else {
-      const s = sign[i] * wScale;
+      // Fast chemical: current pulse scaled by STD resource u.
+      const s = sign[i] * wScale * u;
       for (let k = a; k < b; k++) I[indices[k]] += s * weight[k];
     }
   }
@@ -225,13 +252,15 @@ function step() {
       refrac[i] -= dt;
       continue;
     }
-    const g = (1 + 0.5 * mDA[i] + 0.6 * mOA[i] - 0.4 * m5[i]) * gAro;
-    const thr = thr0 + 0.28 * m5[i] - 0.18 * mOA[i];
+    // Conductance-like gain from slow neuromod; OA also mild facilitation.
+    const g = (1 + 0.55 * mDA[i] + (0.65 + facOA) * mOA[i] - 0.42 * m5[i]) * gAro;
+    // Adaptive threshold: serotonin raises, OA lowers; denser drive → slightly stronger adapt.
+    const thr = thr0 + 0.32 * m5[i] - 0.20 * mOA[i] + 0.12 * adapt[i];
     V[i] += leak * (rest - V[i]) + g * I[i] - adapt[i];
     if (V[i] >= thr) {
       V[i] = reset;
       refrac[i] = ref0;
-      adapt[i] += 0.13;
+      adapt[i] += 0.145;
       spikes[i] = 1;
       nSpikes++;
     }
@@ -284,9 +313,12 @@ onmessage = (ev) => {
   }
   if (m.type === "params") {
     Object.assign(params, m.params);
-    synDecay = Math.exp(-params.dt / params.tauSyn);
+    if (params.tauSyn && !m.params.tauSynFast) params.tauSynFast = params.tauSyn;
+    synDecayFast = Math.exp(-params.dt / params.tauSynFast);
+    synDecayInhib = Math.exp(-params.dt / (params.tauSynInhib || 7));
     adaptDecay = Math.exp(-params.dt / params.tauAdapt);
     modDecay = Math.exp(-params.dt / params.tauMod);
+    stdDecay = Math.exp(-params.dt / (params.tauStd || 220));
     rebuildSign();
     if (m.stepsPerFrame) stepsPerFrame = m.stepsPerFrame;
     return;
@@ -319,6 +351,7 @@ onmessage = (ev) => {
   if (m.type === "reset") {
     V.fill(0); I.fill(0); refrac.fill(0); spikes.fill(0); t = 0;
     if (adapt) { adapt.fill(0); mDA.fill(0); mOA.fill(0); m5.fill(0); }
+    if (uStd) uStd.fill(1);
     sleepBias = 0; arousalGain = 1;
     recent.length = 0;
     return;

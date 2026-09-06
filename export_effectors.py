@@ -7,6 +7,10 @@ Female: BANC proofread neurons, matching prepare_banc.py.
 Joint pools follow NeuroMechFly's 7 DoF × 6 legs: coxa yaw/roll/pitch,
 trochanter-femur, tibia, tarsus — antagonist motor neurons from the
 published type names (promotor/remotor, flexor/extensor, depressor/levator).
+
+Empty pools (e.g. male T2/T3 coxaProm, Ta depressor/levator) mean the
+released annotations simply do not label those muscles in that neuromere —
+we never invent fake MNs.
 """
 
 from __future__ import annotations
@@ -28,10 +32,10 @@ LEGS = [
     ("R3", "T3", "R", "right", "hind_leg"),
 ]
 
-# Male CNS type strings (Berg et al. / MANC motor names).
+# Male CNS type / mancType / instance strings (Berg et al. / MANC motor names).
 MALE_MUSCLE = {
-    "coxaProm": r"Tergopleural/Pleural promotor|Tergopleural",
-    "coxaRem": r"Pleural remotor/abductor",
+    "coxaProm": r"Tergopleural/Pleural promotor|Pleural promotor|Tergopleural promotor|promotor MN",
+    "coxaRem": r"Pleural remotor/abductor|Pleural remotor|remotor/abductor",
     "coxaRotA": r"Sternal anterior rotator",
     "coxaRotP": r"Sternal posterior rotator",
     "coxaAdd": r"Sternal adductor",
@@ -40,11 +44,11 @@ MALE_MUSCLE = {
     "feRed": r"Fe reductor|ltm2-femur",
     "tiFlex": r"Ti flexor MN|Acc\. ti flexor",
     "tiExt": r"Ti extensor MN|ltm1-tibia",
-    "taDep": r"Ta depressor",
-    "taLev": r"Ta levator",
+    "taDep": r"Ta depressor|tarsus depress",
+    "taLev": r"Ta levator|tarsus levat",
 }
 
-# BANC cell_type / peripheral_target_type (Bates et al.).
+# BANC cell_type / malecns_cell_type / peripheral_target_type (Bates et al.).
 BANC_MUSCLE = {
     "coxaProm": r"promotor",
     "coxaRem": r"remotor|abductor",
@@ -53,16 +57,18 @@ BANC_MUSCLE = {
     "coxaAdd": r"adductor",
     "trFlex": r"trochanter_flexor|accessory_trochanter",
     "trExt": r"trochanter_extensor|sternotrochanter|tergotrochanter",
-    "feRed": r"femur_reductor|long_tendon",
+    "feRed": r"femur_reductor|long_tendon|ltm2",
     "tiFlex": r"tibia_flexor|accessory_tibia_flexor",
-    "tiExt": r"tibia_extensor|FETi|SETi",
+    "tiExt": r"tibia_extensor|FETi|SETi|ltm1",
     "taDep": r"tarsus_depressor",
     "taLev": r"tarsus_levator",
 }
 
+# Exit nerves that place a motor axon in a thoracic neuromere (MANC).
 T1_NERVES = {"ProLN", "ProCN", "ProAN", "DProN", "VProN", "PrN"}
-T2_NERVES = {"MesoLN"}
+T2_NERVES = {"MesoLN", "MesoAN"}
 T3_NERVES = {"MetaLN", "DMetaN"}
+NERVE_OF = {"T1": T1_NERVES, "T2": T2_NERVES, "T3": T3_NERVES}
 
 OPTIC_KEYS = [
     "R16", "R7", "R8", "L1", "L2", "L3",
@@ -125,6 +131,7 @@ def export_male() -> None:
     typ = df["type"].fillna("").astype(str)
     inst = df["instance"].fillna("").astype(str)
     side = df["somaSide"].fillna("").astype(str)
+    root = df["rootSide"].fillna("").astype(str) if "rootSide" in df.columns else side
     super_c = df["superclass"].fillna("").astype(str)
     nerve = df["exitNerve"].fillna("").astype(str)
     neu = df["somaNeuromere"].fillna("").astype(str)
@@ -133,7 +140,10 @@ def export_male() -> None:
     cls = df["class"].fillna("").astype(str)
     subclass = df["subclass"].fillna("").astype(str)
     entry = df["entryNerve"].fillna("").astype(str)
+    manc = df["mancType"].fillna("").astype(str) if "mancType" in df.columns else typ
     vnc_mn = super_c == "vnc_motor"
+    # Search type + MANC alias + instance so renamed homologs still match.
+    blob = (typ + " " + manc + " " + inst)
 
     def take(mask):
         return idx_series(mask)
@@ -165,8 +175,8 @@ def export_male() -> None:
         "hygrosensory": take(cls == "hygrosensory"),
     }
 
-    inst_L = inst.str.endswith("_L") | (side == "L")
-    inst_R = inst.str.endswith("_R") | (side == "R")
+    inst_L = inst.str.endswith("_L") | (side == "L") | (root == "L")
+    inst_R = inst.str.endswith("_R") | (side == "R") | (root == "R")
     nerve_T = {
         "T1": entry.isin(T1_NERVES),
         "T2": entry.isin(T2_NERVES),
@@ -175,9 +185,10 @@ def export_male() -> None:
     side_of = {"L": inst_L, "R": inst_R}
 
     for leg, seg, lr, _left, _part in LEGS:
-        seg_m = vnc_mn & (neu == seg) & (side == lr)
+        # Neuromere from soma OR leg exit nerve (real axons only).
+        seg_m = vnc_mn & ((neu == seg) | nerve.isin(NERVE_OF[seg])) & side_of[lr]
         for muscle, pat in MALE_MUSCLE.items():
-            pools[f"{leg}_{muscle}"] = take(seg_m & typ.str.contains(pat))
+            pools[f"{leg}_{muscle}"] = take(seg_m & blob.str.contains(pat, case=False, regex=True))
 
     pools["R16"] = take(typ == "R1-R6")
     pools["R7"] = take(typ.str.startswith("R7"))
@@ -247,16 +258,18 @@ def export_female() -> None:
     name = (typ + " " + manc + " " + pt)
     neu = df["neuromere"].fillna("").astype(str)
     beff = df["body_part_effector"].fillna("").astype(str)
-    bsens = df["body_part_sensory"].fillna("").astype(str)
     scv = df["super_class"].fillna("").astype(str)
     cfun = df["cell_function"].fillna("").astype(str)
     cclass = df["cell_class"].fillna("").astype(str)
     det = df["cell_function_detailed"].fillna("").astype(str) if "cell_function_detailed" in df.columns else cfun
+    bsens = df["body_part_sensory"].fillna("").astype(str)
 
     def take(mask):
         return idx_series(mask)
 
     motorish = (scv == "motor") | (cfun == "leg_motor") | beff.isin(["front_leg", "middle_leg", "hind_leg"])
+    # Include cells whose peripheral_target_type names a muscle even if neuromere is blank.
+    muscle_cell = motorish | pt.str.contains("muscle", case=False)
 
     pools = {
         "T1L": take((neu == "T1") & (side == "left") & ((scv == "motor") | (cfun == "leg_motor") | (beff == "front_leg"))),
@@ -291,7 +304,8 @@ def export_female() -> None:
         pools["T3R"] = take((beff == "hind_leg") & (side == "right"))
 
     for leg, seg, lr, side_name, part in LEGS:
-        seg_m = motorish & (neu == seg) & (side == side_name)
+        # Segment from soma neuromere OR body_part_effector (BANC often blanks neu).
+        seg_m = muscle_cell & (side == side_name) & ((neu == seg) | (beff == part))
         for muscle, pat in BANC_MUSCLE.items():
             pools[f"{leg}_{muscle}"] = take(seg_m & name.str.contains(pat, case=False))
 

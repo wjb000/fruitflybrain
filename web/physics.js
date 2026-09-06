@@ -1,18 +1,22 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
+import { plantUrl, plantBase } from "./plantConfig.js";
+
 export const physics = {
   ok: false,
   err: "",
   pending: new Map(),
   poses: new Map(),
   last: null,
+  plantOrigin: "",
 };
 
 let busy = false;
 
 export async function connectPhysics() {
+  physics.plantOrigin = plantBase() || "(same-origin)";
   try {
-    const r = await fetch("/physics/health");
+    const r = await fetch(plantUrl("/physics/health"));
     const j = await r.json();
     physics.ok = !!j.ok;
     physics.err = j.error || "";
@@ -27,7 +31,7 @@ export async function connectPhysics() {
 
 export async function spawnPhysics(id, x, z, yaw) {
   if (!physics.ok) return null;
-  const r = await fetch("/physics/spawn", {
+  const r = await fetch(plantUrl("/physics/spawn"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, x, z, yaw }),
@@ -45,7 +49,7 @@ export function despawnPhysics(id) {
   physics.pending.delete(id);
   physics.poses.delete(id);
   if (!physics.ok) return;
-  fetch("/physics/despawn", {
+  fetch(plantUrl("/physics/despawn"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
@@ -54,7 +58,7 @@ export function despawnPhysics(id) {
 
 export async function resetPhysics(id, x, z, yaw) {
   if (!physics.ok) return null;
-  const r = await fetch("/physics/reset", {
+  const r = await fetch(plantUrl("/physics/reset"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, x, z, yaw }),
@@ -82,7 +86,7 @@ export function flushPhysics(dt) {
   for (const id of physics.poses.keys()) flies[id] = physics.pending.get(id) || {};
   for (const [id, cmd] of physics.pending) flies[id] = cmd;
   physics.pending.clear();
-  fetch("/physics/step", {
+  fetch(plantUrl("/physics/step"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dt, flies }),

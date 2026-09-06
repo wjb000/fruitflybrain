@@ -234,11 +234,19 @@ setLoad(0.88, "NeuroMechFly body");
 await loadNmf();
 setLoad(0.92, "MuJoCo flesh");
 await connectPhysics();
-if ($("flesh")) $("flesh").textContent = physics.ok ? "MuJoCo" : "kinematic";
+if ($("flesh")) {
+  const origin = physics.plantOrigin || "";
+  $("flesh").textContent = physics.ok
+    ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
+    : "kinematic";
+}
 if ($("info")) {
+  const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
+    ? (" Plant @ " + physics.plantOrigin + ".")
+    : "";
   $("info").textContent = physics.ok
-    ? "Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Motor neurons command NeuroMechFly actuators. MuJoCo is the flesh — no free-joint walk thrusters."
-    : "Static host: MuJoCo plant offline. Flesh is kinematic — MN rates pose legs/wings/head/abdomen; ground motion is stance slip from MN-posed feet. Quiet MNs → quiet body (no scripted gait / cosmetic flaps).";
+    ? ("Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Motor neurons command NeuroMechFly actuators. MuJoCo is the flesh — no free-joint walk thrusters." + plantHint)
+    : ("Static host: MuJoCo plant offline. Flesh is kinematic — MN rates pose legs/wings/head/abdomen; ground motion is stance slip from MN-posed feet. Quiet MNs → quiet body (no scripted gait / cosmetic flaps). Set ?plant=https://… for a remote plant." + plantHint);
 }
 
 spawn("male");
@@ -315,9 +323,14 @@ function onAny() {
   if ($("gaitF")) $("gaitF").textContent = fems[0] ? "♀ " + fems[0].life.mode : "—";
   $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
-  const flesh = physics.ok ? "MuJoCo" : "kinematic MN";
+  const flesh = physics.ok
+    ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
+    : "kinematic MN";
   if ($("flesh")) $("flesh").textContent = flesh;
-  $("lifeHint").textContent = flesh + " · MN-driven · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
+  const eMn = focus.motEma || {};
+  const dlm = (eMn.DLM || 0).toFixed(2);
+  const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
+  $("lifeHint").textContent = flesh + " · MN DLM " + dlm + " legs " + legs + " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   const e = focus.motEma || {};
   const setW = (id, v) => { const el = $(id); if (el) el.style.width = (Math.min(1, v) * 100).toFixed(1) + "%"; };
   setW("slow-sleep", focus.life.sleep);
