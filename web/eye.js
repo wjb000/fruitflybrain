@@ -183,8 +183,10 @@ export class CompoundEye {
           const wy = oy + dy * tw;
           if (wy > 0 && wy < 2.4) { best = tw; hit = "wall"; }
         }
-        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.22, food.z, 0.42);
+        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.35, food.z, 0.85);
         if (tFood < best) { best = tFood; hit = "food"; }
+        const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 2.15, food.z, 0.42);
+        if (tBeacon < best) { best = tBeacon; hit = "food"; }
         const bitter = world.bitter;
         if (bitter) {
           const tB = raySphere(ox, oy, oz, dx, dy, dz, bitter.x, 0.22, bitter.z, 0.42);
@@ -228,10 +230,10 @@ export class CompoundEye {
           uv = w * 0.2;
           sal = 0.08 * near;
         } else if (hit === "food") {
-          // Warm sugar drop — high luminance + chromatic pop.
-          r = 1.15 * day * near; g = 0.78 * day * near; b = 0.10 * day * near;
-          uv = 0.06 * day;
-          sal = 1.15 * near;
+          // Warm sugar drop + beacon — high luminance + chromatic pop for assay.
+          r = 1.45 * day * near; g = 0.95 * day * near; b = 0.12 * day * near;
+          uv = 0.08 * day;
+          sal = 1.55 * near;
         } else if (hit === "bitter") {
           r = 0.18 * day * near; g = 0.48 * day * near; b = 0.10 * day * near;
           uv = 0.22 * day * near;

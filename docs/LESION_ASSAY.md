@@ -98,3 +98,17 @@ fly.clearLesion();
 ```
 
 Worker accepts `{ type: "lesion", lesion: { id, ops }, clear: true }` with ops already resolved to `ids` / `fromIds` / `toIds` (the agent does name→id resolution).
+
+
+## Dish v1 (calm2) — see → dark → yaw → retrieve
+
+Headless: `tools/lib/assay_dish.mjs` + `tools/sweep_lesions.mjs`  
+Browser: `web/assay/assay.js` (lights-out mid-trial, stable spawn, bright beacon landmark)
+
+Phases: **encode** (lights on) → **dark** → **yaw** (π world rotate) → **retrieve** (lights on).
+
+Scoring: `blindness` | `motor` | `memory_heading` (walk+see, post-yaw ≤ chance) | ok.
+
+Baseline runner: `node tools/baseline_intact.mjs [N]` → `results/lesion_sweeps/baseline_intact_dish_v1.json`
+
+**Honest limit:** retrieve has lights on, so intact success can be **visual reacquisition after reorientation**, not proven allocentric memory. Treat lesion hits as **candidate wires for follow-up**, not “memory cells.”

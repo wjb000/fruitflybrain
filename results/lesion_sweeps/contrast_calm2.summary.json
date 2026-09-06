@@ -1,0 +1,14 @@
+{
+  "dish": "dish_v1_see_remember_reorient_retrieve",
+  "outPath": "results/lesion_sweeps/contrast_calm2.jsonl",
+  "n": 7,
+  "chanceFloor": 0.1,
+  "controlApproach": 0.1631480697941391,
+  "nInteresting": 0,
+  "nBlind": 0,
+  "nMotor": 1,
+  "nMemoryHeading": 0,
+  "nTaskOK": 6,
+  "topInteresting": [],
+  "caveat": "Candidate hits only from headless LIF dish — not claimed memory cells. Follow up in browser assay."
+}

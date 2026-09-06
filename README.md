@@ -56,12 +56,17 @@ See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the full sensory→MN�
 
 ## Lesion assay + portable controller
 
-Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a visual approach-after-rotate assay, and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
+Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / delay / hunger), a **see → dark → yaw → retrieve** assay (bright beacon landmark), and a robot-facing vision→steering export. See [`docs/LESION_ASSAY.md`](docs/LESION_ASSAY.md).
+
+Calm closed-loop: MN-only body drive (no thrusters). `calm2` lowers softDrive / joint spans / plant cartoon gain and raises flight gates.
 
 ```bash
-# browser: one trial + silence HS
-# http://127.0.0.1:8787/?assay=1&lesion=silence:HS
+python serve.py
+# http://127.0.0.1:8787/?assay=1&dev=1
 
-# headless sweep
-node tools/sweep_lesions.mjs --lesion 'silence:HS'
+node tools/baseline_intact.mjs 16
+node tools/sweep_lesions.mjs --lesion none --lesion 'silence:HS'
 ```
+
+Intact headless baseline scores live under `results/lesion_sweeps/`. Wire-hunting waits until browser/MuJoCo post-yaw approach is solid — headless success is visual reacquisition, not proven memory.
+

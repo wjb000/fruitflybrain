@@ -8,6 +8,7 @@ export function mountAssayPanel({
   getFly,
   arena,
   keyLight,
+  ambient,
   applyLesion,
   clearLesion,
   root,
@@ -19,7 +20,7 @@ export function mountAssayPanel({
     <button class="collapse" type="button" title="collapse">–</button>
     <div class="kicker">assay · lesion</div>
     <div class="panel-body">
-      <div class="hint">See target → optional rotate → approach. Lesions hit LIF, not joints.</div>
+      <div class="hint">See landmark → lights out → world yaw → retrieve. Lesions hit LIF, not joints. MN-only body.</div>
       <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
         <button type="button" id="assayRun">run trial</button>
         <button type="button" id="assaySilenceHS">silence HS</button>
@@ -52,6 +53,7 @@ export function mountAssayPanel({
     assay = new ApproachAssay({
       arena,
       keyLight,
+      ambient,
       fly,
       lesion,
       onComplete: (r) => {
@@ -103,7 +105,13 @@ export function mountAssayPanel({
   return {
     el,
     tick(dt) {
-      if (assay && assay.active) assay.tick(dt);
+      if (assay && assay.active) {
+        assay.tick(dt);
+        const st = status();
+        if (st && assay.phase) {
+          st.textContent = `${assay.phase} · t=${assay.t.toFixed(1)}s · ${lesionSummary(assay.lesion)}`;
+        }
+      }
     },
     runTrial,
     getAssay: () => assay,

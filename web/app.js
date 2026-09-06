@@ -81,7 +81,8 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-scene.add(new THREE.HemisphereLight(0xb8c4d8, 0x1a120c, 1.05));
+const hemi = new THREE.HemisphereLight(0xb8c4d8, 0x1a120c, 1.05);
+scene.add(hemi);
 const key = new THREE.DirectionalLight(0xfff2dc, 1.35);
 key.position.set(8, 16, 10);
 key.castShadow = true;
@@ -712,6 +713,7 @@ if (wantAssay) {
     getFly: () => selected || flies[0],
     arena,
     keyLight: key,
+    ambient: hemi,
     applyLesion: async (fly, lesion) => { fly.applyLesion(lesion); },
     clearLesion: (fly) => fly.clearLesion(),
   });

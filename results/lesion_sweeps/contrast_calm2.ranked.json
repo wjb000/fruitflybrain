@@ -1,0 +1,413 @@
+[
+  {
+    "id": "silence:T1L,T1R,T2L,T2R,T3L,T3R",
+    "lesion": {
+      "id": "silence:T1L,T1R,T2L,T2R,T3L,T3R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T1L",
+            "T1R",
+            "T2L",
+            "T2R",
+            "T3L",
+            "T3R"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "silence(T1L,T1R,T2L,T2R,T3L,T3R)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 4.3,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 4.3,
+      "approachFrac": 0,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 0,
+      "opticPeak": 0.9967255842500427,
+      "reached": false,
+      "motorOK": false,
+      "sensoryOK": true,
+      "taskOK": false,
+      "betterThanChance": false,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": 0.1631480697941391
+    },
+    "failure": "motor",
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9967255842500427,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2474
+  },
+  {
+    "id": "none",
+    "lesion": {
+      "id": "none",
+      "ops": []
+    },
+    "lesionSummary": "none",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 3.5984632998852017,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 3.5984632998852017,
+      "approachFrac": 0.1631480697941391,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 0.7028214661153539,
+      "opticPeak": 1.5066814846011716,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": 0
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0.088861256904453,
+        "yawRate": 0.9759962066294994
+      },
+      "vision": {
+        "opticPeak": 1.5066814846011716,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2544
+  },
+  {
+    "id": "silence:HS",
+    "lesion": {
+      "id": "silence:HS",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "silence(HS)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 3.3599893891473847,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 3.3599893891473847,
+      "approachFrac": 0.21860711880293376,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 0.9401672132987102,
+      "opticPeak": 0.9977966920481235,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": -0.05545904900879467
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9977966920481235,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2505
+  },
+  {
+    "id": "swapLR:HS,VS",
+    "lesion": {
+      "id": "swapLR:HS,VS",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "swapLR(HS,VS)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 3.330459079817024,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 3.330459079817024,
+      "approachFrac": 0.2254746326006921,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 0.974678491307115,
+      "opticPeak": 0.9977574310057938,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": -0.06232656280655299
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9977574310057938,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2496
+  },
+  {
+    "id": "cut:HS,VS>DNa,DNp",
+    "lesion": {
+      "id": "cut:HS,VS>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "cut(HS,VS→DNa,DNp)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 3.3168527650348554,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 3.3168527650348554,
+      "approachFrac": 0.2286388918523592,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 0.9880804986756967,
+      "opticPeak": 0.9977021045595411,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": -0.0654908220582201
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9977021045595411,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2475
+  },
+  {
+    "id": "silence:DAN",
+    "lesion": {
+      "id": "silence:DAN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "silence(DAN)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 2.851483036342579,
+      "postRotateStartDist": 3.721535358773957,
+      "postRotateEndDist": 2.851483036342579,
+      "approachFrac": 0.2337885411675929,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 1.4513235075834705,
+      "opticPeak": 0.9981863377240671,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": -0.0706404713734538
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9981863377240671,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2501
+  },
+  {
+    "id": "silence:HS,VS",
+    "lesion": {
+      "id": "silence:HS,VS",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    "lesionSummary": "silence(HS,VS)",
+    "dish": {
+      "version": "dish_v1_see_remember_reorient_retrieve",
+      "encodeTicks": 36,
+      "darkTicks": 8,
+      "retrieveTicks": 64,
+      "rotateRad": 3.141592653589793,
+      "spawnAng": 1.0995574287564276,
+      "targetR": 6.5,
+      "chanceApproach": 0.1
+    },
+    "metrics": {
+      "finalDist": 2.87451407060492,
+      "postRotateStartDist": 4.3,
+      "postRotateEndDist": 2.87451407060492,
+      "approachFrac": 0.33150835567327436,
+      "encodeApproach": 0,
+      "chanceApproach": 0.1,
+      "displacement": 1.4256725572756475,
+      "opticPeak": 0.9982051102169335,
+      "reached": false,
+      "motorOK": true,
+      "sensoryOK": true,
+      "taskOK": true,
+      "betterThanChance": true,
+      "encodeSaw": true,
+      "controlApproach": 0.1631480697941391,
+      "deltaVsControl": -0.16836028587913526
+    },
+    "failure": null,
+    "interesting": false,
+    "portable": {
+      "steering": {
+        "forward": 0,
+        "yawRate": 0
+      },
+      "vision": {
+        "opticPeak": 0.9982051102169335,
+        "encodeSaw": true
+      }
+    },
+    "ticks": 108,
+    "rotateAt": 44,
+    "elapsedMs": 2499
+  }
+]

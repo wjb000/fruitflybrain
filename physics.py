@@ -61,7 +61,7 @@ CARTOON = {
     "tibiaX": -0.62,
     "tarsusX": 0.22,
 }
-CARTOON_GAIN = 0.55
+CARTOON_GAIN = 0.48
 
 AXIS_TO_CARTOON = {
     ("coxa", "yaw"): "coxaYaw",

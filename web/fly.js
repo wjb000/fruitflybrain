@@ -3,10 +3,10 @@ import * as THREE from "three";
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
   // Moderate spans: body follows MNs without extreme thrashing.
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.78],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.58],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.52],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.88],
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.68],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.50],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.45],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.78],
   "trochanterfemur-roll": ["feRed", null, 0.35],
   "tibia-pitch": ["tiExt", "tiFlex", 0.75],
   "tarsus1-pitch": ["taLev", "taDep", 0.45],
@@ -282,7 +282,7 @@ function antagonist(pos, neg) {
   // Quiet pools stay limp. Mild flex/ext contrast — no seizure thrash.
   if (mag < 0.01) return 0;
   const raw = (p - n) / (mag + 0.06);
-  return Math.tanh(raw * 1.75);
+  return Math.tanh(raw * 1.55);
 }
 
 function follow(cur, target, dt) {
@@ -511,7 +511,38 @@ export function createArena() {
     return grp;
   }
 
-  const food = drop(0xf0c040, 0xffaa22, 6.5, 4.2);
+  // Assay landmark: warm sugar drop + tall beacon the compound eye can resolve.
+  const food = drop(0xffcc44, 0xff9900, 6.5, 4.2);
+  food.traverse((o) => {
+    if (o.isMesh && o.material && o.material.emissive) o.material.emissiveIntensity = 0.95;
+    if (o.isLight) o.intensity = 2.2;
+  });
+  {
+    const beacon = new THREE.Group();
+    beacon.name = "assayBeacon";
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 1.9, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0xffaa22, emissive: 0xff7700, emissiveIntensity: 1.15, roughness: 0.45,
+      })
+    );
+    pole.position.y = 1.15;
+    pole.castShadow = true;
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.38, 14, 12),
+      new THREE.MeshStandardMaterial({
+        color: 0xffe066, emissive: 0xffaa00, emissiveIntensity: 1.7,
+        roughness: 0.3, metalness: 0.05,
+      })
+    );
+    ball.position.y = 2.2;
+    ball.castShadow = true;
+    const glow = new THREE.PointLight(0xffaa33, 2.4, 10);
+    glow.position.y = 2.2;
+    beacon.add(pole, ball, glow);
+    food.add(beacon);
+    food.userData.assayBeacon = beacon;
+  }
   const bitter = drop(0x3d6b2e, 0x5a8f2a, -7.2, 5.8);
   const water = drop(0x4aa8ff, 0x3388ff, -5.5, -3.8);
 

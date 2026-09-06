@@ -1,0 +1,3704 @@
+{
+  "description": "Broad lesion grid covering optic/HS/VS/T4-T5/descending/neuromod/chemotaxis/proprio + cuts/swap/delay/hunger. Results are candidate hits for follow-up — not claimed memory cells.",
+  "generated": "2026-09-06T08:44:32.856Z",
+  "count": 285,
+  "lesions": [
+    {
+      "id": "none",
+      "ops": []
+    },
+    {
+      "id": "silence:HS",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:VS",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:HT",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:vision",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "vision"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:R16",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "R16"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:R7",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "R7"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:R8",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "R8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4a",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4a"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4b",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4c",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4c"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5a",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5a"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5b",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5c",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5c"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNa",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNp",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNg02",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DN1a",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DN1a"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DN1p",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DN1p"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNp01",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNp01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:escape",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "escape"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:ADMN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "ADMN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DAN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:OA",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:sLNv",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sLNv"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:lLNv",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "lLNv"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:LNd",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "LNd"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:pep",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "pep"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:pIP1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "pIP1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:aIPg",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "aIPg"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:foodORN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "foodORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:smell",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "smell"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:pherORN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "pherORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:aversiveORN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "aversiveORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:co2ORN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "co2ORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:sweet",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sweet"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:bitter",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "bitter"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:taste",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "taste"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:IR52b",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "IR52b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:fru",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "fru"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:courtship",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "courtship"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:ppk23",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "ppk23"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:ppk25",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "ppk25"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:JO",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "JO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:proprio",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "proprio"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:campaniform",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "campaniform"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hairplate",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hairplate"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:chordotonal",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "chordotonal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DLM",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DLM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DVM",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DVM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:MN9",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "MN9"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:neck",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "neck"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:neckL",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "neckL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:neckR",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "neckR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hygro",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hygro"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hygrosensory",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hygrosensory"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hpT1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hpT1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hpT2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hpT2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:hpT3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "hpT3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:propT1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "propT1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:propT2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "propT2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:propT3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "propT3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:choT1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "choT1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:choT2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "choT2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:choT3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "choT3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:tactT1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "tactT1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:tactT2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "tactT2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:tactT3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "tactT3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:csaT1",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "csaT1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:csaT2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "csaT2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:csaT3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "csaT3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:touch",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "touch"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:abdomen",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "abdomen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:proboscis",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "proboscis"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:HS,VS",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:HS,VS,HT",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS",
+            "VS",
+            "HT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:R7,R8",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "R7",
+            "R8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L1,L2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L1",
+            "L2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L2,L3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L2",
+            "L3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:L1,L2,L3",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4a,T4b",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4a",
+            "T4b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4c,T4d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4c",
+            "T4d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5a,T5b",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5a",
+            "T5b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5c,T5d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5c",
+            "T5d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4a,T4b,T4c,T4d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4a",
+            "T4b",
+            "T4c",
+            "T4d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T5a,T5b,T5c,T5d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5a",
+            "T5b",
+            "T5c",
+            "T5d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T4a,T4b,T4c,T4d,T5a,T5b,T5c,T5d",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4a",
+            "T4b",
+            "T4c",
+            "T4d",
+            "T5a",
+            "T5b",
+            "T5c",
+            "T5d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNa,DNp",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNa,DNg02",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNa",
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNp,DNg02",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNp",
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DNa,DNp,DNg02",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DNa",
+            "DNp",
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DN1a,DN1p",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DN1a",
+            "DN1p"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DAN,OA",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN",
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:sLNv,lLNv",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sLNv",
+            "lLNv"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:sLNv,lLNv,LNd",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sLNv",
+            "lLNv",
+            "LNd"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:foodORN,smell",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "foodORN",
+            "smell"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:foodORN,pherORN",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "foodORN",
+            "pherORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:sweet,bitter",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sweet",
+            "bitter"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:JO,proprio",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "JO",
+            "proprio"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:pep,aIPg",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "pep",
+            "aIPg"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:fru,courtship",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "fru",
+            "courtship"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:neckL,neckR",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "neckL",
+            "neckR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:DLM,DVM",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DLM",
+            "DVM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:vision,R16",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "vision",
+            "R16"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T1L",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T1L"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T1R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T1R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T2L",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T2L"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T2R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T2R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T3L",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T3L"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T3R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T3R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T1L,T1R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T1L",
+            "T1R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T2L,T2R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T2L",
+            "T2R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T3L,T3R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T3L",
+            "T3R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silence:T1L,T1R,T2L,T2R,T3L,T3R",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T1L",
+            "T1R",
+            "T2L",
+            "T2R",
+            "T3L",
+            "T3R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boost:HS:2.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "HS"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "boost:VS:2.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "VS"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "boost:HS,VS:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "HS",
+            "VS"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:HS:4",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "HS"
+          ],
+          "gain": 4
+        }
+      ]
+    },
+    {
+      "id": "boost:VS:4",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "VS"
+          ],
+          "gain": 4
+        }
+      ]
+    },
+    {
+      "id": "boost:DAN:2.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DAN"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "boost:OA:2.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "boost:DAN:4",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DAN"
+          ],
+          "gain": 4
+        }
+      ]
+    },
+    {
+      "id": "boost:OA:4",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 4
+        }
+      ]
+    },
+    {
+      "id": "boost:OA:1.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 1.5
+        }
+      ]
+    },
+    {
+      "id": "boost:foodORN:2.5",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "foodORN"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "boost:smell:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "smell"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:DNa:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DNa"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:DNp:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DNp"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:DNg02:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DNg02"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:vision:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "vision"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:vision:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "vision"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "boost:HS:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "HS"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "boost:VS:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "VS"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "boost:DAN:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DAN"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "boost:OA:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "boost:JO:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "JO"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:proprio:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "proprio"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:aIPg:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "aIPg"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "boost:pep:2",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "pep"
+          ],
+          "gain": 2
+        }
+      ]
+    },
+    {
+      "id": "cut:HS>DNa",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS"
+          ],
+          "to": [
+            "DNa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS>DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS"
+          ],
+          "to": [
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:VS>DNa",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "VS"
+          ],
+          "to": [
+            "DNa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:VS>DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "VS"
+          ],
+          "to": [
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNa",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNg02",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>escape",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "escape"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS>DNa,DNp,DNg02",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS"
+          ],
+          "to": [
+            "DNa",
+            "DNp",
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:VS>DNa,DNp,DNg02",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp",
+            "DNg02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HT>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HT"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:L1>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "L1"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:L2>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "L2"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:L3>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "L3"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:L1,L2,L3>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "L1",
+            "L2",
+            "L3"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4a>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4a"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4b>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4b"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4c>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4c"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4d>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4d"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T5a>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T5a"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T5b>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T5b"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T5c>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T5c"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T5d>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T5d"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4a,T4b,T4c,T4d>HS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4a",
+            "T4b",
+            "T4c",
+            "T4d"
+          ],
+          "to": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T5a,T5b,T5c,T5d>VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T5a",
+            "T5b",
+            "T5c",
+            "T5d"
+          ],
+          "to": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:T4a,T4b,T4c,T4d,T5a,T5b,T5c,T5d>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "T4a",
+            "T4b",
+            "T4c",
+            "T4d",
+            "T5a",
+            "T5b",
+            "T5c",
+            "T5d"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:R7>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "R7"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:R8>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "R8"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:R7,R8>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "R7",
+            "R8"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:R16>HS,VS",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "R16"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DAN>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DAN"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:OA>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "OA"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DAN>OA",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DAN"
+          ],
+          "to": [
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:OA>DAN",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "OA"
+          ],
+          "to": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:foodORN>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "foodORN"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:smell>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "smell"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:pherORN>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "pherORN"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:sLNv,lLNv>DAN",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "sLNv",
+            "lLNv"
+          ],
+          "to": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:sLNv,lLNv>OA",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "sLNv",
+            "lLNv"
+          ],
+          "to": [
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:LNd>DAN",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "LNd"
+          ],
+          "to": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:JO>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "JO"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:proprio>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "proprio"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:campaniform>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "campaniform"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:aIPg>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "aIPg"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:pep>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "pep"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:fru>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "fru"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:courtship>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "courtship"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:pIP1>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "pIP1"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:escape>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "escape"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DN1a,DN1p>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DN1a",
+            "DN1p"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DNa>T1L,T1R",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DNa"
+          ],
+          "to": [
+            "T1L",
+            "T1R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DNp>T1L,T1R",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DNp"
+          ],
+          "to": [
+            "T1L",
+            "T1R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DNa,DNp>T1L,T1R,T2L,T2R,T3L,T3R",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DNa",
+            "DNp"
+          ],
+          "to": [
+            "T1L",
+            "T1R",
+            "T2L",
+            "T2R",
+            "T3L",
+            "T3R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>T1L,T1R,T2L,T2R,T3L,T3R",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "T1L",
+            "T1R",
+            "T2L",
+            "T2R",
+            "T3L",
+            "T3R"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:DAN,OA>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DAN",
+            "OA"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:foodORN,smell>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "foodORN",
+            "smell"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision,HS,VS>DNa,DNp",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision",
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:HS",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "HS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:VS",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:HS,VS",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:DNa",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "DNa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:DNp",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:DNa,DNp",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "DNa",
+            "DNp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:DAN",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:OA",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:neckL,neckR",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "neckL",
+            "neckR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:T4a,T4b",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "T4a",
+            "T4b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swapLR:foodORN",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "foodORN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:20",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 20
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:80",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 80
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:120",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 120
+        }
+      ]
+    },
+    {
+      "id": "delay:VS:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "VS"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:VS:80",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "VS"
+          ],
+          "ms": 80
+        }
+      ]
+    },
+    {
+      "id": "delay:HS,VS:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS",
+            "VS"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:HS,VS:80",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS",
+            "VS"
+          ],
+          "ms": 80
+        }
+      ]
+    },
+    {
+      "id": "delay:DNa:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "DNa"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:DNp:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "DNp"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:DNa,DNp:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "DNa",
+            "DNp"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:DAN:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "DAN"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:OA:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "OA"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:vision:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "vision"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:vision:80",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "vision"
+          ],
+          "ms": 80
+        }
+      ]
+    },
+    {
+      "id": "delay:foodORN:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "foodORN"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:JO:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "JO"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:proprio:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "proprio"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:aIPg:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "aIPg"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "delay:pep:40",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "pep"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "hunger:0.1",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 0.1
+        }
+      ]
+    },
+    {
+      "id": "hunger:0.2",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 0.2
+        }
+      ]
+    },
+    {
+      "id": "hunger:0.5",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 0.5
+        }
+      ]
+    },
+    {
+      "id": "hunger:0.8",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 0.8
+        }
+      ]
+    },
+    {
+      "id": "hunger:1",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 1
+        }
+      ]
+    },
+    {
+      "id": "hunger:1.2",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "hunger:1.5",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 1.5
+        }
+      ]
+    },
+    {
+      "id": "hunger:2",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "hunger:2.5",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 2.5
+        }
+      ]
+    },
+    {
+      "id": "hunger:3",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 3
+        }
+      ]
+    },
+    {
+      "id": "hunger:4",
+      "ops": [
+        {
+          "op": "hunger",
+          "level": 4
+        }
+      ]
+    },
+    {
+      "id": "silence:HS|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "HS"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:VS|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "VS"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:DAN|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:OA|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "OA"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:DAN|hunger:2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "silence:OA|hunger:2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "OA"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "silence:foodORN|hunger:2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "foodORN"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNa,DNp|hunger:1.2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNa,DNp|hunger:2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "silence:DAN|boost:OA:2.5",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        },
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "silence:OA|boost:DAN:2.5",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "OA"
+          ]
+        },
+        {
+          "op": "boost",
+          "pools": [
+            "DAN"
+          ],
+          "gain": 2.5
+        }
+      ]
+    },
+    {
+      "id": "swapLR:HS,VS|hunger:1.2",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:40|hunger:1.2",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 40
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "delay:HS:80|hunger:1.2",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 80
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:sLNv,lLNv|hunger:1.5",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sLNv",
+            "lLNv"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.5
+        }
+      ]
+    },
+    {
+      "id": "silence:sLNv,lLNv|hunger:2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "sLNv",
+            "lLNv"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "cut:DAN>DNa,DNp|silence:OA",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "DAN"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "silence",
+          "pools": [
+            "OA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:OA>DNa,DNp|silence:DAN",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "OA"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "silence",
+          "pools": [
+            "DAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cut:vision>HS,VS|hunger:1.2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "vision"
+          ],
+          "to": [
+            "HS",
+            "VS"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "boost:HS:0.3|boost:VS:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "HS"
+          ],
+          "gain": 0.3
+        },
+        {
+          "op": "boost",
+          "pools": [
+            "VS"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "cut:HS,VS>DNa,DNp|delay:DNa:40",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "HS",
+            "VS"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "delay",
+          "pools": [
+            "DNa"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "swapLR:HS,VS|delay:HS:40",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "HS",
+            "VS"
+          ]
+        },
+        {
+          "op": "delay",
+          "pools": [
+            "HS"
+          ],
+          "ms": 40
+        }
+      ]
+    },
+    {
+      "id": "silence:T4a,T4b,T4c,T4d|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T4a",
+            "T4b",
+            "T4c",
+            "T4d"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:T5a,T5b,T5c,T5d|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "T5a",
+            "T5b",
+            "T5c",
+            "T5d"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:JO|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "JO"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:proprio|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "proprio"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "cut:JO>DNa,DNp|hunger:1.2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "JO"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:aIPg|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "aIPg"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:pep|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "pep"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "silence:fru|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "fru"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "cut:fru>DNa,DNp|hunger:1.2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "fru"
+          ],
+          "to": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "boost:DAN:0.3|boost:OA:0.3",
+      "ops": [
+        {
+          "op": "boost",
+          "pools": [
+            "DAN"
+          ],
+          "gain": 0.3
+        },
+        {
+          "op": "boost",
+          "pools": [
+            "OA"
+          ],
+          "gain": 0.3
+        }
+      ]
+    },
+    {
+      "id": "silence:DN1a,DN1p|hunger:1.2",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "DN1a",
+            "DN1p"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "cut:sLNv,lLNv>DAN|hunger:2",
+      "ops": [
+        {
+          "op": "cut",
+          "from": [
+            "sLNv",
+            "lLNv"
+          ],
+          "to": [
+            "DAN"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "id": "silence:LNd|hunger:1.5",
+      "ops": [
+        {
+          "op": "silence",
+          "pools": [
+            "LNd"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.5
+        }
+      ]
+    },
+    {
+      "id": "swapLR:DNa,DNp|hunger:1.2",
+      "ops": [
+        {
+          "op": "swapLR",
+          "pools": [
+            "DNa",
+            "DNp"
+          ]
+        },
+        {
+          "op": "hunger",
+          "level": 1.2
+        }
+      ]
+    },
+    {
+      "id": "delay:DAN:40|hunger:1.5",
+      "ops": [
+        {
+          "op": "delay",
+          "pools": [
+            "DAN"
+          ],
+          "ms": 40
+        },
+        {
+          "op": "hunger",
+          "level": 1.5
+        }
+      ]
+    }
+  ]
+}

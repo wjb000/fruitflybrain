@@ -56,7 +56,7 @@ function hzVis(v, gain = 70, base = 3) {
 /** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
  *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
  */
-function softDrive(v, gain = 2.8) {
+function softDrive(v, gain = 2.55) {
   const x = Math.max(0, v || 0);
   return Math.tanh(x * gain);
 }
@@ -64,7 +64,7 @@ function softDrive(v, gain = 2.8) {
 /** Antagonist pair from real pool EMAs. Quiet×quiet → 0. Mild asymmetry
  *  so flex/ext can step without saturating; never invents a CPG clock.
  */
-function antagPair(posEma, negEma, gain = 2.8) {
+function antagPair(posEma, negEma, gain = 2.55) {
   const p = softDrive(posEma, gain);
   const n = softDrive(negEma, gain);
   const d = Math.tanh((p - n) * 1.35);
@@ -533,11 +533,11 @@ export class EmbodiedFly {
     cmd.muscle = {};
     for (const name of LEG_NAMES) {
       const ema = (muscle) => e[`${name}_${muscle}`] || 0;
-      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 3.0);
-      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 2.9);
+      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 2.7);
+      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 2.6);
       const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 2.8);
-      const tr = antagPair(ema("trFlex"), ema("trExt"), 3.2);
-      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 3.2);
+      const tr = antagPair(ema("trFlex"), ema("trExt"), 2.85);
+      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 2.85);
       const ta = antagPair(ema("taDep"), ema("taLev"), 2.9);
       cmd.muscle[name] = {
         coxaProm: coxa.pos,
@@ -599,15 +599,15 @@ export class EmbodiedFly {
       const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
       if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
       // Flight threshold not hair-trigger from MN noise (raised post-densify).
-      if (cmd.fly > 0.52) {
+      if (cmd.fly > 0.58) {
         this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
       } else this.vy -= 18 * dt;
       this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && cmd.fly < 0.52) this.vy = 0;
+      if (this.y === stand && cmd.fly < 0.58) this.vy = 0;
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
-      if (cmd.fly > 0.52) {
+      if (cmd.fly > 0.58) {
         const step = 4.2 * cmd.fly * dt;
         this.body.position.x += Math.sin(this.heading) * step;
         this.body.position.z += Math.cos(this.heading) * step;
@@ -615,7 +615,7 @@ export class EmbodiedFly {
       } else if (slip && slip.n > 0) {
         // Quiet stance-slip — feet still translate body; no thrashing.
         // Still brain-derived — no free-joint walk thruster / CPG gait.
-        const slipGain = 1.1;
+        const slipGain = 0.95;
         this.body.position.x += (slip.x / slip.n) * slipGain;
         this.body.position.z += (slip.z / slip.n) * slipGain;
         this.heading += (slip.yawR - slip.yawL) * 1.15;
@@ -795,8 +795,8 @@ export class EmbodiedFly {
       LNd: 2 + day * 11 + night * 7,
       DN1a: 2 + night * 14,
       DN1p: 2 + night * 16 + slp * 10,
-      DAN: 3 + aro * 11 + (1 - hung) * 4,
-      OA: 3 + aro * 16 + esc * 12,
+      DAN: 2 + aro * 8 + (1 - hung) * 3,
+      OA: 2 + aro * 12 + esc * 8,
       HT: 2 + slp * 10 + night * 5,
       pep: 2 + hung * 10,
     };

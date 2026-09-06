@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Lesion sweep runner — headless LIF approach assay.
+ * Lesion sweep runner — headless LIF see→remember→reorient→retrieve dish.
  *
  * Usage:
  *   node tools/sweep_lesions.mjs
- *   node tools/sweep_lesions.mjs --out sweeps/run.jsonl --ticks 120
- *   node tools/sweep_lesions.mjs --lesion 'silence:HS' --lesion 'cut:HS,VS>DNa'
+ *   node tools/sweep_lesions.mjs --out results/lesion_sweeps/run.jsonl
+ *   node tools/sweep_lesions.mjs --config tools/configs/lesion_grid_broad.json
+ *   node tools/sweep_lesions.mjs --lesion 'silence:HS' --lesion 'none'
  */
 import fs from "fs";
 import path from "path";
@@ -14,6 +15,7 @@ import {
   LifEngine, loadBins, mergePools, expandLesionOps,
 } from "./lib/lif_engine.mjs";
 import { parseLesionFlag, lesionSummary, DEFAULT_SWEEP } from "./lib/lesion_schema.mjs";
+import { runDishAssay, runChanceProbe, DISH } from "./lib/assay_dish.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -26,133 +28,6 @@ function arg(name, def) {
 }
 function has(name) {
   return process.argv.includes(name);
-}
-
-function soft(hz) {
-  if (hz <= 0) return 0;
-  return Math.min(1, 1 - Math.exp(-hz / 18));
-}
-
-function runAssay(engine, poolMap, lesionCfg, opts) {
-  const stepsPerTick = opts.stepsPerTick || 8;
-  const ticks = opts.ticks || 120;
-  const rotateAt = opts.rotateAt ?? 40;
-  const dtBody = opts.dtBody || 0.05;
-
-  const ops = expandLesionOps(lesionCfg, poolMap);
-  engine.reset();
-  engine.applyLesion(ops);
-
-  const vision = poolMap.vision || poolMap.R16 || [];
-  engine.bindChannels({
-    vision,
-    HS: poolMap.HS || [],
-    VS: poolMap.VS || [],
-    foodORN: poolMap.foodORN || [],
-  });
-  const effectorNames = [
-    "T1L", "T1R", "T2L", "T2R", "T3L", "T3R",
-    "HS", "VS", "DNa", "DNp", "DLM", "DVM", "ADMN", "DAN", "OA",
-  ];
-  const pools = {};
-  for (const k of effectorNames) pools[k] = poolMap[k] || [];
-  engine.bindEffectors(pools);
-
-  let targetAng = Math.PI * 0.35;
-  let targetR = 7.5;
-  let tx = Math.sin(targetAng) * targetR;
-  let tz = Math.cos(targetAng) * targetR;
-  let x = -Math.sin(targetAng) * 2.5;
-  let z = -Math.cos(targetAng) * 2.5;
-  let heading = targetAng + Math.PI;
-  let opticPeak = 0;
-  let displacement = 0;
-  let lx = x, lz = z;
-  const samples = [];
-
-  for (let tick = 0; tick < ticks; tick++) {
-    if (tick === rotateAt) {
-      const rad = Math.PI;
-      const c = Math.cos(rad), s = Math.sin(rad);
-      const nx = tx * c - tz * s;
-      const nz = tx * s + tz * c;
-      tx = nx; tz = nz;
-    }
-    const dx = tx - x, dz = tz - z;
-    const dist = Math.hypot(dx, dz) + 1e-6;
-    const c = Math.cos(heading), s = Math.sin(heading);
-    const bearing = Math.atan2(dx * c - dz * s, dx * s + dz * c);
-    const loom = Math.max(0, 1.2 - dist / 10);
-    const vis = 40 + loom * 50;
-    const hs = Math.abs(bearing) < 1.2 ? 35 + (1 - Math.abs(bearing)) * 40 : 8;
-    engine.setRates({
-      vision: vis,
-      HS: hs,
-      VS: 12 + loom * 20,
-      foodORN: 10 + loom * 15,
-    });
-
-    for (let si = 0; si < stepsPerTick; si++) engine.step();
-    const hz = engine.effectorHz(stepsPerTick);
-    const legsL = soft(((hz.T1L || 0) + (hz.T2L || 0) + (hz.T3L || 0)) / 3);
-    const legsR = soft(((hz.T1R || 0) + (hz.T2R || 0) + (hz.T3R || 0)) / 3);
-    const legs = (legsL + legsR) / 2;
-    const walk = Math.tanh(legs * 2.9);
-    const turn = Math.tanh((legsR - legsL) * 2.0);
-    const optic = soft(hz.HS || 0) + soft(hz.VS || 0);
-    if (optic > opticPeak) opticPeak = optic;
-    const steer = turn + Math.tanh(-bearing) * soft(hz.HS || 0) * 0.35;
-    heading += steer * 1.1 * dtBody;
-    const step = walk * 2.8 * dtBody;
-    x += Math.sin(heading) * step;
-    z += Math.cos(heading) * step;
-    displacement += Math.hypot(x - lx, z - lz);
-    lx = x; lz = z;
-    samples.push({ t: tick * dtBody, dist: Math.hypot(tx - x, tz - z), legs, optic, walk, turn });
-  }
-
-  const after = samples.filter((_, i) => i >= rotateAt);
-  const startPost = after[0]?.dist ?? samples[0].dist;
-  const endPost = after.at(-1)?.dist ?? samples.at(-1).dist;
-  const approachFrac = startPost > 1e-3 ? Math.max(0, (startPost - endPost) / startPost) : 0;
-  const chanceApproach = 0.22;
-  const reached = endPost <= 2.4;
-  const motorOK = displacement >= 1.0 || (samples.at(-1)?.legs ?? 0) >= 0.04;
-  const sensoryOK = opticPeak >= 0.02;
-  const taskOK = approachFrac > chanceApproach || reached;
-  const interesting = sensoryOK && motorOK && !taskOK;
-  let failure = null;
-  if (!sensoryOK) failure = "blindness";
-  else if (!motorOK) failure = "motor";
-  else if (!taskOK) failure = "memory_heading";
-
-  return {
-    id: lesionCfg.id,
-    lesion: lesionCfg,
-    lesionSummary: lesionSummary(lesionCfg),
-    metrics: {
-      finalDist: endPost,
-      postRotateStartDist: startPost,
-      postRotateEndDist: endPost,
-      approachFrac,
-      chanceApproach,
-      displacement,
-      opticPeak,
-      reached,
-      motorOK,
-      sensoryOK,
-      taskOK,
-      betterThanChance: taskOK,
-    },
-    failure,
-    interesting,
-    portable: {
-      steering: { forward: samples.at(-1)?.walk ?? 0, yawRate: samples.at(-1)?.turn ?? 0 },
-      vision: { opticPeak },
-    },
-    ticks,
-    rotateAt,
-  };
 }
 
 function loadConfigs() {
@@ -172,9 +47,22 @@ function loadConfigs() {
   return lesions;
 }
 
+function rankRows(rows, controlApproach) {
+  return [...rows].sort((a, b) => {
+    const ia = a.interesting ? 1 : 0, ib = b.interesting ? 1 : 0;
+    if (ib !== ia) return ib - ia;
+    // among interesting: bigger drop vs control first
+    const da = (controlApproach ?? 0) - (a.metrics?.approachFrac ?? 0);
+    const db = (controlApproach ?? 0) - (b.metrics?.approachFrac ?? 0);
+    if (ia && ib && Math.abs(db - da) > 1e-6) return db - da;
+    return (a.metrics?.approachFrac || 0) - (b.metrics?.approachFrac || 0);
+  });
+}
+
 function main() {
   if (has("--help") || has("-h")) {
-    console.log("Usage: node tools/sweep_lesions.mjs [--out FILE] [--ticks N] [--lesion FLAG] [--config JSON]");
+    console.log("Usage: node tools/sweep_lesions.mjs [--out FILE] [--config JSON] [--lesion FLAG]");
+    console.log("Dish: encode → dark → yaw → retrieve (L/R landmark eyes, MN+HS steer, soft walls)");
     process.exit(0);
   }
 
@@ -183,41 +71,115 @@ function main() {
   const poolMap = mergePools(effectors, stim);
   const engine = new LifEngine(neu, csr);
   const configs = loadConfigs();
-  const outPath = arg("--out", path.join(ROOT, "sweeps", "lesion_" + Date.now() + ".jsonl"));
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "").replace("T", "T").slice(0, 16) + "Z";
+  const outPath = arg("--out", path.join(ROOT, "results", "lesion_sweeps", `dish_v1_${stamp}.jsonl`));
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  const ticks = Number(arg("--ticks", "80"));
-  const rotateAt = Number(arg("--rotate-at", "28"));
+
+  const dishOpts = {
+    encodeTicks: Number(arg("--encode", String(DISH.encodeTicks))),
+    darkTicks: Number(arg("--dark", String(DISH.darkTicks))),
+    retrieveTicks: Number(arg("--retrieve", String(DISH.retrieveTicks))),
+  };
+
+  // Calibrate chance floor
+  console.log("Calibrating chance probe…");
+  const chance = runChanceProbe(engine, poolMap, expandLesionOps, lesionSummary, dishOpts);
+  const chanceFloor = Math.max(DISH.chanceApproach, Math.min(0.25, chance.metrics.approachFrac || 0));
+  dishOpts.chanceApproach = chanceFloor;
+  console.log(`  chanceFloor=${chanceFloor.toFixed(3)} (probe approach=${(chance.metrics.approachFrac || 0).toFixed(3)})`);
 
   const rows = [];
   const fd = fs.openSync(outPath, "w");
+  // write chance probe first
+  chance.dish = { version: "dish_v1_see_remember_reorient_retrieve", chanceFloor };
+  fs.writeSync(fd, JSON.stringify(chance) + "\n");
+  rows.push(chance);
+
+  let controlApproach = null;
   for (const cfg of configs) {
     const t0 = Date.now();
-    const row = runAssay(engine, poolMap, cfg, { ticks, rotateAt });
+    const row = runDishAssay(engine, poolMap, cfg, expandLesionOps, lesionSummary, dishOpts);
     row.elapsedMs = Date.now() - t0;
+    row.metrics.controlApproach = controlApproach;
+    row.metrics.deltaVsControl = controlApproach != null
+      ? (controlApproach - row.metrics.approachFrac)
+      : null;
+    if (cfg.id === "none" || cfg.id === "control" || (cfg.ops || []).length === 0) {
+      if (controlApproach == null) controlApproach = row.metrics.approachFrac;
+      row.metrics.controlApproach = controlApproach;
+      row.metrics.deltaVsControl = 0;
+    }
+    // Re-label interesting relative to control when available:
+    // must be motor+sensory OK, below chance+margin (already in dish), and drop vs control.
+    if (controlApproach != null && row.interesting) {
+      const drop = controlApproach - row.metrics.approachFrac;
+      row.metrics.dropVsControl = drop;
+      // demote tiny drops (noise) — keep as interesting only if drop >= 0.05 or approach < chance
+      if (drop < 0.05 && row.metrics.approachFrac > chanceFloor) {
+        row.interesting = false;
+        row.failure = null;
+        row.metrics.taskOK = true;
+        row.note = "demoted: within noise of control";
+      }
+    }
     rows.push(row);
     fs.writeSync(fd, JSON.stringify(row) + "\n");
     const mark = row.interesting ? "*" : " ";
     console.log(
-      mark + " " + String(row.id).padEnd(16) +
+      mark + " " + String(row.id).padEnd(28).slice(0, 28) +
       " fail=" + String(row.failure).padEnd(16) +
-      " approach=" + row.metrics.approachFrac.toFixed(2) +
-      " motor=" + row.metrics.motorOK +
+      " app=" + row.metrics.approachFrac.toFixed(2) +
+      " enc=" + (row.metrics.encodeApproach ?? 0).toFixed(2) +
+      " mot=" + row.metrics.motorOK +
       " sens=" + row.metrics.sensoryOK +
       " (" + row.elapsedMs + "ms)"
     );
   }
   fs.closeSync(fd);
 
-  const ranked = [...rows].sort((a, b) => {
-    const ia = a.interesting ? 1 : 0, ib = b.interesting ? 1 : 0;
-    if (ib !== ia) return ib - ia;
-    return (a.metrics.approachFrac || 0) - (b.metrics.approachFrac || 0);
-  });
+  // If control ran after others, second pass isn't needed — we put none first in grids.
+  // Ensure controlApproach set from any intact row:
+  if (controlApproach == null) {
+    const c = rows.find((r) => (r.lesion?.ops || []).length === 0 && r.id !== "chance-probe");
+    if (c) controlApproach = c.metrics.approachFrac;
+  }
+
+  const ranked = rankRows(rows.filter((r) => r.id !== "chance-probe"), controlApproach);
+  const interesting = ranked.filter((r) => r.interesting);
   const rankPath = outPath.replace(/\.jsonl$/, "") + ".ranked.json";
+  const summaryPath = outPath.replace(/\.jsonl$/, "") + ".summary.json";
   fs.writeFileSync(rankPath, JSON.stringify(ranked, null, 2));
-  console.log("\nWrote " + rows.length + " rows -> " + outPath);
+  const summary = {
+    dish: "dish_v1_see_remember_reorient_retrieve",
+    outPath,
+    n: rows.length - 1,
+    chanceFloor,
+    controlApproach,
+    nInteresting: interesting.length,
+    nBlind: ranked.filter((r) => r.failure === "blindness").length,
+    nMotor: ranked.filter((r) => r.failure === "motor").length,
+    nMemoryHeading: ranked.filter((r) => r.failure === "memory_heading").length,
+    nTaskOK: ranked.filter((r) => r.failure == null && r.id !== "chance-probe").length,
+    topInteresting: interesting.slice(0, 20).map((r) => ({
+      id: r.id,
+      lesionSummary: r.lesionSummary,
+      approachFrac: r.metrics.approachFrac,
+      encodeApproach: r.metrics.encodeApproach,
+      dropVsControl: r.metrics.dropVsControl ?? (controlApproach - r.metrics.approachFrac),
+      displacement: r.metrics.displacement,
+      opticPeak: r.metrics.opticPeak,
+      failure: r.failure,
+    })),
+    caveat: "Candidate hits only from headless LIF dish — not claimed memory cells. Follow up in browser assay.",
+  };
+  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  console.log("\nWrote " + (rows.length - 1) + " lesions -> " + outPath);
   console.log("Ranked -> " + rankPath);
-  console.log("Interesting: " + ranked.filter((r) => r.interesting).length + "/" + rows.length);
+  console.log("Summary -> " + summaryPath);
+  console.log("Control approach=" + (controlApproach?.toFixed(3) ?? "?") +
+    " chanceFloor=" + chanceFloor.toFixed(3) +
+    " interesting=" + interesting.length + "/" + (rows.length - 1));
 }
 
 main();
