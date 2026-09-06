@@ -6,7 +6,7 @@
 import * as THREE from "three";
 
 const ARENA_R = 17.4;
-const MAX_PUFFS = 420;
+const MAX_PUFFS = 560;
 
 function makeSprite() {
   const c = document.createElement("canvas");
@@ -114,15 +114,31 @@ class PuffField {
   }
 
   sample(x, y, z) {
+    // Dual-kernel: sharp filament core (klinotaxis L/R contrast) + soft halo.
+    // Resolves ~antenna-spacing gradients without changing emission / bomb.
     let c = 0;
     for (const p of this.puffs) {
       const dx = x - p.x, dy = y - p.y, dz = z - p.z;
       const s2 = p.sig * p.sig;
-      const r2 = dx * dx + dy * dy * 1.6 + dz * dz;
-      if (r2 > s2 * 9) continue;
-      c += p.q * Math.exp(-r2 / (2 * s2));
+      const r2 = dx * dx + dy * dy * 1.55 + dz * dz;
+      if (r2 > s2 * 12) continue;
+      const core = Math.exp(-r2 / (2 * s2 * 0.38));
+      const halo = Math.exp(-r2 / (2 * s2));
+      c += p.q * (0.72 * core + 0.38 * halo);
     }
     return c;
+  }
+
+  /** Multi-point sample around an antenna tip for denser local fidelity. */
+  sampleProbe(x, y, z, heading, sideSign) {
+    const s = Math.sin(heading), c = Math.cos(heading);
+    // tip + slight lateral / forward offsets (~JO/ORN sensilla spread)
+    const ox = -sideSign * 0.06 * c + 0.05 * s;
+    const oz = sideSign * 0.06 * s + 0.05 * c;
+    const a = this.sample(x, y, z);
+    const b = this.sample(x + ox, y + 0.02, z + oz);
+    const d = this.sample(x + 0.04 * s, y - 0.03, z + 0.04 * c);
+    return 0.55 * a + 0.30 * b + 0.15 * d;
   }
 }
 
@@ -289,6 +305,17 @@ export class OdorWorld {
       co2: this.co2.sample(x, y, z),
       moist: this.moist.sample(x, y, z),
       bitter: this.bitter.sample(x, y, z),
+    };
+  }
+
+  /** Antenna-local probe — denser spatial sampling for L/R gradient resolve. */
+  sampleAntenna(x, y, z, heading, sideSign) {
+    return {
+      food: this.food.sampleProbe(x, y, z, heading, sideSign),
+      pher: this.pher.sampleProbe(x, y, z, heading, sideSign),
+      co2: this.co2.sampleProbe(x, y, z, heading, sideSign),
+      moist: this.moist.sampleProbe(x, y, z, heading, sideSign),
+      bitter: this.bitter.sampleProbe(x, y, z, heading, sideSign),
     };
   }
 }

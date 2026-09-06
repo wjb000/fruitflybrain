@@ -18,7 +18,10 @@ const PROPRIO_KEYS = [
   "tactT1L", "tactT1R", "tactT2L", "tactT2R", "tactT3L", "tactT3R",
 ];
 const LEG_NEUROMERE = { L1: "T1", R1: "T1", L2: "T2", R2: "T2", L3: "T3", R3: "T3" };
-const OPTIC_TYPES = ["R16", "R7", "R8", "L1", "L2"];
+const OPTIC_TYPES = [
+  "R16", "R7", "R8", "L1", "L2", "L3",
+  "T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d", "HS", "VS",
+];
 const OPTIC_SECTOR_TYPES = ["R16", "R7", "R8"];
 const ODOR_TYPES = ["foodORN", "pherORN", "co2ORN", "JO", "aversiveORN"];
 const CLOCK_KEYS = ["sLNv", "lLNv", "LNd", "DN1a", "DN1p", "DAN", "OA", "HT", "pep"];
@@ -113,11 +116,30 @@ function bearingTo(tx, tz, x, z, c, s) {
 
 function phasicTonic(filt, key, c, dt = 0.032) {
   const slow = filt[key] || 0;
-  const a = 1 - Math.exp(-dt / 0.28);
+  // Faster adaptation → sharper filament onsets (Cardé / Murlis intermittency).
+  const a = 1 - Math.exp(-dt / 0.18);
   filt[key] = slow + (c - slow) * a;
   const onset = Math.max(0, c - filt[key]);
-  // Stronger tonic + onset so sparse ORN/proprio hits still drive the network.
-  return 10 + onset * 620 + c * 78;
+  // Log-compressed tonic + strong phasic → wide dynamic range into ORN pools.
+  const tonic = Math.log1p(Math.max(0, c) * 7.2) * 48;
+  return Math.min(210, 6 + onset * 820 + tonic + c * 28);
+}
+
+/** Amplify L/R concentration contrast for klinotaxis (sensory only). */
+function lrKlinotaxis(hzL, hzR, gain = 0.62) {
+  const mid = 0.5 * (hzL + hzR);
+  const d = hzL - hzR;
+  const g = 0.5 + gain;
+  return {
+    L: Math.max(0, Math.min(210, mid + d * g)),
+    R: Math.max(0, Math.min(210, mid - d * g)),
+  };
+}
+
+function gradedContact(dist, reach, peak = 100) {
+  if (dist >= reach) return 0;
+  const u = 1 - dist / reach;
+  return peak * u * u;
 }
 
 const ARENA_R = 17.4;
@@ -603,50 +625,71 @@ export class EmbodiedFly {
     if (ants[0]) tipOf(ants[0], _antL); else _antL.set(x - 0.22 * c + 0.85 * s, this.y + 1.35, z + 0.22 * s + 0.85 * c);
     if (ants[1]) tipOf(ants[1], _antR); else _antR.set(x + 0.22 * c + 0.85 * s, this.y + 1.35, z - 0.22 * s + 0.85 * c);
     const odors = this.world.odors;
-    const hungerGain = 0.55 + 1.55 * this.life.hunger;
-    const sampL = odors ? odors.sample(_antL.x, _antL.y, _antL.z) : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
-    const sampR = odors ? odors.sample(_antR.x, _antR.y, _antR.z) : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+    const hungerGain = 0.55 + 1.7 * this.life.hunger;
+    // Antenna-local multi-point sampling resolves plume gradients for klinotaxis.
+    const sampL = odors
+      ? (odors.sampleAntenna
+        ? odors.sampleAntenna(_antL.x, _antL.y, _antL.z, this.heading, -1)
+        : odors.sample(_antL.x, _antL.y, _antL.z))
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+    const sampR = odors
+      ? (odors.sampleAntenna
+        ? odors.sampleAntenna(_antR.x, _antR.y, _antR.z, this.heading, 1)
+        : odors.sample(_antR.x, _antR.y, _antR.z))
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
     const foodL = sampL.food * hungerGain;
     const foodR = sampR.food * hungerGain;
     const pherL = sampL.pher, pherR = sampR.pher;
     const co2L = sampL.co2, co2R = sampR.co2;
-    const smellL = phasicTonic(this.ornFilt, "foodL", foodL);
-    const smellR = phasicTonic(this.ornFilt, "foodR", foodR);
-    const pherHzL = phasicTonic(this.ornFilt, "pherL", pherL);
-    const pherHzR = phasicTonic(this.ornFilt, "pherR", pherR);
-    const co2HzL = phasicTonic(this.ornFilt, "co2L", co2L);
-    const co2HzR = phasicTonic(this.ornFilt, "co2R", co2R);
-    const avL = phasicTonic(this.ornFilt, "avL", sampL.bitter || 0);
-    const avR = phasicTonic(this.ornFilt, "avR", sampR.bitter || 0);
+    const moistL = sampL.moist || 0, moistR = sampR.moist || 0;
+    let smellL = phasicTonic(this.ornFilt, "foodL", foodL);
+    let smellR = phasicTonic(this.ornFilt, "foodR", foodR);
+    let pherHzL = phasicTonic(this.ornFilt, "pherL", pherL);
+    let pherHzR = phasicTonic(this.ornFilt, "pherR", pherR);
+    let co2HzL = phasicTonic(this.ornFilt, "co2L", co2L);
+    let co2HzR = phasicTonic(this.ornFilt, "co2R", co2R);
+    let avL = phasicTonic(this.ornFilt, "avL", sampL.bitter || 0);
+    let avR = phasicTonic(this.ornFilt, "avR", sampR.bitter || 0);
+    // Boost bilateral contrast so sparse filament hits still lateralize.
+    ({ L: smellL, R: smellR } = lrKlinotaxis(smellL, smellR, 0.72));
+    ({ L: pherHzL, R: pherHzR } = lrKlinotaxis(pherHzL, pherHzR, 0.58));
+    ({ L: co2HzL, R: co2HzR } = lrKlinotaxis(co2HzL, co2HzR, 0.5));
+    ({ L: avL, R: avR } = lrKlinotaxis(avL, avR, 0.55));
     this.lastSmellL = smellL;
     this.lastSmellR = smellR;
     this.lastOdor = { foodL: smellL, foodR: smellR, pherL: pherHzL, pherR: pherHzR, co2L: co2HzL, co2R: co2HzR };
     const windL = odors ? odors.windAt(_antL.x, _antL.z) : { x: 0, z: 0 };
     const windR = odors ? odors.windAt(_antR.x, _antR.z) : { x: 0, z: 0 };
+    // Body-frame wind: side = left+, forward along heading.
     const sideL = windL.x * c - windL.z * s;
     const sideR = windR.x * c - windR.z * s;
-    const joL = 12 + Math.hypot(windL.x, windL.z) * 38 + Math.max(0, -sideL) * 26;
-    const joR = 12 + Math.hypot(windR.x, windR.z) * 38 + Math.max(0, sideR) * 26;
+    const fwdL = windL.x * s + windL.z * c;
+    const fwdR = windR.x * s + windR.z * c;
+    const spdL = Math.hypot(windL.x, windL.z), spdR = Math.hypot(windR.x, windR.z);
+    let joL = 8 + spdL * 52 + Math.max(0, -sideL) * 48 + Math.max(0, fwdL) * 14;
+    let joR = 8 + spdR * 52 + Math.max(0, sideR) * 48 + Math.max(0, fwdR) * 14;
+    ({ L: joL, R: joR } = lrKlinotaxis(joL, joR, 0.45));
     const distF = Math.hypot(this.world.food.x - x, this.world.food.z - z);
     const distW = Math.hypot(this.world.water.x - x, this.world.water.z - z);
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
-    const closing = (this.prevDistO - distQ) / 0.032;
     this.prevDistO = distQ;
-    const bOth = other ? bearingTo(other.body.position.x, other.body.position.z, x, z, c, s) : 0;
     const day = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 0.012));
     this.day = day;
     const head = this.body.userData.head;
     if (head) head.getWorldPosition(_head);
     else _head.set(x + Math.sin(this.heading) * 0.7, this.y + 1.28, z + Math.cos(this.heading) * 0.7);
+    const bombPos = odors && odors.bombEnabled ? odors.getBombPos() : null;
     const eye = this.eye.sample({
       origin: { x: _head.x, y: _head.y, z: _head.z },
       heading: this.heading,
       day,
+      t,
       food: this.world.food,
       water: this.world.water,
       bitter: this.world.bitter,
       perch: this.world.perch,
+      bomb: bombPos,
       other: other ? { pos: other.body.position, heading: other.heading } : null,
       otherColor: other && other.sex === "female" ? [1.0, 0.43, 0.71] : [0.23, 0.47, 0.91],
       others: (this.world.others || []).map((o) => ({
@@ -663,21 +706,26 @@ export class EmbodiedFly {
     const opticRates = this.opticRates(eye, extraV);
     this.lastOptic = opticRates;
     const stand = this.body.userData.standZ || 1.3;
-    const onSweet = distF < 0.95 && this.y < stand + 0.28;
-    const onBitterDrop = this.world.bitter
-      && Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) < 0.95 && this.y < stand + 0.28;
-    const taste = onSweet ? 90 : 0;
-    const sweetHz = onSweet ? 95 : 0;
-    const bitterHz = onBitterDrop ? 95 : 0;
-    const hygro = 6 + (sampL.moist + sampR.moist) * 55
-      + (distW < 1.05 && this.y < stand + 0.2 ? 40 : 0);
-    const contact = distQ < 1.28;
-    const ppkL = contact ? 95 : 0;
-    const ppkR = contact ? 95 : 0;
+    const nearFloor = this.y < stand + 0.36;
+    // Graded GRN / ppk contact — not binary on/off.
+    const sweetHz = nearFloor ? gradedContact(distF, 1.35, 115) : gradedContact(distF, 0.7, 25);
+    const distB = this.world.bitter
+      ? Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) : 99;
+    const bitterHz = nearFloor ? gradedContact(distB, 1.35, 110) : 0;
+    const taste = Math.max(sweetHz, bitterHz * 0.85);
+    const hygroL = 5 + moistL * 70 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 55) : 0);
+    const hygroR = 5 + moistR * 70 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 55) : 0);
+    const hygro = 0.5 * (hygroL + hygroR);
+    // ppk courtship / contact — graded by proximity + slight L/R from bearing.
+    const bOth = other ? bearingTo(other.body.position.x, other.body.position.z, x, z, c, s) : 0;
+    const ppkBase = gradedContact(distQ, 1.55, 120);
+    const ppkL = Math.min(180, ppkBase * (1 + Math.max(0, -bOth) * 0.35));
+    const ppkR = Math.min(180, ppkBase * (1 + Math.max(0, bOth) * 0.35));
     const radial = Math.hypot(x, z);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    const wall = radial > ARENA_R - 1.15 ? 75 : 0;
-    const touch = wall + (grounded ? 8 + this.speedS * 32 : 3);
+    const wallProx = Math.max(0, radial - (ARENA_R - 2.4));
+    const wall = wallProx > 0 ? Math.min(110, 20 + wallProx * 55) : 0;
+    const touch = wall + (grounded ? 10 + this.speedS * 42 : 4) + ppkBase * 0.15;
 
     const proprio = this.readProprio(wall, grounded);
     const extra = this.extra || {};
@@ -717,27 +765,47 @@ export class EmbodiedFly {
     for (const side of ["L", "R"]) {
       const e = eye[side];
       // Sector photoreceptors: R1–R6 = luminance, R7 = UV, R8 = mixed.
-      // Contrast vs mean boosts cells when the scene has structure (not flat sky).
+      // Object salience (food/water/fly/bomb) further boosts structured sectors.
       const meanL = e.lum || 0.001;
       const meanU = e.uv || 0.001;
+      const sFood = e.sectorsFood || [0, 0, 0, 0];
+      const sWater = e.sectorsWater || [0, 0, 0, 0];
+      const sFly = e.sectorsFly || [0, 0, 0, 0];
       for (let s = 0; s < 4; s++) {
-        const cL = (e.sectors[s] - meanL) / (meanL + 0.08);
-        const cU = (e.sectorsUV[s] - meanU) / (meanU + 0.08);
+        const cL = (e.sectors[s] - meanL) / (meanL + 0.06);
+        const cU = (e.sectorsUV[s] - meanU) / (meanU + 0.06);
         const contrast = Math.max(0, Math.abs(cL));
         const uvContrast = Math.max(0, Math.abs(cU));
-        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.45, 210, 8) + extraV;
-        r["R7" + side + s] = hzVis(e.sectorsUV[s] + uvContrast * 0.5, 220, 6) + extraV * 0.5;
+        const obj = (sFood[s] || 0) * 0.9 + (sWater[s] || 0) * 0.75 + (sFly[s] || 0) * 1.05;
+        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.65 + obj * 0.35, 245, 7) + extraV;
+        r["R7" + side + s] = hzVis(
+          e.sectorsUV[s] + uvContrast * 0.7 + (sWater[s] || 0) * 0.55, 250, 5
+        ) + extraV * 0.5;
         r["R8" + side + s] = hzVis(
-          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.5 + contrast * 0.2, 190, 6
+          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.28 + obj * 0.2, 220, 5
         ) + extraV * 0.4;
       }
-      // L1 ON / L2 OFF lamina — drive from temporal contrast, not tonic fake Hz.
+      // L1 ON / L2 OFF / L3 — temporal contrast + object motion salience.
       const on = e.on || 0, off = e.off || 0;
       const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
+      const sal = (e.sal || 0) + (e.salFood || 0) + (e.salFly || 0) * 1.1;
       const t4 = (e.t4a || 0) + (e.t4b || 0) + (e.t4c || 0) + (e.t4d || 0);
       const t5 = (e.t5a || 0) + (e.t5b || 0) + (e.t5c || 0) + (e.t5d || 0);
-      r["L1" + side] = hzVis(on * 3.4 + t4 * 2.0 + mot * 0.75, 240, 6);
-      r["L2" + side] = hzVis(off * 3.4 + t5 * 2.0 + mot * 0.65, 240, 6);
+      r["L1" + side] = hzVis(on * 4.2 + t4 * 2.4 + mot * 0.95 + sal * 0.45, 260, 5);
+      r["L2" + side] = hzVis(off * 4.2 + t5 * 2.4 + mot * 0.85 + sal * 0.35, 260, 5);
+      r["L3" + side] = hzVis(e.uv * 1.4 + on * 1.2 + (e.salWater || 0) * 1.6, 210, 5);
+      // Direction-selective T4/T5 pools — map Hassenstein–Reichardt arms 1:1.
+      r["T4a" + side] = hzVis(e.t4a || 0, 280, 4);
+      r["T4b" + side] = hzVis(e.t4b || 0, 280, 4);
+      r["T4c" + side] = hzVis(e.t4c || 0, 280, 4);
+      r["T4d" + side] = hzVis(e.t4d || 0, 280, 4);
+      r["T5a" + side] = hzVis(e.t5a || 0, 280, 4);
+      r["T5b" + side] = hzVis(e.t5b || 0, 280, 4);
+      r["T5c" + side] = hzVis(e.t5c || 0, 280, 4);
+      r["T5d" + side] = hzVis(e.t5d || 0, 280, 4);
+      // Wide-field HS/VS lobula plate — signed motion magnitude into Hz.
+      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.35 + (e.salFly || 0) * 0.8, 240, 4);
+      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.35 + on * 0.5, 240, 4);
     }
     return r;
   }
@@ -790,8 +858,8 @@ export class EmbodiedFly {
         const stHz = phasicTonic(filt, `st${seg}${lr}`, ss, 0.032);
         const ldHz = phasicTonic(filt, `ld${seg}${lr}`, ld, 0.032);
         const flexHz = phasicTonic(filt, `fx${seg}${lr}`, flex, 0.032);
-        const choL = Math.min(180, 12 + flex * 55 + flexHz * 0.22 + vv * 7);
-        const tactL = Math.min(160, stHz * 0.45 + ss * 55 + wall * 0.4 + (grounded ? 8 : 2));
+        const choL = Math.min(190, 10 + flex * 68 + flexHz * 0.28 + vv * 9);
+        const tactL = Math.min(175, stHz * 0.55 + ss * 65 + wall * 0.5 + (grounded ? 10 : 2));
         rates[`cho${seg}${lr}`] = choL;
         rates[`tact${seg}${lr}`] = tactL;
       }
@@ -799,10 +867,10 @@ export class EmbodiedFly {
       a /= nLeg; v /= nLeg; st /= nLeg; load /= nLeg; slipV /= nLeg;
       const stP = phasicTonic(filt, `st${seg}`, st, 0.032);
       const ldP = phasicTonic(filt, `ld${seg}`, load, 0.032);
-      const cho = Math.min(180, 12 + a * 55 + v * 7 + (stP - 6) * 0.12);
+      const cho = Math.min(190, 10 + a * 68 + v * 9 + (stP - 6) * 0.16);
       const hp = Math.min(140, 8 + a * 36 + (stP - 6) * 0.08);
-      const csa = Math.min(170, 8 + st * 52 + ldP * 0.32 + slipV * 4.5 + (grounded ? this.speedS * 18 : 0));
-      const tact = Math.min(160, st * 58 + wall * 0.4 + (grounded ? 8 : 2) + (stP - 6) * 0.28);
+      const csa = Math.min(180, 8 + st * 62 + ldP * 0.4 + slipV * 5.5 + (grounded ? this.speedS * 22 : 0));
+      const tact = Math.min(175, st * 68 + wall * 0.5 + (grounded ? 10 : 2) + (stP - 6) * 0.35);
       const prop = cho * 0.5 + hp * 0.22 + csa * 0.28;
       rates[`cho${seg}`] = cho;
       rates[`hp${seg}`] = hp;
@@ -838,17 +906,17 @@ export class EmbodiedFly {
         const stHz = phasicTonic(filt, `mjst${seg}${lr}`, ss, 0.032);
         const ldHz = phasicTonic(filt, `mjld${seg}${lr}`, Math.min(1.5, ff * 0.04 + ss * 0.5), 0.032);
         const fxHz = phasicTonic(filt, `mjfx${seg}${lr}`, fl, 0.032);
-        rates[`cho${seg}${lr}`] = Math.min(180, 12 + fl * 38 + fxHz * 0.18 + spd * 4);
-        rates[`tact${seg}${lr}`] = Math.min(160, stHz * 0.45 + ss * 55 + wall * 0.4 + (grounded ? 8 : 2));
+        rates[`cho${seg}${lr}`] = Math.min(190, 10 + fl * 48 + fxHz * 0.25 + spd * 5);
+        rates[`tact${seg}${lr}`] = Math.min(175, stHz * 0.55 + ss * 65 + wall * 0.5 + (grounded ? 10 : 2));
       }
       const nLeg = Math.max(1, names.length);
       flex /= nLeg; st /= nLeg; fz /= nLeg; slipV /= nLeg;
       const stP = phasicTonic(filt, `mjst${seg}`, st, 0.032);
       const ldP = phasicTonic(filt, `mjld${seg}`, Math.min(1.5, fz * 0.03 + st * 0.5), 0.032);
-      const cho = Math.min(180, 12 + flex * 38 + spd * 4 + (stP - 6) * 0.12);
+      const cho = Math.min(190, 10 + flex * 48 + spd * 5 + (stP - 6) * 0.16);
       const hp = Math.min(140, 8 + flex * 22 + (stP - 6) * 0.08);
-      const csa = Math.min(170, 8 + st * 52 + ldP * 0.38 + fz * 1.5 + slipV * 5 + (grounded ? this.speedS * 18 : 0));
-      const tact = Math.min(160, st * 58 + wall * 0.4 + (grounded ? 8 : 2) + (stP - 6) * 0.28);
+      const csa = Math.min(180, 8 + st * 62 + ldP * 0.45 + fz * 1.8 + slipV * 6 + (grounded ? this.speedS * 22 : 0));
+      const tact = Math.min(175, st * 68 + wall * 0.5 + (grounded ? 10 : 2) + (stP - 6) * 0.35);
       const prop = cho * 0.5 + hp * 0.22 + csa * 0.28;
       rates[`cho${seg}`] = cho;
       rates[`hp${seg}`] = hp;

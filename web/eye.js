@@ -158,12 +158,17 @@ export class CompoundEye {
       const prev = this.prevL[sideName];
       const prevOn = this.prevOn[sideName];
       let sumL = 0, sumUV = 0, sumOn = 0, sumOff = 0;
+      let sumSal = 0, sumFood = 0, sumWater = 0, sumFly = 0, sumBitter = 0;
       let t4a = 0, t4b = 0, t4c = 0, t4d = 0;
       let t5a = 0, t5b = 0, t5c = 0, t5d = 0;
       const secL = [0, 0, 0, 0], secN = [0, 0, 0, 0];
       const secUV = [0, 0, 0, 0];
+      const secFood = [0, 0, 0, 0], secWater = [0, 0, 0, 0];
+      const secFly = [0, 0, 0, 0], secBitter = [0, 0, 0, 0];
       const onArr = new Float32Array(N);
       const offArr = new Float32Array(N);
+      const salArr = new Float32Array(N);
+      const hitKind = new Uint8Array(N);
 
       for (let i = 0; i < N; i++) {
         const om = OMM[i];
@@ -187,6 +192,11 @@ export class CompoundEye {
         }
         const tWat = raySphere(ox, oy, oz, dx, dy, dz, water.x, 0.22, water.z, 0.42);
         if (tWat < best) { best = tWat; hit = "water"; }
+        const bomb = world.bomb;
+        if (bomb) {
+          const tBomb = raySphere(ox, oy, oz, dx, dy, dz, bomb.x, bomb.y || 0.7, bomb.z, bomb.r || 0.55);
+          if (tBomb < best) { best = tBomb; hit = "bomb"; }
+        }
         const perch = world.perch;
         if (perch) {
           const tP = rayCylY(ox, oy, oz, dx, dy, dz, perch.x, perch.z, perch.r || 0.2, perch.h || 2.2);
@@ -197,7 +207,9 @@ export class CompoundEye {
           if (t < best) { best = t; hit = "fly"; hitCol = fb.col || hitCol; }
         }
 
-        let r, g, b, uv;
+        // Distance falloff keeps near objects punchier than far arena clutter.
+        const near = Math.max(0.12, Math.min(1, 2.8 / (0.55 + best)));
+        let r, g, b, uv, sal = 0;
         if (hit === "sky") {
           const el = Math.max(0, dy);
           const sky = (0.22 + 0.78 * day) * (0.35 + 0.65 * el);
@@ -206,46 +218,109 @@ export class CompoundEye {
         } else if (hit === "floor") {
           const px = ox + dx * best, pz = oz + dz * best;
           const chk = ((Math.floor(px * 0.55) + Math.floor(pz * 0.55)) & 1);
-          const fl = (chk ? 0.16 : 0.07) * (0.35 + 0.65 * day);
+          const fl = (chk ? 0.18 : 0.06) * (0.35 + 0.65 * day);
+          // Checker contrast → stronger spatial structure for R1–R6.
           r = fl; g = fl * 0.95; b = fl * 0.85;
           uv = fl * 0.15;
         } else if (hit === "wall") {
-          const w = 0.18 * day;
+          const w = 0.20 * day;
           r = w * 0.9; g = w; b = w * 1.1;
           uv = w * 0.2;
+          sal = 0.08 * near;
         } else if (hit === "food") {
-          r = 0.95 * day; g = 0.72 * day; b = 0.16 * day;
-          uv = 0.08 * day;
-        } else if (hit === "bitter") {
-          r = 0.22 * day; g = 0.42 * day; b = 0.12 * day;
-          uv = 0.18 * day;
-        } else if (hit === "perch") {
-          r = 0.42 * day; g = 0.28 * day; b = 0.12 * day;
+          // Warm sugar drop — high luminance + chromatic pop.
+          r = 1.15 * day * near; g = 0.78 * day * near; b = 0.10 * day * near;
           uv = 0.06 * day;
+          sal = 1.15 * near;
+        } else if (hit === "bitter") {
+          r = 0.18 * day * near; g = 0.48 * day * near; b = 0.10 * day * near;
+          uv = 0.22 * day * near;
+          sal = 0.85 * near;
+        } else if (hit === "perch") {
+          r = 0.48 * day * near; g = 0.30 * day * near; b = 0.12 * day * near;
+          uv = 0.05 * day;
+          sal = 0.35 * near;
         } else if (hit === "water") {
-          r = 0.18 * day; g = 0.52 * day; b = 0.95 * day;
-          uv = 0.35 * day;
+          // Blue-UV bright water for R7 / hygrosensory visual cue.
+          r = 0.14 * day * near; g = 0.58 * day * near; b = 1.15 * day * near;
+          uv = 0.55 * day * near;
+          sal = 1.05 * near;
+        } else if (hit === "bomb") {
+          // Scent orb: intense warm flicker target (visual only — odor is plume).
+          const pulse = 0.85 + 0.15 * Math.sin((world.t || 0) * 9.5 + i * 0.07);
+          r = 1.25 * day * near * pulse; g = 0.85 * day * near * pulse; b = 0.18 * day * near;
+          uv = 0.12 * day * near;
+          sal = 1.35 * near * pulse;
         } else {
-          r = hitCol[0] * day; g = hitCol[1] * day; b = hitCol[2] * day;
-          uv = 0.12 * day;
+          // Other fly — saturated body color + slight UV so motion pops.
+          r = hitCol[0] * 1.25 * day * near;
+          g = hitCol[1] * 1.15 * day * near;
+          b = hitCol[2] * 1.2 * day * near;
+          uv = 0.22 * day * near;
+          sal = 1.25 * near;
         }
 
-        const L = 0.30 * r + 0.59 * g + 0.11 * b;
+        let L = 0.30 * r + 0.59 * g + 0.11 * b;
+        // Local acceptance blur: mix a touch of neighbor luminance after pass
+        // (filled below). Store raw first.
         lum[i] = L;
         uvA[i] = uv;
+        salArr[i] = sal;
+        hitKind[i] = hit === "food" ? 1 : hit === "water" ? 2 : hit === "fly" ? 3
+          : hit === "bitter" ? 4 : hit === "bomb" ? 5 : 0;
         const dL = L - prev[i];
-        const on = dL > 0 ? dL : 0;
-        const off = dL < 0 ? -dL : 0;
+        // Salient objects get motion gain so loom / walk-by drives T4/T5 hard.
+        const salGain = 1 + sal * 1.8;
+        const on = dL > 0 ? dL * salGain : 0;
+        const off = dL < 0 ? -dL * salGain : 0;
         onArr[i] = on;
         offArr[i] = off;
         sumL += L;
         sumUV += uv;
         sumOn += on;
         sumOff += off;
+        sumSal += sal;
 
         const sec = Math.max(0, Math.min(3, (om.az / FOV + 1) * 2 | 0));
         secL[sec] += L;
         secUV[sec] += uv;
+        secN[sec]++;
+        if (hit === "food" || hit === "bomb") { secFood[sec] += sal; sumFood += sal; }
+        else if (hit === "water") { secWater[sec] += sal; sumWater += sal; }
+        else if (hit === "fly") { secFly[sec] += sal; sumFly += sal; }
+        else if (hit === "bitter") { secBitter[sec] += sal; sumBitter += sal; }
+      }
+
+      // Lateral contrast: boost ommatidia that differ from their hex neighbors.
+      for (let i = 0; i < N; i++) {
+        const om = OMM[i];
+        let surr = 0, nS = 0;
+        for (const nb of [om.azP, om.azM, om.elP, om.elM]) {
+          if (nb == null) continue;
+          surr += lum[nb];
+          nS++;
+        }
+        if (!nS) continue;
+        const c = lum[i] - surr / nS;
+        const boosted = Math.max(0, lum[i] + c * 0.55);
+        lum[i] = boosted;
+        // Edge contrast also feeds ON/OFF if it sharpened this frame.
+        const dEdge = boosted - prev[i];
+        if (dEdge > 0) onArr[i] = Math.max(onArr[i], dEdge * (1 + salArr[i]));
+        else if (dEdge < 0) offArr[i] = Math.max(offArr[i], -dEdge * (1 + salArr[i]));
+      }
+      // Recompute means after contrast pass.
+      sumL = 0; sumOn = 0; sumOff = 0;
+      for (let i = 0; i < N; i++) {
+        sumL += lum[i];
+        sumOn += onArr[i];
+        sumOff += offArr[i];
+      }
+      for (let s = 0; s < 4; s++) { secL[s] = 0; secN[s] = 0; }
+      for (let i = 0; i < N; i++) {
+        const om = OMM[i];
+        const sec = Math.max(0, Math.min(3, (om.az / FOV + 1) * 2 | 0));
+        secL[sec] += lum[i];
         secN[sec]++;
       }
 
@@ -275,12 +350,13 @@ export class CompoundEye {
       this.prevOn[sideName].set(onArr);
       const inv = 1 / N;
       // Stronger Hassenstein–Reichardt gain so sparse motion still drives T4/T5 hard.
-      const mot = 1 / Math.max(1, N * 0.032);
+      const mot = 1 / Math.max(1, N * 0.024);
       const sectors = secL.map((v, i) => (secN[i] ? v / secN[i] : 0));
       const sectorsUV = secUV.map((v, i) => (secN[i] ? v / secN[i] : 0));
       // Opponency: preferred minus null direction (not just raw correlator sums).
       const t4A = t4a * mot, t4B = t4b * mot, t4C = t4c * mot, t4D = t4d * mot;
       const t5A = t5a * mot, t5B = t5b * mot, t5C = t5c * mot, t5D = t5d * mot;
+      const invN = 1 / Math.max(1, N);
       out[sideName] = {
         lum: sumL * inv,
         uv: sumUV * inv,
@@ -299,8 +375,17 @@ export class CompoundEye {
         t5d: Math.max(0, t5D - 0.55 * t5C),
         hs: (t4A - t4B) + 0.65 * (t5A - t5B),
         vs: (t4C - t4D) + 0.65 * (t5C - t5D),
+        // World-object salience (mean over ommatidia) for stronger channel drive.
+        sal: sumSal * invN,
+        salFood: sumFood * invN,
+        salWater: sumWater * invN,
+        salFly: sumFly * invN,
+        salBitter: sumBitter * invN,
         sectors,
         sectorsUV,
+        sectorsFood: secFood.map((v, i) => (secN[i] ? v / secN[i] : 0)),
+        sectorsWater: secWater.map((v, i) => (secN[i] ? v / secN[i] : 0)),
+        sectorsFly: secFly.map((v, i) => (secN[i] ? v / secN[i] : 0)),
         map: lum,
         mapUV: uvA,
       };

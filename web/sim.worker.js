@@ -22,7 +22,7 @@ let params = {
   // Retuned so mean drive is slightly stronger than prior linear regime.
   wScale: 0.055,
   inhibGain: 2.15,
-  stimAmp: 0.22,
+  stimAmp: 0.30,
   // Milder STD use → more reliable transmission while depression still present.
   stdUse: 0.11,
   // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
@@ -247,7 +247,10 @@ function step() {
   const pScale = dt / 1000;
   for (let i = 0; i < n; i++) {
     const r = drive[i];
-    if (r > 0 && rngs() < r * pScale) I[i] += stimAmp;
+    if (r <= 0) continue;
+    // Soft-cap Poisson + rate-scaled current: mid/high sensory Hz transmit cleaner.
+    const p = Math.min(0.90, r * pScale);
+    if (rngs() < p) I[i] += stimAmp * (0.62 + 0.55 * Math.min(1, r / 100));
   }
 
   spikes.fill(0);
