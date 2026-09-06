@@ -29,8 +29,8 @@ ARENA_R = 18.0  # small pad (matches web/world/procgen.js)
 OPEN_WORLD = True  # no hard ring walls; soft XY clamp at WORLD_SOFT_LIMIT
 WORLD_SOFT_LIMIT = 15.8  # soft pad rim (~ARENA_R - 2.2)
 FLY_CEILING = 5.8
-SPAWN_Z = 0.55
-VISUAL_THORAX_Y = 1.18  # fly.js body.position.y inside the outer group
+SPAWN_Z = 0.55  # free-joint seed; stand_z remeasured after warmup (~1.15)
+VISUAL_THORAX_Y = 1.18  # nmf visual thorax height; client standZ syncs to plant pose.y
 PERCH = dict(three_x=4.8, three_z=-7.4, r_pole=0.20, r_cap=0.42, h=2.18)
 
 OUR_LEGS = ["L1", "L2", "L3", "R1", "R2", "R3"]  # maps 1:1 onto NMF lf,lm,lh,rf,rm,rh
@@ -448,19 +448,20 @@ class Plant:
             # Still hard-gated on MN drive; no walk/turn free-joint cheats.
             if fly_a < 0.48:
                 fly_a = 0.0
+        # Keep feet sticky while grounded. Over-peeling vaulted the thorax
+        # (y→1.9, ncon~4) so the mesh hung and XY stalled — only peel swing lightly.
         adh = np.zeros(6, dtype=float) if fly_a else np.ones(6, dtype=float)
         if not fly_a:
             for i, nmf in enumerate(NMF_LEGS):
                 our = NMF_TO_OUR[nmf]
                 m = muscle.get(our) or {}
-                # Peel adhesion on swing so planted feet can push (was too sticky → twitch).
                 tr_f = float(m.get("trFlex") or 0)
                 tr_e = float(m.get("trExt") or 0)
                 cox_p = float(m.get("coxaProm") or 0)
                 cox_r = float(m.get("coxaRem") or 0)
-                lifting = tr_f > tr_e + 0.10
-                swinging = abs(cox_p - cox_r) > 0.18 and (cox_p + cox_r) > 0.25
-                adh[i] = 0.12 if lifting else (0.45 if swinging else 1.0)
+                lifting = tr_f > tr_e + 0.22
+                swinging = abs(cox_p - cox_r) > 0.28 and (cox_p + cox_r) > 0.35
+                adh[i] = 0.55 if lifting else (0.78 if swinging else 1.0)
         sim.set_leg_adhesion_states(body.fly_id, adh)
 
         model, data = sim.mj_model, sim.mj_data
@@ -488,12 +489,18 @@ class Plant:
             *data.qpos[body.free_qposadr + 3 : body.free_qposadr + 7]
         )
         ncon = int(data.ncon)
+        # Leg-level contacts (more reliable than raw ncon which counts all geoms).
+        found, *_ = sim.get_ground_contact_info(body.fly_id)
+        n_leg = int(sum(1 for i in range(6) if float(found[i]) > 0.5))
         flipped = abs(pitch) > 0.70 or abs(roll) > 0.70
         lost = thz < 0.15 or thz > FLY_CEILING + 2.5 or not math.isfinite(thz)
-        # Grounded walk should keep contacts; settle floaters / flips / hover-without-wings.
-        airborne_wrong = (not fly_a) and ncon == 0 and thz > body.stand_z + 0.22
-        floating = (not fly_a) and ncon == 0 and abs(thz - body.stand_z) > 0.12
-        if flipped or lost or airborne_wrong or floating:
+        # Root cause fix: moderate MN drive vaulted thorax (y≈1.9) while ncon>0
+        # so old ncon==0 settle never fired — mesh hung, feet cycled in air, XY≈0.
+        vaulted = (not fly_a) and thz > body.stand_z + 0.22
+        weak_plant = (not fly_a) and n_leg < 2 and thz > body.stand_z + 0.10
+        airborne_wrong = (not fly_a) and n_leg == 0 and thz > body.stand_z + 0.08
+        floating = (not fly_a) and ncon == 0 and abs(thz - body.stand_z) > 0.10
+        if flipped or lost or airborne_wrong or floating or vaulted or weak_plant:
             snap = self._snapshot(body)
             self._teleport(
                 body,
@@ -503,11 +510,24 @@ class Plant:
                 z_up=body.stand_z,
             )
             data.qvel[body.free_dofadr : body.free_dofadr + 6] = 0
-            # Re-engage adhesion after settle so feet stick again.
             sim.set_leg_adhesion_states(body.fly_id, np.ones(6))
             mj.mj_forward(model, data)
+        elif not fly_a and thz > body.stand_z + 0.05:
+            # Soft plant: bleed upward vault without free-joint walk thruster.
+            vz = float(data.qvel[body.free_dofadr + 2])
+            if vz > 0:
+                data.qvel[body.free_dofadr + 2] = vz * 0.25
+            data.qpos[body.free_qposadr + 2] += 0.35 * (body.stand_z - thz)
+            mj.mj_forward(model, data)
         self._contain(body)
-        return self._snapshot(body)
+        snap = self._snapshot(body)
+        # Recompute after settle/contain so HUD matches true contacts.
+        n_leg_f = int(sum(1 for v in (snap.get("contact") or {}).values() if v))
+        snap["n_leg"] = n_leg_f
+        snap["planted"] = bool(
+            n_leg_f >= 2 and float(snap.get("thoraxZ") or 0) <= body.stand_z + 0.18
+        )
+        return snap
 
     def _contain(self, body: Body) -> None:
         """Open world: no XY cage. Sanity soft-limit far out; still clamp Z ceiling/floor."""
@@ -582,6 +602,7 @@ class Plant:
                 "p": list(mj_to_three(float(p_rel[0]), float(p_rel[1]), float(p_rel[2]))),
                 "q": _mat_to_quat(_C @ R_rel @ _C.T),
             }
+        n_leg = int(sum(1 for v in contact.values() if v))
         return {
             "x": three_x,
             "y": three_y,
@@ -596,6 +617,8 @@ class Plant:
             "contact": contact,
             "force": force,
             "ncon": int(sim.mj_data.ncon),
+            "n_leg": n_leg,
+            "planted": bool(n_leg >= 2 and float(xpos[2]) <= body.stand_z + 0.18),
             "speed": float(math.hypot(v[0], v[1])),
             "fallen": bool(fallen),
             "mass": body.mass,

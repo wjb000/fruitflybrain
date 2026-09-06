@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js";
-import { CompoundEye } from "./eye.js";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js";
-import { portableControls, stubRobotDriver } from "./controller/portable.js";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=walkfix1";
+import { CompoundEye } from "./eye.js?v=walkfix1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=walkfix1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=walkfix1";
+import { portableControls, stubRobotDriver } from "./controller/portable.js?v=walkfix1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -239,7 +239,13 @@ export class EmbodiedFly {
     this._ensurePlant = () => {
       if (!physics.ok) return;
       spawnPhysics(this.physId, this.body.position.x, this.body.position.z, this.heading).then((pose) => {
-        if (pose) this.mjPose = pose;
+        if (!pose) return;
+        this.mjPose = pose;
+        // Align visual standZ to measured MuJoCo thorax height (was fixed 1.3 → mesh/plant skew).
+        if (pose.y != null && Number.isFinite(pose.y)) {
+          this.body.userData.standZ = pose.y;
+          this.y = pose.y;
+        }
       }).catch(() => {});
     };
     this._ensurePlant();
@@ -634,15 +640,25 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Stance-slip translates body from MN foot motion (no thruster / CPG).
-        // Raised after calm2 left XY≈0 with visible joint twitch.
-        const slipGain = 2.45;
-        this.body.position.x += (slip.x / slip.n) * slipGain;
-        this.body.position.z += (slip.z / slip.n) * slipGain;
-        this.heading += (slip.yawR - slip.yawL) * 1.55;
+        // Stance-slip from MN foot motion (no thruster / CPG). Scale with leg MN
+        // asymmetry so quiet co-contraction does not thrash XY.
+        const asym = Math.min(1.4, Math.abs(legR - legL) * 2.2 + softDrive(legs, 2.4));
+        const slipGain = 2.2 + 1.6 * asym;
+        const sx = (slip.x / slip.n) * slipGain;
+        const sz = (slip.z / slip.n) * slipGain;
+        this.body.position.x += sx;
+        this.body.position.z += sz;
+        this.heading += (slip.yawR - slip.yawL) * (1.2 + 0.6 * asym);
+        this.lastSlipAbs = Math.hypot(sx, sz);
+      } else {
+        this.lastSlipAbs = 0;
       }
+      const slipMag = slip && slip.n
+        ? (slip.meanAbs != null ? slip.meanAbs : Math.hypot(slip.x, slip.z) / slip.n)
+        : 0;
+      this.slipMeanAbs = (this.slipMeanAbs || 0) * 0.88 + slipMag * 0.12;
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
-        ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
+        ? slipMag / 0.035
         : cmd.fly) * 0.7;
       // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
       if (OPEN_WORLD) {
@@ -686,9 +702,14 @@ export class EmbodiedFly {
   applyMujoco(pose, cmd, dt) {
     this.mjPose = pose;
     this.heading = pose.yaw;
-    this.y = pose.y;
+    // Visual root == plant thorax (XYZ). Never leave mesh at nmf.standZ while
+    // MuJoCo walks — that was the suspended-mesh / offset-shadow bug.
+    const py = pose.y;
+    this.y = py;
     this.vy = 0;
-    // Open world: trust MuJoCo XY; sanity clip only.
+    if (pose.planted && pose.y != null && Number.isFinite(pose.y)) {
+      this.body.userData.standZ = this.body.userData.standZ * 0.9 + pose.y * 0.1;
+    }
     let px = pose.x, pz = pose.z;
     const rad = Math.hypot(px, pz);
     if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
@@ -696,11 +717,12 @@ export class EmbodiedFly {
       px *= s;
       pz *= s;
     }
-    this.body.position.set(px, pose.y, pz);
-    // Yaw only on the root — pitch/roll from a converted quat was flipping flies.
+    this.body.position.set(px, py, pz);
     this.body.rotation.set(0, pose.yaw, 0);
     applyPhysicsPose(this.body, pose, dt, this.clock, cmd);
     this.speedS = this.speedS * 0.3 + Math.min(1.4, (pose.speed || 0) / 8) * 0.7;
+    this.plantNLeg = pose.n_leg != null ? pose.n_leg : 0;
+    this.planted = !!pose.planted;
     const perch = this.world.perch;
     this.onPerch = false;
     if (perch) {
