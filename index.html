@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Living flies — Male CNS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}</style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="loader" id="loader">
+    <div class="kicker">FlyEM · Janelia · Princeton</div>
+    <h2>Male fruit fly CNS</h2>
+    <p>Loading the complete adult male central nervous system — Male CNS v1.0 — driving a NeuroMechFly body in an open procedural world. You can add more males.</p>
+    <div class="progress"><i id="bar"></i></div>
+    <p id="loadmsg">fetching maps…</p>
+  </div>
+  <div class="hud">
+    <div class="panel top-left" id="panelL">
+      <button class="collapse" type="button" title="collapse">–</button>
+      <div class="kicker">Flock · live</div>
+      <div class="panel-body">
+        <h1>They run themselves</h1>
+        <div class="sub">World → sensors → connectome → motor neurons → body. Vision→walk via optic pools → LIF → leg MNs (no thrusters). Flight translation off by default (<code>?flight=1</code> to re-enable). Small pad arena (soft rim); male CNS; walk-only MN stance-slip (flight off).</div>
+        <div class="stats">
+          <div><b id="nNeurons">—</b><span>♂ map</span></div>
+          <div><b id="nFlock">1</b><span>living flies</span></div>
+          <div><b id="gait">♂ …</b><span>mode</span></div>
+          <div><b id="hunger">—</b><span>selected hunger</span></div>
+          <div><b id="flesh">…</b><span>body plant</span></div>
+        </div>
+        <div class="kicker">living</div>
+        <div class="row" id="flock"></div>
+        <div class="row">
+          <button id="addM">+ male</button>
+        </div>
+        <div class="row" id="stims"></div>
+        <div class="row">
+          <button id="pause">pause</button>
+          <button id="reset">reset</button>
+          <label class="tog on"><input type="checkbox" id="followFlock" checked /> follow flock</label>
+          <label class="tog"><input type="checkbox" id="followSel" /> follow selected</label>
+          <label class="tog"><input type="checkbox" id="xray" /> x-ray CNS</label>
+          <label class="tog"><input type="checkbox" id="showOdor" /> show odor</label>
+          <label class="tog"><input type="checkbox" id="sensoryBomb" /> scent bomb</label>
+        </div>
+        <div class="hint hidden" id="bombHint">drag the scent orb — flies smell it via ORNs only</div>
+        <div id="info">Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Clock cells are not force-fed daylight (only l-LNv CRY). Body motion is MN-driven only — limp when pools are quiet. Perch is landing. Wall bounce is reflection.</div>
+      </div>
+    </div>
+    <div class="panel top-right" id="panelR">
+      <button class="collapse" type="button" title="collapse">–</button>
+      <div class="kicker">selected · <span id="selName">♂1</span></div>
+      <div class="panel-body">
+        <div class="kicker">commands</div>
+        <div id="acts"></div>
+        <div class="kicker" style="margin-top:10px">joints (flex − ext)</div>
+        <div id="joints"></div>
+        <div class="kicker" style="margin-top:10px">motor neurons (live)</div>
+        <div id="mnBars">
+          <div class="barline"><div class="name">DLM</div><div class="track"><i id="mn-dlm" style="background:#7ecbff"></i></div></div>
+          <div class="barline"><div class="name">DVM</div><div class="track"><i id="mn-dvm" style="background:#7ecbff"></i></div></div>
+          <div class="barline"><div class="name">ADMN</div><div class="track"><i id="mn-admn" style="background:#7ecbff"></i></div></div>
+          <div class="barline"><div class="name">legs</div><div class="track"><i id="mn-legs" style="background:#9ae66e"></i></div></div>
+          <div class="barline"><div class="name">neck</div><div class="track"><i id="mn-neck" style="background:#f5d76e"></i></div></div>
+          <div class="barline"><div class="name">abd</div><div class="track"><i id="mn-abd" style="background:#ff9f1c"></i></div></div>
+          <div class="barline"><div class="name">MN9</div><div class="track"><i id="mn-mn9" style="background:#ff4fd8"></i></div></div>
+        </div>
+        <div class="kicker" style="margin-top:10px">compound eyes</div>
+        <div class="eyes"><canvas id="eyeL" width="150" height="128"></canvas><canvas id="eyeR" width="150" height="128"></canvas></div>
+        <div class="kicker" style="margin-top:10px">slow physics</div>
+        <div id="slowBars">
+          <div class="barline"><div class="name">sleep</div><div class="track"><i id="slow-sleep" style="background:#7a8cff"></i></div></div>
+          <div class="barline"><div class="name">PDF</div><div class="track"><i id="slow-pdf" style="background:#f5d76e"></i></div></div>
+          <div class="barline"><div class="name">DA</div><div class="track"><i id="slow-da" style="background:#ff5c7a"></i></div></div>
+          <div class="barline"><div class="name">OA</div><div class="track"><i id="slow-oa" style="background:#ff9f1c"></i></div></div>
+        </div>
+        <div class="kicker" style="margin-top:10px">antennae (filament)</div>
+        <div id="odorBars">
+          <div class="barline"><div class="name">food L</div><div class="track"><i id="odorFL" style="background:#f0c040"></i></div></div>
+          <div class="barline"><div class="name">food R</div><div class="track"><i id="odorFR" style="background:#f0c040"></i></div></div>
+          <div class="barline"><div class="name">pher L</div><div class="track"><i id="odorPL" style="background:#ff4fd8"></i></div></div>
+          <div class="barline"><div class="name">pher R</div><div class="track"><i id="odorPR" style="background:#ff4fd8"></i></div></div>
+        </div>
+        <div class="hint" id="stimHint">every fly closed-loop</div>
+        <div class="hint" id="lifeHint">loading</div>
+      </div>
+    </div>
+    <div class="bottom">
+      <div class="panel rates" id="panelB">
+        <button class="collapse" type="button" title="collapse">–</button>
+        <div class="kicker">Shared world</div>
+        <div class="panel-body">
+          <div class="hint">Closed loop: world → sensory cells → connectome → motor neurons → flesh (MuJoCo locally, kinematic MN posing on Pages). Buttons are optogenetics, not puppet strings.</div>
+        </div>
+      </div>
+    </div>
+    <div class="cam-pad" id="camPad" aria-label="Camera controls">
+      <button type="button" id="camZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+      <button type="button" id="camZoomOut" aria-label="Zoom out" title="Zoom out">−</button>
+      <button type="button" id="camRecenter" class="cam-recenter" aria-label="Recenter overview" title="Recenter">⊙</button>
+    </div>
+    <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
+  </div>
+  <script type="module" src="app.js?v=small1"></script>
+</body>
+</html>
