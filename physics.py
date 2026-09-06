@@ -206,6 +206,15 @@ class Body:
     thorax_bodyid: int
     seg_ids: list = field(default_factory=list)
     stand_z: float = 0.6
+    last_step: float = field(default_factory=time.time)
+    born: float = field(default_factory=time.time)
+
+
+# Soft dish limit: keep thorax inside with slack so flies don't glue to the rim.
+ARENA_SOFT = ARENA_R - 1.8
+ARENA_EPS = 0.08
+MAX_BODIES = 8
+BODY_TTL = 25.0  # despawn if not stepped this long (ghost tabs)
 
 
 @dataclass
@@ -215,6 +224,8 @@ class Plant:
     timestep: float = 2e-4
     lock: threading.Lock = field(default_factory=threading.Lock)
     bodies: dict[str, Body] = field(default_factory=dict)
+    max_bodies: int = MAX_BODIES
+    body_ttl: float = BODY_TTL
 
     def spawn(self, fly_id: str, x: float, z: float, yaw: float = 0.0) -> dict:
         with self.lock:
@@ -222,8 +233,15 @@ class Plant:
 
     def _spawn_locked(self, fly_id: str, x: float, z: float, yaw: float = 0.0) -> dict:
         if fly_id in self.bodies:
-            self._teleport(self.bodies[fly_id], x, z, yaw)
-            return self._snapshot(self.bodies[fly_id])
+            body = self.bodies[fly_id]
+            body.last_step = time.time()
+            self._teleport(body, x, z, yaw)
+            return self._snapshot(body)
+        # Cap active bodies — ghost browser sessions used to pile up forever.
+        self._evict_stale_locked(now=time.time())
+        while len(self.bodies) >= self.max_bodies:
+            oldest_id = min(self.bodies.items(), key=lambda kv: kv[1].born)[0]
+            self.bodies.pop(oldest_id, None)
         fly = make_locomotion_fly(name=fly_id, colorize=False)
         world = FlatGroundWorld(name=f"dish_{fly_id}", half_size=40)
         extras = _add_dish(world)
@@ -289,6 +307,21 @@ class Plant:
         with self.lock:
             self.bodies.pop(fly_id, None)
 
+    def clear(self) -> dict:
+        """Drop every body — call from client on load so ghosts never accumulate."""
+        with self.lock:
+            n = len(self.bodies)
+            self.bodies.clear()
+        return {"ok": True, "cleared": n}
+
+    def _evict_stale_locked(self, now: float | None = None) -> list[str]:
+        now = time.time() if now is None else now
+        ttl = float(self.body_ttl)
+        dead = [fid for fid, b in self.bodies.items() if (now - b.last_step) > ttl]
+        for fid in dead:
+            self.bodies.pop(fid, None)
+        return dead
+
     def reset(self, fly_id: str, x: float, z: float, yaw: float = 0.0) -> dict:
         with self.lock:
             body = self.bodies.get(fly_id)
@@ -302,10 +335,17 @@ class Plant:
             return self._snapshot(body)
 
     def step(self, dt: float, flies: dict) -> dict:
-        """flies: {id: {muscle, dlm, dvm, admn, fly}} — MN rates only; no walk/turn cheats."""
+        """flies: {id: {muscle, dlm, dvm, admn, fly}} — MN rates only; no walk/turn cheats.
+
+        Each client's step is a heartbeat: ids present get last_step refreshed;
+        ids not seen for BODY_TTL are despawned (dead tabs release plant slots).
+        """
         out = {}
+        now = time.time()
         with self.lock:
-            for fly_id, cmd in flies.items():
+            self._evict_stale_locked(now=now)
+            seen = set(flies.keys()) if flies else set()
+            for fly_id, cmd in (flies or {}).items():
                 cmd = cmd or {}
                 body = self.bodies.get(fly_id)
                 if body is None:
@@ -318,17 +358,25 @@ class Plant:
                     body = self.bodies.get(fly_id)
                 if body is None:
                     continue
+                body.last_step = now
                 out[fly_id] = self._step_one(body, float(dt), cmd)
+            # Also refresh last_step for ids that were only listed (heartbeat)
+            # — already done above. Drop anything else older than TTL again.
+            self._evict_stale_locked(now=now)
+            _ = seen  # documented: client flock = live set
         return out
 
     def health(self) -> dict:
         with self.lock:
+            self._evict_stale_locked()
             flies = {k: self._snapshot(v) for k, v in self.bodies.items()}
         return {
             "ok": True,
             "engine": "mujoco+neuromechfly",
             "timestep": self.timestep,
             "n": len(flies),
+            "max": self.max_bodies,
+            "ttl": self.body_ttl,
             "flies": {k: {"ncon": v.get("ncon"), "z": v.get("thoraxZ")} for k, v in flies.items()},
         }
 
@@ -426,9 +474,10 @@ class Plant:
         ncon = int(data.ncon)
         flipped = abs(pitch) > 0.70 or abs(roll) > 0.70
         lost = thz < 0.15 or thz > FLY_CEILING + 2.5 or not math.isfinite(thz)
-        # Grounded walk should keep contacts; settle floaters / flips.
-        airborne_wrong = (not fly_a) and ncon == 0 and thz > body.stand_z + 0.35
-        if flipped or lost or airborne_wrong:
+        # Grounded walk should keep contacts; settle floaters / flips / hover-without-wings.
+        airborne_wrong = (not fly_a) and ncon == 0 and thz > body.stand_z + 0.22
+        floating = (not fly_a) and ncon == 0 and abs(thz - body.stand_z) > 0.12
+        if flipped or lost or airborne_wrong or floating:
             snap = self._snapshot(body)
             self._teleport(
                 body,
@@ -445,24 +494,31 @@ class Plant:
         return self._snapshot(body)
 
     def _contain(self, body: Body) -> None:
-        """Keep the thorax inside the dish: radius and height."""
+        """Soft inward push — reflect velocity, place at limit-ε; never pin on rim."""
         d = body.sim.mj_data
         th = d.xpos[body.thorax_bodyid]
         mx, my, mz = float(th[0]), float(th[1]), float(th[2])
         adr = body.free_qposadr
         dadr = body.free_dofadr
-        limit = ARENA_R - 1.4
+        limit = ARENA_SOFT
         r = math.hypot(mx, my)
         dirty = False
         if r > limit and r > 1e-6:
-            s = limit / r
-            d.qpos[adr] += mx * (s - 1.0)
-            d.qpos[adr + 1] += my * (s - 1.0)
             nx, ny = mx / r, my / r
-            outward = float(d.qvel[dadr]) * nx + float(d.qvel[dadr + 1]) * ny
+            # Place just inside the soft limit (ε slack) so they bounce off, not glue.
+            target = max(0.0, limit - ARENA_EPS)
+            d.qpos[adr] += nx * target - mx
+            d.qpos[adr + 1] += ny * target - my
+            # Reflect outward radial velocity inward (keep tangential).
+            vx, vy = float(d.qvel[dadr]), float(d.qvel[dadr + 1])
+            outward = vx * nx + vy * ny
             if outward > 0:
-                d.qvel[dadr] -= outward * nx
-                d.qvel[dadr + 1] -= outward * ny
+                d.qvel[dadr] = vx - 2.0 * outward * nx
+                d.qvel[dadr + 1] = vy - 2.0 * outward * ny
+            else:
+                # Still nudge a little inward so they don't re-hit next frame.
+                d.qvel[dadr] -= 0.15 * nx
+                d.qvel[dadr + 1] -= 0.15 * ny
             dirty = True
         if mz > FLY_CEILING:
             d.qpos[adr + 2] += FLY_CEILING - mz

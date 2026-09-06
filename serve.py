@@ -103,6 +103,8 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/physics/despawn":
                 plant.despawn(str(body["id"]))
                 return self._json({"ok": True})
+            if path == "/physics/clear":
+                return self._json(plant.clear())
             if path == "/physics/reset":
                 pose = plant.reset(
                     str(body["id"]),

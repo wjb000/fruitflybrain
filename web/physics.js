@@ -102,7 +102,28 @@ export function despawnPhysics(id) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
+    keepalive: true,
   }).catch(() => {});
+}
+
+/** Drop every plant body (ghost hygiene). Call on page load before spawn. */
+export async function clearPhysics() {
+  physics.pending.clear();
+  physics.poses.clear();
+  if (!physics.ok) return null;
+  try {
+    const r = await fetch(plantUrl("/physics/clear"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    return await r.json();
+  } catch (e) {
+    physics.ok = false;
+    physics.err = String(e);
+    reconnectAt = performance.now() + 3000;
+    return null;
+  }
 }
 
 export async function resetPhysics(id, x, z, yaw) {
@@ -128,10 +149,56 @@ export function setCommand(id, cmd) {
   physics.pending.set(id, cmd);
 }
 
+function releaseClientBodies() {
+  for (const id of [...physics.poses.keys()]) despawnPhysics(id);
+}
+
+/** Lightweight step so plant TTL sees our live fly ids (works while UI is paused). */
+export function heartbeatPhysics() {
+  if (!physics.ok || busy) return;
+  if (document.visibilityState === "hidden") return;
+  if (physics.poses.size === 0 && physics.pending.size === 0) return;
+  busy = true;
+  const flies = {};
+  for (const id of physics.poses.keys()) flies[id] = physics.pending.get(id) || {};
+  for (const [id, cmd] of physics.pending) flies[id] = cmd;
+  fetch(plantUrl("/physics/step"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dt: 0.016, flies }),
+  })
+    .then((r) => r.json())
+    .then((j) => {
+      if (j.ok === false) {
+        physics.ok = false;
+        physics.err = j.error || "step failed";
+        reconnectAt = performance.now() + 3000;
+        return;
+      }
+      physics.last = j;
+      if (j.flies) {
+        for (const [id, pose] of Object.entries(j.flies)) physics.poses.set(id, pose);
+      }
+    })
+    .catch((e) => {
+      physics.ok = false;
+      physics.err = String(e);
+      reconnectAt = performance.now() + 3000;
+    })
+    .finally(() => { busy = false; });
+}
+
 if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", () => {
-    for (const id of [...physics.poses.keys()]) despawnPhysics(id);
+  window.addEventListener("pagehide", releaseClientBodies);
+  // Backgrounded tabs free plant slots; on return, agents re-spawn via event.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      releaseClientBodies();
+    } else if (physics.ok) {
+      try { window.dispatchEvent(new CustomEvent("ffb-physics-resume")); } catch (_) {}
+    }
   });
+  setInterval(heartbeatPhysics, 5000);
 }
 
 export function flushPhysics(dt) {

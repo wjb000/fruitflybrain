@@ -201,10 +201,16 @@ export class EmbodiedFly {
     this.onPerch = false;
     this.physId = `${sex}-${Math.random().toString(36).slice(2, 8)}`;
     this.mjPose = null;
-    if (physics.ok) {
-      spawnPhysics(this.physId, x, z, this.heading).then((pose) => {
+    this._ensurePlant = () => {
+      if (!physics.ok) return;
+      spawnPhysics(this.physId, this.body.position.x, this.body.position.z, this.heading).then((pose) => {
         if (pose) this.mjPose = pose;
       }).catch(() => {});
+    };
+    this._ensurePlant();
+    this._onPhysicsResume = () => this._ensurePlant();
+    if (typeof window !== "undefined") {
+      window.addEventListener("ffb-physics-resume", this._onPhysicsResume);
     }
     this.lastOdor = { foodL: 0, foodR: 0, pherL: 0, pherR: 0 };
     this.prevDistO = 99;
@@ -338,6 +344,9 @@ export class EmbodiedFly {
 
   dispose() {
     try { this.worker.terminate(); } catch (_) {}
+    if (typeof window !== "undefined" && this._onPhysicsResume) {
+      window.removeEventListener("ffb-physics-resume", this._onPhysicsResume);
+    }
     despawnPhysics(this.physId);
     if (this.body && this.body.parent) this.body.parent.remove(this.body);
   }
@@ -543,11 +552,14 @@ export class EmbodiedFly {
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? Math.hypot(slip.x, slip.z) / slip.n / 0.04
         : cmd.fly) * 0.7;
+      // Soft rim: bounce inward before exact ARENA_R so they don't park on the edge.
+      const softLim = ARENA_R - 1.6;
       const rad = Math.hypot(this.body.position.x, this.body.position.z);
-      if (rad > ARENA_R) {
+      if (rad > softLim && rad > 1e-6) {
         const nx = this.body.position.x / rad, nz = this.body.position.z / rad;
-        this.body.position.x = nx * ARENA_R;
-        this.body.position.z = nz * ARENA_R;
+        const target = softLim - 0.12;
+        this.body.position.x = nx * target;
+        this.body.position.z = nz * target;
         const dx = Math.sin(this.heading), dz = Math.cos(this.heading);
         const dot = dx * nx + dz * nz;
         if (dot > 0) {
@@ -589,11 +601,13 @@ export class EmbodiedFly {
     this.heading = pose.yaw;
     this.y = pose.y;
     this.vy = 0;
-    const lim = ARENA_R - 1.4;
+    // Visual soft limit matches plant ARENA_SOFT — don't re-pin on the exact rim.
+    const lim = ARENA_R - 1.8;
     let px = pose.x, pz = pose.z;
     const rad = Math.hypot(px, pz);
-    if (rad > lim) {
-      const s = lim / rad;
+    if (rad > lim && rad > 1e-6) {
+      const target = lim - 0.08;
+      const s = target / rad;
       px *= s;
       pz *= s;
     }
@@ -722,8 +736,9 @@ export class EmbodiedFly {
     const ppkR = Math.min(120, ppkBase * (1 + Math.max(0, bOth) * 0.28));
     const radial = Math.hypot(x, z);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    const wallProx = Math.max(0, radial - (ARENA_R - 2.4));
-    const wall = wallProx > 0 ? Math.min(70, 12 + wallProx * 35) : 0;
+    // Soft wall contact: earlier onset, lower peak — avoid constant scream into escape MNs.
+    const wallProx = Math.max(0, radial - (ARENA_R - 3.2));
+    const wall = wallProx > 0 ? Math.min(28, 4 + wallProx * 10) : 0;
     const touch = wall + (grounded ? 8 + this.speedS * 24 : 3) + ppkBase * 0.12;
 
     const proprio = this.readProprio(wall, grounded);

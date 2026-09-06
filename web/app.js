@@ -4,7 +4,7 @@ import { loadNmf, createMaleFly, createFemaleFly, createArena } from "./fly.js";
 import { EmbodiedFly } from "./agent.js";
 import { drawOmmatidia } from "./eye.js";
 import { OdorWorld } from "./plume.js";
-import { physics, connectPhysics, flushPhysics } from "./physics.js";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c");
@@ -234,6 +234,10 @@ setLoad(0.88, "NeuroMechFly body");
 await loadNmf();
 setLoad(0.92, "MuJoCo flesh");
 await connectPhysics();
+// Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
+if (physics.ok) {
+  try { await clearPhysics(); } catch (_) {}
+}
 if ($("flesh")) {
   const origin = physics.plantOrigin || "";
   $("flesh").textContent = physics.ok
