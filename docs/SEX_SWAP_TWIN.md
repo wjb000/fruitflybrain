@@ -4,7 +4,11 @@ Closed-loop digital twin of the adult *Drosophila* CNS in which **only sex-speci
 
 ## Abstract
 
-We built a closed-loop sex-swap twin of the Berg et al. (Cell, 3 Sept 2026) male CNS connectome (prepared **n = 165122**, **nEdges = 6235682**, minWeight 5; source annotations **211577** rows, NT table **1835518** rows) paired with Bates et al. BANC v888 female annotations (meta **188508 × 81**; prepared **n = 139458**, **nEdges = 3372365**, minWeight 3). BANC regions: optic_lobe **108764**, central_brain **47688**, VNC **31688**; BANC `super_class` descending **1316**, ascending **1849**. Male descending (**group 1326**; `descending_neuron` = 1314) and ascending (**group 2393**; `ascending_neuron` = 1846) neurons sit in the **same MCSR** as optic lobe, central brain, and VNC — the intact neck connective. A dimorphic set of **2368** neurons / **478** types (male-specific 1258, sexually dimorphic 771, potentially sexually dimorphic 177, potentially male-specific 162) accounts for **176325** outgoing edges. Cross-sex map: `malecns_match` non-null **23608**; `malecns_cell_type` nunique **10445** overlapping **5250** male traced types; `cell_type` overlap **7442**. BANC transplant **v2** (ablate male-specific + potentially MS outgoing; replace body-matched `malecns_match` and type-matched `malecns_cell_type` dimorphic outgoing with BANC-mapped edges; **keep unmatched sexually-dimorphic male outgoing**) yields female_swap nnz **6124057** (body-mapped **22115**, type-transplant **6247**; **1678** neurons' outs removed; **690** unmatched SD kept; **1420** MS ablated). **CVA-SST** is a compact headless assay (no UI): one pad scene with a female-silhouette + courtship/touch channel versus a male-silhouette + cVA/smell channel; male vs isomorphic-only vs BANC female-swap vs shuffled sex-edges. **N=16 (ticks=48, steps=8): no CI↔AI sign flip.** Claim status: **FAILED**. Secondary: iso_only collapses aIPg **1.45→0.006** Hz; transplant restores **~0.71** Hz without flipping preference.
+We built a closed-loop sex-swap twin of the Berg et al. (Cell, 3 Sept 2026) male CNS connectome (prepared **n = 165122**, **nEdges = 6235682**, minWeight 5; source annotations **211577** rows, NT table **1835518** rows) paired with Bates et al. BANC v888 female annotations (meta **188508 × 81**; prepared **n = 139458**, **nEdges = 3372365**, minWeight 3). BANC regions: optic_lobe **108764**, central_brain **47688**, VNC **31688**; BANC `super_class` descending **1316**, ascending **1849**. Male descending (**group 1326**; `descending_neuron` = 1314) and ascending (**group 2393**; `ascending_neuron` = 1846) neurons sit in the **same MCSR** as optic lobe, central brain, and VNC — the intact neck connective. A dimorphic set of **2368** neurons / **478** types (male-specific 1258, sexually dimorphic 771, potentially sexually dimorphic 177, potentially male-specific 162) accounts for **176325** outgoing edges. Cross-sex map: `malecns_match` non-null **23608**; `malecns_cell_type` nunique **10445** overlapping **5250** male traced types; `cell_type` overlap **7442**. BANC transplant **v2** (ablate male-specific + potentially MS outgoing; replace body-matched `malecns_match` and type-matched `malecns_cell_type` dimorphic outgoing with BANC-mapped edges; **keep unmatched sexually-dimorphic male outgoing**) yields female_swap nnz **6124057** (body-mapped **22115**, type-transplant **6247**; **1678** neurons' outs removed; **690** unmatched SD kept; **1420** MS ablated). **CVA-SST** is a compact headless assay (no UI).
+
+**Exp0** (mixed two-cue pad): female-silhouette + courtship/touch versus male-silhouette + cVA/smell in one scene; male vs isomorphic-only vs BANC female-swap vs shuffled sex-edges. **N=16 (ticks=48, steps=8): no CI↔AI sign flip.** Claim status: **FAILED**. Secondary: iso_only collapses aIPg **1.45→0.006** Hz; transplant restores **~0.71** Hz without flipping preference.
+
+**Exp1** (intact male only; isolated Scene F vs Scene M; no female_swap; no weight retune): Scene F = female silhouette + courtship/touch; Scene M = male silhouette + cVA/smell. PASS requires courtship_core Hz F>M **and** aIPg Hz M>F. **N=16 (ticks=48, steps=8): FAIL.** Courtship is higher in F (0.529 vs 0.198 Hz) but aIPg is **higher in Scene F (0.448 Hz) than Scene M (0.023 Hz)** — aggression is not gated by the male/cVA scene. CI−AI sign that tracks the only visible cue is an orientation artifact.
 
 ## Methods (postdoc rerun)
 
@@ -27,7 +31,8 @@ python3 tools/sex_swap/build_isomorphism.py
 python3 tools/sex_swap/build_sex_swap_graph.py
 python3 tools/sex_swap/build_banc_transplant.py        # v2; gitignored connectome_female_swap.bin
 node tools/sex_swap/run_cva_assay.mjs --smoke          # 4 seeds × 12 ticks
-node tools/sex_swap/run_cva_assay.mjs                  # default N=16, ticks=48, steps=8
+node tools/sex_swap/run_cva_assay.mjs                  # Exp0 default N=16, ticks=48, steps=8
+node tools/sex_swap/run_exp1_male_scenes.mjs           # Exp1 male Scene F vs M; does not load female_swap
 ```
 
 Seeds: `params/sex_swap_seeds.txt` (1000–1015). Parameters, claim, and pool names: `params/sex_swap_v1.json`.
@@ -60,11 +65,12 @@ Body, photoreceptors, ORNs/ppk, and isomorphic (non-dimorphic) weights stay the 
 1. **Counts and neck.** Male/female source vs prepared n, nEdges, minWeight; DN/AN in one CSR (Fig. 1 equivalent: `results/sex_swap/counts.json`).
 2. **Isomorphism.** malecns_match coverage, type overlap, unmatched sex-specific counts (`isomorph_summary.json`).
 3. **Graph edits.** 2368 dimorphic cells, 176325 out-edges; BANC transplant v2 female_swap nnz 6124057 (`graph_edit_manifest.json`, `transplant_summary.json`).
-4. **CVA scene.** Fixed pad; female silhouette (front-left) + courtship/touch drive; male silhouette (front-right) + cVA/smell drive; MN tank-steer chassis.
-5. **CI vs AI by controller (N=16).** Means below; **signFlip = false**.
-6. **Secondary finding.** iso_only aIPg collapse and partial restore under transplant — not a preference flip.
+4. **Exp0 CVA scene.** Fixed pad; female silhouette (front-left) + courtship/touch drive; male silhouette (front-right) + cVA/smell drive; MN tank-steer chassis.
+5. **Exp0 CI vs AI by controller (N=16).** Means below; **signFlip = false**.
+6. **Exp0 secondary finding.** iso_only aIPg collapse and partial restore under transplant — not a preference flip.
+7. **Exp1 isolated scenes.** Intact male; Scene F vs Scene M; pool-rate gate (courtship_core F>M and aIPg M>F); **FAIL**.
 
-## Results (N=16, ticks=48, steps=8)
+## Exp0 results (mixed two-cue, N=16, ticks=48, steps=8)
 
 | controller | mean CI | mean AI | Δ(CI−AI) | wing Hz | aIPg Hz |
 |---|---|---|---|---|---|
@@ -77,17 +83,29 @@ Body, photoreceptors, ORNs/ppk, and isomorphic (non-dimorphic) weights stay the 
 
 **Secondary:** iso_only collapses aIPg **1.45→0.006**; BANC transplant restores **~0.71** without a CI↔AI flip.
 
+## Exp1 results (intact male Scene F vs M, N=16, ticks=48, steps=8)
+
+Male controller only. Same LIF params and `drive_hz` as Exp0. **Did not run female_swap. Did not retune weights.** `results/sex_swap/exp1_male_scenes.json`.
+
+| scene | mean CI | mean AI | Δ(CI−AI) | courtship_core Hz | aIPg Hz | wing Hz |
+|---|---|---|---|---|---|---|
+| F (female + courtship/touch) | 0.635 | 0.234 | +0.401 | 0.529 | 0.448 | 4.15 |
+| M (male + cVA/smell) | 0.122 | 0.365 | −0.243 | 0.198 | 0.023 | 2.14 |
+
+**claim_status = FAILED.** Courtship_core is higher in Scene F than Scene M (0.529 > 0.198) — that gate points the right way — but **aIPg is not**: 0.448 Hz in Scene F vs **0.023 Hz in Scene M**. Scene M AI (0.365) is almost entirely the 0.35 orientation term from facing the only remaining cue (`fracOrientMale = 1`, aIPg ≈ 0). CI−AI therefore changes sign with the single cue without an aggression-pool gate. PASS required courtship_core F>M **and** aIPg M>F.
+
 ## Claim
 
 **Status: FAILED** (`FAILED_NO_SIGN_FLIP`).
 
 Intended claim: sex-specific/dimorphic wiring alone (isomorphic weights, body, sensors fixed) is necessary and sufficient to flip closed-loop courtship vs aggression preference under matched scenes; isomorphic-only and shuffled sex-edges do not flip.
 
-N=16 BANC transplant v2 did **not** produce a CI↔AI sign flip (male Δ+0.289, female_swap Δ+0.443). The claim is rejected on this assay.
+N=16 BANC transplant v2 did **not** produce a CI↔AI sign flip (male Δ+0.289, female_swap Δ+0.443). **Exp1** (intact male, isolated Scene F vs M) also **FAILED**: aIPg is not gated by the male/cVA scene. The sex-swap claim is rejected on this assay.
 
 ## What failed (plain language)
 
-- **No CI↔AI flip after BANC transplant v2 (N=16).** Male, iso_only, female_swap, and shuffle_sex all stay courtship-preferring (CI > AI). Female-swap Δ(+0.443) does not invert male Δ(+0.289). **signFlip = false; claim FAILED.**
+- **Exp0 — No CI↔AI flip after BANC transplant v2 (N=16).** Male, iso_only, female_swap, and shuffle_sex all stay courtship-preferring (CI > AI). Female-swap Δ(+0.443) does not invert male Δ(+0.289). **signFlip = false; claim FAILED.**
+- **Exp1 — Intact male Scene F vs Scene M FAIL (N=16).** Isolated female vs male scenes, male controller only, weights unchanged. Courtship_core is higher in F than M, but aIPg is **higher in the female scene (0.448 Hz) than the male/cVA scene (0.023 Hz)**. Aggression is not gated by Scene M. The CI−AI sign flip is an orientation artifact (one cue in the arena). `run_exp1_male_scenes.mjs`.
 - **Secondary, not a flip:** iso_only collapses aIPg 1.447→0.006 Hz; transplant restores ~0.715 Hz. Aggression-pool drive is wiring-sensitive; preference sign is not.
 - **No silencing falsifier for a failed flip.** There is no demonstrated CI↔AI flip to abolish with intersectional silence of P1/aIPg/mAL/TN1/vPR6/pIP1. That experiment is not offered here.
 - **P1a/P1b type strings are empty** in Male CNS v1.0; we used the real `pC1_*` cluster (n = 156) rather than inventing P1a cells. aIPg3 is also empty.
@@ -102,4 +120,5 @@ N=16 BANC transplant v2 did **not** produce a CI↔AI sign flip (male Δ+0.289, 
 - BANC transplant v2: `tools/sex_swap/build_banc_transplant.py`
 - Parameters (claim_status FAILED_NO_SIGN_FLIP, pools, Hz): `params/sex_swap_v1.json`
 - Seeds: `params/sex_swap_seeds.txt` (1000…1015)
-- One-sentence claim status: **FAILED** (no CI↔AI sign flip). See **Claim** above.
+- Exp1 male Scene F vs M: `tools/sex_swap/run_exp1_male_scenes.mjs` → `results/sex_swap/exp1_male_scenes.json`
+- One-sentence claim status: **FAILED** (Exp0 no CI↔AI sign flip; Exp1 no aIPg Scene-M gate). See **Claim** and **Exp1 results** above.
