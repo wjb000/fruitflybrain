@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>hΔ fast weights — continual nav</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    html, body { overflow: auto; touch-action: auto; }
+    #c { position: relative; width: min(920px, 100%); height: min(520px, 58vh); inset: auto; margin: 18px auto 0; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: #07080d; display: block; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 18px 18px 48px; }
+    .hud { position: static; }
+    .lead { color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 720px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+    .metric { background: rgba(10,12,18,0.78); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .metric b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .metric span { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .metric.bad b { color: #ff9f1c; }
+    .metric.good b { color: #3dff9a; }
+    .legend-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .sw { width: 10px; height: 10px; border-radius: 99px; display: inline-block; margin-right: 6px; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="kicker">Male CNS · hDeltaH/A/I/G</div>
+    <h1>Fast weights, two contexts</h1>
+    <p class="lead">
+      Online Δw on <b>hDeltaH / A / I / G</b> outgoing synapses (real Male CNS cells → PFL3).
+      Context A: odor A, goal left. Context B: odor B, goal right.
+      <b>Plastic</b> remaps. <b>Frozen</b> after A fails B.
+      Separate from CVA-SST Exp0/1 and M1–M3.
+      Methods: <a href="../docs/FAST_WEIGHT_HDELTA.md">FAST_WEIGHT_HDELTA.md</a>
+      · <a href="index.html">main sim</a>
+    </p>
+    <canvas id="c" width="920" height="520"></canvas>
+    <div class="legend-row">
+      <span><i class="sw" style="background:#4de4ff"></i>plastic path</span>
+      <span><i class="sw" style="background:#ff9f1c"></i>frozen path</span>
+      <span><i class="sw" style="background:#3dff9a"></i>goal A (left)</span>
+      <span><i class="sw" style="background:#ff4fd8"></i>goal B (right)</span>
+    </div>
+    <div class="row">
+      <button type="button" id="run" class="on">run A → B</button>
+      <button type="button" id="reset">reset</button>
+      <span class="hint" id="phase">idle</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b id="mA">—</b><span>correct A (shared)</span></div>
+      <div class="metric good"><b id="mPlas">—</b><span>plastic B</span></div>
+      <div class="metric bad"><b id="mFrz">—</b><span>frozen B</span></div>
+      <div class="metric"><b id="mGap">—</b><span>gap (plas − frz)</span></div>
+    </div>
+    <p class="hint" id="lifNote">Headless LIF numbers load from <code>results/hdelta/summary.json</code> when served from the repo root.</p>
+  </div>
+<script type="module">
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const LEFT = { x: -4.2, z: 6.2 };
+const RIGHT = { x: 4.2, z: 6.2 };
+const ARENA = 11;
+
+function mulberry32(a) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// 45 columnar hΔ units (counts H8 A12 I17 G8) with FB column prefs.
+function makeCells() {
+  const spec = { H: 8, A: 12, I: 17, G: 8 };
+  const cells = [];
+  for (const [typ, n] of Object.entries(spec)) {
+    const nCol = typ === "A" || typ === "I" ? 12 : 8;
+    for (let i = 0; i < n; i++) {
+      const col = (i % nCol) + 1;
+      cells.push({ typ, col, nCol, wL: 0, wR: 0 });
+    }
+  }
+  return cells;
+}
+
+function bump(cells, heading) {
+  const r = [];
+  for (const c of cells) {
+    const pref = ((c.col - 1) / c.nCol) * Math.PI * 2;
+    let d = heading - pref;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    const w = Math.max(0, Math.cos(d));
+    r.push(w * w);
+  }
+  return r;
+}
+
+function hebb(cells, rates, goal, eta, decay, clip, plastic) {
+  if (!plastic) return;
+  const tL = goal < 0 ? 1 : -1;
+  const tR = goal > 0 ? 1 : -1;
+  for (let i = 0; i < cells.length; i++) {
+    const pre = rates[i];
+    cells[i].wL = Math.max(-clip, Math.min(clip, (cells[i].wL + eta * pre * tL) * decay));
+    cells[i].wR = Math.max(-clip, Math.min(clip, (cells[i].wR + eta * pre * tR) * decay));
+  }
+}
+
+function fwTurn(cells, rates) {
+  let L = 0, R = 0;
+  for (let i = 0; i < cells.length; i++) {
+    L += rates[i] * cells[i].wL;
+    R += rates[i] * cells[i].wR;
+  }
+  return Math.tanh((R - L) / 8);
+}
+
+function eye(x, z, heading, cue) {
+  const dx = cue.x - x, dz = cue.z - z;
+  const dist = Math.hypot(dx, dz) + 1e-6;
+  const c = Math.cos(heading), s = Math.sin(heading);
+  const bearing = Math.atan2(dx * c - dz * s, dx * s + dz * c);
+  return { dist, bearing };
+}
+
+function worldTo(x, z) {
+  const s = 18;
+  return { x: canvas.width / 2 + x * s, y: canvas.height * 0.72 - z * s };
+}
+
+function drawArena(phase, paths) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#07080d";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const o = worldTo(0, 0);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.arc(o.x, o.y, ARENA * 18, 0, Math.PI * 2);
+  ctx.stroke();
+  const a = worldTo(LEFT.x, LEFT.z);
+  const b = worldTo(RIGHT.x, RIGHT.z);
+  ctx.fillStyle = phase === "B" ? "rgba(61,255,154,0.25)" : "#3dff9a";
+  ctx.beginPath(); ctx.arc(a.x, a.y, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = phase === "A" ? "rgba(255,79,216,0.25)" : "#ff4fd8";
+  ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.font = "11px IBM Plex Sans";
+  ctx.fillStyle = "#8b95a8";
+  ctx.fillText("A left", a.x + 10, a.y);
+  ctx.fillText("B right", b.x + 10, b.y);
+  for (const p of paths) {
+    if (p.pts.length < 2) continue;
+    ctx.strokeStyle = p.color;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    p.pts.forEach((q, i) => {
+      const w = worldTo(q.x, q.z);
+      if (i === 0) ctx.moveTo(w.x, w.y); else ctx.lineTo(w.x, w.y);
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    const last = p.pts[p.pts.length - 1];
+    const w = worldTo(last.x, last.z);
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    ctx.rotate(last.h);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.moveTo(8, 0); ctx.lineTo(-6, 5); ctx.lineTo(-6, -5);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function cloneW(cells) {
+  return cells.map((c) => ({ ...c }));
+}
+
+function score(x, z, heading, goalCue, otherCue) {
+  const g = eye(x, z, heading, goalCue);
+  const o = eye(x, z, heading, otherCue);
+  const og = Math.abs(g.bearing) < Math.PI / 4 ? 1 : 0;
+  const oo = Math.abs(o.bearing) < Math.PI / 4 ? 1 : 0;
+  const ng = g.dist < 2.8 ? 1 : 0;
+  const no = o.dist < 2.8 ? 1 : 0;
+  return { correct: 0.6 * og + 0.4 * ng, wrong: 0.6 * oo + 0.4 * no };
+}
+
+async function run() {
+  const rng = mulberry32(2001);
+  let cells = makeCells();
+  const eta = 0.12, decay = 0.994, clip = 2.5;
+  const ticks = 48, evalLast = 20, dt = 0.05;
+  const pathA = { color: "#9aa3b5", pts: [] };
+  const pathP = { color: "#4de4ff", pts: [] };
+  const pathF = { color: "#ff9f1c", pts: [] };
+  const phaseEl = document.getElementById("phase");
+
+  function stepBody(state, cells, context, goal, plastic) {
+    const rates = bump(cells, state.h);
+    hebb(cells, rates, goal, eta, decay, clip, plastic);
+    const turn = fwTurn(cells, rates);
+    state.h += turn * 1.55 * dt;
+    const walk = 2.5 * dt;
+    state.x += Math.sin(state.h) * walk;
+    state.z += Math.cos(state.h) * walk;
+    const r = Math.hypot(state.x, state.z);
+    if (r > ARENA) { state.x *= ARENA / r; state.z *= ARENA / r; }
+    return { ...state };
+  }
+
+  let state = { x: 0, z: 0, h: 0 };
+  let accA = 0, nE = 0;
+  phaseEl.textContent = "context A · learning left";
+  for (let t = 0; t < ticks; t++) {
+    state = stepBody(state, cells, "A", -1, true);
+    pathA.pts.push({ x: state.x, z: state.z, h: state.h });
+    if (t >= ticks - evalLast) { accA += score(state.x, state.z, state.h, LEFT, RIGHT).correct; nE++; }
+    if (t % 2 === 0) { drawArena("A", [pathA]); await new Promise((r) => requestAnimationFrame(r)); }
+  }
+  const snap = cloneW(cells);
+  const correctA = accA / nE;
+
+  let plas = { x: 0, z: 0, h: rng() * 0.1 - 0.05 };
+  cells = cloneW(snap);
+  let accP = 0; nE = 0;
+  phaseEl.textContent = "context B · plastic remap (right)";
+  for (let t = 0; t < ticks; t++) {
+    plas = stepBody(plas, cells, "B", 1, true);
+    pathP.pts.push({ x: plas.x, z: plas.z, h: plas.h });
+    if (t >= ticks - evalLast) { accP += score(plas.x, plas.z, plas.h, RIGHT, LEFT).correct; nE++; }
+    if (t % 2 === 0) { drawArena("B", [pathA, pathP]); await new Promise((r) => requestAnimationFrame(r)); }
+  }
+  const correctP = accP / nE;
+
+  let frz = { x: 0, z: 0, h: rng() * 0.1 - 0.05 };
+  cells = cloneW(snap);
+  let accF = 0; nE = 0;
+  phaseEl.textContent = "context B · frozen after A";
+  for (let t = 0; t < ticks; t++) {
+    frz = stepBody(frz, cells, "B", 1, false);
+    pathF.pts.push({ x: frz.x, z: frz.z, h: frz.h });
+    if (t >= ticks - evalLast) { accF += score(frz.x, frz.z, frz.h, RIGHT, LEFT).correct; nE++; }
+    if (t % 2 === 0) { drawArena("B", [pathA, pathP, pathF]); await new Promise((r) => requestAnimationFrame(r)); }
+  }
+  const correctF = accF / nE;
+  drawArena("B", [pathA, pathP, pathF]);
+  document.getElementById("mA").textContent = correctA.toFixed(2);
+  document.getElementById("mPlas").textContent = correctP.toFixed(2);
+  document.getElementById("mFrz").textContent = correctF.toFixed(2);
+  document.getElementById("mGap").textContent = (correctP - correctF).toFixed(2);
+  phaseEl.textContent = `done · frozen ${correctF < correctP - 0.12 ? "fails B" : "contrast weak"}`;
+}
+
+document.getElementById("run").onclick = () => {
+  document.getElementById("run").disabled = true;
+  run().finally(() => { document.getElementById("run").disabled = false; });
+};
+document.getElementById("reset").onclick = () => {
+  drawArena("A", []);
+  document.getElementById("phase").textContent = "idle";
+  for (const id of ["mA", "mPlas", "mFrz", "mGap"]) document.getElementById(id).textContent = "—";
+};
+drawArena("A", []);
+
+fetch("data/hdelta_summary.json")
+  .then((r) => r.ok ? r.json() : null)
+  .then((j) => {
+    if (!j) return;
+    const el = document.getElementById("lifNote");
+    el.innerHTML = `LIF assay (${j.n} seeds): plastic B <b>${(j.plastic?.meanCorrectB ?? 0).toFixed(2)}</b>
+      vs frozen B <b>${(j.frozen?.meanCorrectB ?? 0).toFixed(2)}</b> — ${j.verdict || ""}`;
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

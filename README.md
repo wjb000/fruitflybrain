@@ -93,3 +93,12 @@ node tools/sweep_lesions.mjs --lesion none --lesion 'silence:HS'
 
 Intact dark-retrieve baselines live under `results/lesion_sweeps/baseline_intact_dish_v2_dark.json`. Wire-hunting waits until intact post-yaw **dark** approach is clearly above chance with encode lock-on — lights-on reacquisition no longer counts.
 
+## hΔ fast-weight continual nav
+
+Online fast weights on **hDeltaH / A / I / G** outgoing synapses; plastic vs frozen ablation on a two-context heading remap. Frozen fails the second context. Methods: [`docs/FAST_WEIGHT_HDELTA.md`](docs/FAST_WEIGHT_HDELTA.md). Demo: [`web/hdelta.html`](web/hdelta.html). Does **not** reopen CVA-SST Exp0/Exp1 or M1–M3.
+
+```bash
+python3 tools/hdelta/build_pools.py
+node tools/hdelta/run_continual_nav.mjs
+```
+

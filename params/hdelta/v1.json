@@ -1,0 +1,49 @@
+{
+  "name": "hDelta-fastW-continual-nav",
+  "version": "v1",
+  "claim": "Online fast weights on hDeltaH/A/I/G outgoing synapses are necessary to remap a context→goal heading. After learning context A (left landmark), freezing those weights causes failure on context B (right landmark); keeping them plastic remaps.",
+  "falsifier": "Clamping or silencing hDeltaH/A/I/G synaptic plasticity (or the cells) in real flies should prevent reversing a learned heading goal when the rewarded landmark switches, while leaving first-context heading largely intact. PFL3 laterality is the readout, not a new motor neuron.",
+  "plastic_types": ["hDeltaH", "hDeltaA", "hDeltaI", "hDeltaG"],
+  "readout": "hDelta → PFL3 (real Male CNS edges; 261 synapses from all 45 plastic cells). Assay steering mixes MN tank-steer with fast-weight-decoded PFL3 laterality. NeuroMechFly is not closed.",
+  "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+  "seeds_file": "params/hdelta/seeds.txt",
+  "n_seeds_default": 8,
+  "lif": {
+    "dt": 0.5,
+    "wScale": 0.012,
+    "inhibGain": 2.15,
+    "stimAmp": 0.11
+  },
+  "fastW": {
+    "eta": 0.12,
+    "decay": 0.994,
+    "clip": 2.5,
+    "hebbFromDrive": true
+  },
+  "drive_hz": {
+    "vision": 36,
+    "smellA": 32,
+    "smellB": 32,
+    "headingBump": 40,
+    "hDeltaBump": 28
+  },
+  "scene": {
+    "ticks": 32,
+    "evalLast": 16,
+    "stepsPerTick": 4,
+    "dtBody": 0.05,
+    "arenaR": 11,
+    "approachR": 2.8,
+    "orientRad": 0.7853981633974483,
+    "left": { "x": -4.2, "z": 6.2 },
+    "right": { "x": 4.2, "z": 6.2 },
+    "spawn": { "x": 0, "z": 0, "heading": 0 }
+  },
+  "steering": {
+    "kMN": 0.28,
+    "kPFL": 0.22,
+    "kFW": 1.35,
+    "walkGain": 2.6,
+    "turnGain": 1.35
+  }
+}

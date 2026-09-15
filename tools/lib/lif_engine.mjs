@@ -84,6 +84,96 @@ export class LifEngine {
     this.DELAY = 64;
     this.delayRing = Array.from({ length: this.DELAY }, () => []);
     this.delayPos = 0;
+    this.fastW = null;
+    this.fastWPre = null;
+    this.fastWIds = null;
+    this.fastWEdges = null;
+    this.fastWTarget = null;
+    this.fastWPlastic = false;
+    this.fastWEta = 0.08;
+    this.fastWDecay = 0.996;
+    this.fastWClip = 2.5;
+  }
+
+  /**
+   * Online fast weights on a named pre-synaptic set (hDeltaH/A/I/G).
+   * Additive Δw on those cells' outgoing chemical edges; outer-product /
+   * three-factor Hebbian when plastic. Frozen = apply Δw, do not update.
+   */
+  enableFastW(opts = {}) {
+    const ids = Array.from(opts.ids || []).filter((i) => i >= 0 && i < this.n);
+    this.fastWIds = Uint32Array.from(ids);
+    this.fastWPre = new Uint8Array(this.n);
+    const edges = [];
+    for (const i of ids) {
+      this.fastWPre[i] = 1;
+      for (let k = this.indptr[i]; k < this.indptr[i + 1]; k++) edges.push(k);
+    }
+    this.fastWEdges = Uint32Array.from(edges);
+    this.fastW = new Float32Array(this.weight.length);
+    this.fastWEta = opts.eta ?? 0.08;
+    this.fastWDecay = opts.decay ?? 0.996;
+    this.fastWClip = opts.clip ?? 2.5;
+    this.fastWPlastic = opts.plastic !== false;
+    this.fastWTarget = null;
+    return { nPre: ids.length, nEdges: edges.length };
+  }
+
+  setFastWPlastic(on) {
+    this.fastWPlastic = !!on;
+  }
+
+  setFastWTarget(arr) {
+    this.fastWTarget = arr || null;
+  }
+
+  clearFastW() {
+    if (this.fastW) this.fastW.fill(0);
+  }
+
+  snapshotFastW() {
+    if (!this.fastW || !this.fastWEdges) return null;
+    const values = new Float32Array(this.fastWEdges.length);
+    for (let e = 0; e < this.fastWEdges.length; e++) values[e] = this.fastW[this.fastWEdges[e]];
+    return { values, plastic: this.fastWPlastic };
+  }
+
+  restoreFastW(snap) {
+    if (!snap || !this.fastW || !this.fastWEdges) return;
+    this.fastW.fill(0);
+    const n = Math.min(this.fastWEdges.length, snap.values.length);
+    for (let e = 0; e < n; e++) this.fastW[this.fastWEdges[e]] = snap.values[e];
+    if (snap.plastic != null) this.fastWPlastic = !!snap.plastic;
+  }
+
+  /** Rate-based outer product: Δw_{i→j} += η * drive[i] * target[j] (plastic only). */
+  hebbFromDrive(preScale = 1 / 60) {
+    if (!this.fastW || !this.fastWPlastic || !this.fastWTarget || !this.fastWIds) return;
+    const eta = this.fastWEta;
+    const clip = this.fastWClip;
+    const tgt = this.fastWTarget;
+    for (let p = 0; p < this.fastWIds.length; p++) {
+      const i = this.fastWIds[p];
+      const pre = this.drive[i] * preScale;
+      if (pre <= 0) continue;
+      const a = this.indptr[i], b = this.indptr[i + 1];
+      for (let k = a; k < b; k++) {
+        if (this.edgeScale[k] <= 0) continue;
+        const post = tgt[this.indices[k]];
+        if (!post) continue;
+        let v = this.fastW[k] + eta * pre * post;
+        if (v > clip) v = clip;
+        else if (v < -clip) v = -clip;
+        this.fastW[k] = v;
+      }
+    }
+  }
+
+  fastWNorm() {
+    if (!this.fastW || !this.fastWEdges) return 0;
+    let s = 0;
+    for (let e = 0; e < this.fastWEdges.length; e++) s += Math.abs(this.fastW[this.fastWEdges[e]]);
+    return s;
   }
 
   _rebuildSign() {
@@ -201,6 +291,10 @@ export class LifEngine {
       this.mDA[i] *= modDecay; this.mOA[i] *= modDecay; this.m5[i] *= modDecay;
       this.uStd[i] += (1 - this.uStd[i]) * (1 - stdDecay);
     }
+    if (this.fastW && this.fastWPlastic && this.fastWEdges && this.fastWDecay < 1) {
+      const dcy = this.fastWDecay;
+      for (let e = 0; e < this.fastWEdges.length; e++) this.fastW[this.fastWEdges[e]] *= dcy;
+    }
     for (let i = 0; i < n; i++) {
       if (!this.spikes[i]) continue;
       const knt = this.nt[i];
@@ -239,9 +333,30 @@ export class LifEngine {
         this.delayRing[slot].push({ s: this.sign[i] * p.wScale * u * gOut, a, b });
       } else {
         const s = this.sign[i] * p.wScale * u * gOut;
-        for (let k = a; k < b; k++) {
-          if (this.edgeScale[k] <= 0) continue;
-          this.I[this.indices[k]] += s * Math.sqrt(this.weight[k]) * this.edgeScale[k];
+        const useFW = this.fastW && this.fastWPre && this.fastWPre[i];
+        if (useFW) {
+          const hebb = this.fastWPlastic;
+          const tgt = this.fastWTarget;
+          const eta = this.fastWEta;
+          const clip = this.fastWClip;
+          for (let k = a; k < b; k++) {
+            if (this.edgeScale[k] <= 0) continue;
+            const j = this.indices[k];
+            this.I[j] += s * (Math.sqrt(this.weight[k]) + this.fastW[k]) * this.edgeScale[k];
+            if (hebb) {
+              const post = tgt ? tgt[j] : (this.spikes[j] ? 1 : 0);
+              if (!post) continue;
+              let v = this.fastW[k] + eta * post;
+              if (v > clip) v = clip;
+              else if (v < -clip) v = -clip;
+              this.fastW[k] = v;
+            }
+          }
+        } else {
+          for (let k = a; k < b; k++) {
+            if (this.edgeScale[k] <= 0) continue;
+            this.I[this.indices[k]] += s * Math.sqrt(this.weight[k]) * this.edgeScale[k];
+          }
         }
       }
     }
