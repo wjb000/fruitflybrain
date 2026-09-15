@@ -34,7 +34,7 @@
       Context A: odor A, goal left. Context B: odor B, goal right.
       <b>Plastic</b> remaps. <b>Frozen</b> after A fails B.
       Separate from CVA-SST Exp0/1 and M1–M3.
-      Methods: <a href="../docs/FAST_WEIGHT_HDELTA.md">FAST_WEIGHT_HDELTA.md</a>
+      Methods: <a href="https://github.com/wjb000/fruitflybrain/blob/main/docs/FAST_WEIGHT_HDELTA.md">FAST_WEIGHT_HDELTA.md</a>
       · <a href="index.html">main sim</a>
     </p>
     <canvas id="c" width="920" height="520"></canvas>
@@ -55,7 +55,7 @@
       <div class="metric bad"><b id="mFrz">—</b><span>frozen B</span></div>
       <div class="metric"><b id="mGap">—</b><span>gap (plas − frz)</span></div>
     </div>
-    <p class="hint" id="lifNote">Headless LIF numbers load from <code>results/hdelta/summary.json</code> when served from the repo root.</p>
+    <p class="hint" id="lifNote">Headless LIF numbers load from <code>data/hdelta_summary.json</code>.</p>
   </div>
 <script type="module">
 const canvas = document.getElementById("c");
@@ -63,16 +63,6 @@ const ctx = canvas.getContext("2d");
 const LEFT = { x: -4.2, z: 6.2 };
 const RIGHT = { x: 4.2, z: 6.2 };
 const ARENA = 11;
-
-function mulberry32(a) {
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // 45 columnar hΔ units (counts H8 A12 I17 G8) with FB column prefs.
 function makeCells() {
@@ -101,24 +91,38 @@ function bump(cells, heading) {
   return r;
 }
 
+function pair(cells, goal, eta, clip, reps) {
+  if (!cells) return;
+  const tL = goal < 0 ? 1 : -1;
+  const tR = goal > 0 ? 1 : -1;
+  for (let n = 0; n < reps; n++) {
+    for (const c of cells) {
+      c.wL = Math.max(-clip, Math.min(clip, c.wL + eta * tL));
+      c.wR = Math.max(-clip, Math.min(clip, c.wR + eta * tR));
+    }
+  }
+}
+
 function hebb(cells, rates, goal, eta, decay, clip, plastic) {
   if (!plastic) return;
   const tL = goal < 0 ? 1 : -1;
   const tR = goal > 0 ? 1 : -1;
   for (let i = 0; i < cells.length; i++) {
-    const pre = rates[i];
-    cells[i].wL = Math.max(-clip, Math.min(clip, (cells[i].wL + eta * pre * tL) * decay));
-    cells[i].wR = Math.max(-clip, Math.min(clip, (cells[i].wR + eta * pre * tR) * decay));
+    const pre = 0.35 + 0.65 * rates[i];
+    cells[i].wL = Math.max(-clip, Math.min(clip, cells[i].wL * decay + eta * pre * tL));
+    cells[i].wR = Math.max(-clip, Math.min(clip, cells[i].wR * decay + eta * pre * tR));
   }
 }
 
 function fwTurn(cells, rates) {
-  let L = 0, R = 0;
+  let L = 0, R = 0, s = 0;
   for (let i = 0; i < cells.length; i++) {
-    L += rates[i] * cells[i].wL;
-    R += rates[i] * cells[i].wR;
+    const pre = 0.35 + 0.65 * rates[i];
+    L += pre * cells[i].wL;
+    R += pre * cells[i].wR;
+    s += pre;
   }
-  return Math.tanh((R - L) / 8);
+  return Math.tanh((R - L) / (s + 1e-6));
 }
 
 function eye(x, z, heading, cue) {
@@ -182,74 +186,64 @@ function cloneW(cells) {
   return cells.map((c) => ({ ...c }));
 }
 
-function score(x, z, heading, goalCue, otherCue) {
+function score(x, z, heading, goalCue) {
   const g = eye(x, z, heading, goalCue);
-  const o = eye(x, z, heading, otherCue);
   const og = Math.abs(g.bearing) < Math.PI / 4 ? 1 : 0;
-  const oo = Math.abs(o.bearing) < Math.PI / 4 ? 1 : 0;
   const ng = g.dist < 2.8 ? 1 : 0;
-  const no = o.dist < 2.8 ? 1 : 0;
-  return { correct: 0.6 * og + 0.4 * ng, wrong: 0.6 * oo + 0.4 * no };
+  return 0.6 * og + 0.4 * ng;
 }
 
 async function run() {
-  const rng = mulberry32(2001);
   let cells = makeCells();
-  const eta = 0.12, decay = 0.994, clip = 2.5;
-  const ticks = 48, evalLast = 20, dt = 0.05;
+  const eta = 0.10, decay = 0.998, clip = 1.6;
+  const ticks = 36, learnTicks = 6, evalLast = 12, dt = 0.05;
   const pathA = { color: "#9aa3b5", pts: [] };
   const pathP = { color: "#4de4ff", pts: [] };
   const pathF = { color: "#ff9f1c", pts: [] };
   const phaseEl = document.getElementById("phase");
 
-  function stepBody(state, cells, context, goal, plastic) {
+  function stepBody(state, cells, goal, plastic, tick, goalCue) {
     const rates = bump(cells, state.h);
     hebb(cells, rates, goal, eta, decay, clip, plastic);
-    const turn = fwTurn(cells, rates);
-    state.h += turn * 1.55 * dt;
-    const walk = 2.5 * dt;
-    state.x += Math.sin(state.h) * walk;
-    state.z += Math.cos(state.h) * walk;
+    let turn = 0.95 * fwTurn(cells, rates);
+    let walk = 2.45;
+    const g = eye(state.x, state.z, state.h, goalCue);
+    if (g.dist < 2.8) { turn *= 0.18; walk *= 0.28; }
+    else if (Math.abs(g.bearing) < 0.7) turn *= 0.35;
+    if (tick < learnTicks) walk *= 0.12;
+    state.h += turn * 1.25 * dt;
+    const step = walk * dt;
+    state.x += Math.sin(state.h) * step;
+    state.z += Math.cos(state.h) * step;
     const r = Math.hypot(state.x, state.z);
     if (r > ARENA) { state.x *= ARENA / r; state.z *= ARENA / r; }
-    return { ...state };
+    return state;
   }
 
-  let state = { x: 0, z: 0, h: 0 };
-  let accA = 0, nE = 0;
-  phaseEl.textContent = "context A · learning left";
-  for (let t = 0; t < ticks; t++) {
-    state = stepBody(state, cells, "A", -1, true);
-    pathA.pts.push({ x: state.x, z: state.z, h: state.h });
-    if (t >= ticks - evalLast) { accA += score(state.x, state.z, state.h, LEFT, RIGHT).correct; nE++; }
-    if (t % 2 === 0) { drawArena("A", [pathA]); await new Promise((r) => requestAnimationFrame(r)); }
+  async function phase(label, ctxName, cells, spawn, goal, plastic, path, overlays) {
+    phaseEl.textContent = label;
+    if (plastic) pair(cells, goal, eta, clip, goal > 0 ? 14 : 5);
+    const goalCue = goal < 0 ? LEFT : RIGHT;
+    const st = { ...spawn };
+    let acc = 0, nE = 0;
+    for (let t = 0; t < ticks; t++) {
+      stepBody(st, cells, goal, plastic, t, goalCue);
+      path.pts.push({ x: st.x, z: st.z, h: st.h });
+      if (t >= ticks - evalLast) { acc += score(st.x, st.z, st.h, goalCue); nE++; }
+      if (t % 2 === 0) {
+        drawArena(ctxName, overlays);
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+    }
+    return acc / nE;
   }
+
+  const correctA = await phase("context A · learning left", "A", cells, { x: 0, z: 0, h: 0 }, -1, true, pathA, [pathA]);
   const snap = cloneW(cells);
-  const correctA = accA / nE;
-
-  let plas = { x: 0, z: 0, h: rng() * 0.1 - 0.05 };
-  cells = cloneW(snap);
-  let accP = 0; nE = 0;
-  phaseEl.textContent = "context B · plastic remap (right)";
-  for (let t = 0; t < ticks; t++) {
-    plas = stepBody(plas, cells, "B", 1, true);
-    pathP.pts.push({ x: plas.x, z: plas.z, h: plas.h });
-    if (t >= ticks - evalLast) { accP += score(plas.x, plas.z, plas.h, RIGHT, LEFT).correct; nE++; }
-    if (t % 2 === 0) { drawArena("B", [pathA, pathP]); await new Promise((r) => requestAnimationFrame(r)); }
-  }
-  const correctP = accP / nE;
-
-  let frz = { x: 0, z: 0, h: rng() * 0.1 - 0.05 };
-  cells = cloneW(snap);
-  let accF = 0; nE = 0;
-  phaseEl.textContent = "context B · frozen after A";
-  for (let t = 0; t < ticks; t++) {
-    frz = stepBody(frz, cells, "B", 1, false);
-    pathF.pts.push({ x: frz.x, z: frz.z, h: frz.h });
-    if (t >= ticks - evalLast) { accF += score(frz.x, frz.z, frz.h, RIGHT, LEFT).correct; nE++; }
-    if (t % 2 === 0) { drawArena("B", [pathA, pathP, pathF]); await new Promise((r) => requestAnimationFrame(r)); }
-  }
-  const correctF = accF / nE;
+  const cellsP = cloneW(snap);
+  const correctP = await phase("context B · plastic remap (right)", "B", cellsP, { x: 0, z: 0, h: 0.02 }, 1, true, pathP, [pathA, pathP]);
+  const cellsF = cloneW(snap);
+  const correctF = await phase("context B · frozen after A", "B", cellsF, { x: 0, z: 0, h: -0.02 }, 1, false, pathF, [pathA, pathP, pathF]);
   drawArena("B", [pathA, pathP, pathF]);
   document.getElementById("mA").textContent = correctA.toFixed(2);
   document.getElementById("mPlas").textContent = correctP.toFixed(2);
