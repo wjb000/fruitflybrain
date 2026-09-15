@@ -15,9 +15,24 @@
       "rows": 211577,
       "Traced": 165122
     },
+    "male_nt_feather": {
+      "rows": 1835518,
+      "bytes": 43282834
+    },
     "banc_meta": {
       "rows": 188508,
-      "malecns_match_nonnull": 23608
+      "cols": 81,
+      "malecns_match_nonnull": 23608,
+      "malecns_cell_type_nunique": 10445,
+      "malecns_cell_type_overlap_male_traced_types": 5250,
+      "cell_type_overlap_male_traced_types": 7442,
+      "region": {
+        "optic_lobe": 108764,
+        "central_brain": 47688,
+        "VNC": 31688
+      },
+      "super_class_descending": 1316,
+      "super_class_ascending": 1849
     },
     "neck": {
       "descending_neuron": 1314,
@@ -28,7 +43,12 @@
     },
     "dimorphic_in_graph": {
       "neurons": 2368,
-      "out_edges": 176325
+      "types": 478,
+      "out_edges": 176325,
+      "male-specific": 1258,
+      "sexually dimorphic": 771,
+      "potentially sexually dimorphic": 177,
+      "potentially male-specific": 162
     },
     "urls": {
       "neuprint_dataset": "male-cns:v1.0",
@@ -50,11 +70,30 @@
   "live": {
     "male_annotations_rows": 211577,
     "male_traced": 165122,
+    "male_nt_rows": 1835518,
     "descending_neuron": 1314,
     "ascending_neuron": 1846,
+    "dimorphic_neurons": 2368,
+    "dimorphic_types": 478,
+    "dimorphism_counts": {
+      "male-specific": 1258,
+      "sexually dimorphic": 771,
+      "potentially sexually dimorphic": 177,
+      "potentially male-specific": 162
+    },
     "banc_meta_rows": 188508,
     "banc_malecns_match_nonnull": 23608,
     "banc_prepared_filter_n": 139458,
+    "banc_super_class_descending": 1316,
+    "banc_super_class_ascending": 1849,
+    "banc_region": {
+      "optic_lobe": 108764,
+      "central_brain": 47688,
+      "VNC": 31688
+    },
+    "malecns_cell_type_nunique": 10445,
+    "malecns_cell_type_overlap_male_traced_types": 5250,
+    "cell_type_overlap_male_traced_types": 7442,
     "male_meta_n": 165122,
     "male_meta_nEdges": 6235682,
     "male_mcsr": {
@@ -98,6 +137,7 @@
           "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
           "dest": "data/body-annotations.feather",
           "bytes": 14483314,
+          "rows": 211577,
           "required_for": [
             "verify_counts",
             "build_isomorphism",
@@ -112,8 +152,10 @@
           "bytes": 43282834,
           "required_for": [
             "prepare.py",
-            "NT-aware signs"
-          ]
+            "NT-aware signs",
+            "verify_counts"
+          ],
+          "rows": 1835518
         },
         {
           "id": "connectome-weights",
@@ -138,6 +180,8 @@
           "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
           "dest": "data/banc/banc_888_meta.feather",
           "bytes": 57503026,
+          "rows": 188508,
+          "cols": 81,
           "required_for": [
             "verify_counts",
             "build_isomorphism",

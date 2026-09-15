@@ -16,6 +16,7 @@
         "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
         "dest": "data/body-annotations.feather",
         "bytes": 14483314,
+        "rows": 211577,
         "required_for": ["verify_counts", "build_isomorphism", "export_effectors", "prepare.py"]
       },
       {
@@ -23,7 +24,8 @@
         "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
         "dest": "data/body-neurotransmitters.feather",
         "bytes": 43282834,
-        "required_for": ["prepare.py", "NT-aware signs"]
+        "required_for": ["prepare.py", "NT-aware signs", "verify_counts"],
+        "rows": 1835518
       },
       {
         "id": "connectome-weights",
@@ -46,6 +48,8 @@
         "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
         "dest": "data/banc/banc_888_meta.feather",
         "bytes": 57503026,
+        "rows": 188508,
+        "cols": 81,
         "required_for": ["verify_counts", "build_isomorphism", "prepare_banc.py"]
       },
       {

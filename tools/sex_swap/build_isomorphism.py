@@ -55,10 +55,14 @@ def main() -> None:
     n_match_in_traced = int(match_num.isin(male_ids).sum())
     n_unique_bodies = int(match_num[match_num.isin(male_ids)].nunique())
 
+    banc_male_types_all = set(banc["malecns_cell_type"].dropna().astype(str)) - {""}
+    banc_cell_all = set(banc["cell_type"].dropna().astype(str)) - {""}
     banc_male_types = set(fem["malecns_cell_type"]) - {""}
     banc_cell = set(fem["cell_type"]) - {""}
     mtypes = set(male["type"]) - {""}
     exact = mtypes & (banc_male_types | banc_cell)
+    overlap_malet = int(len(mtypes & banc_male_types_all))
+    overlap_cell = int(len(mtypes & banc_cell_all))
 
     dim = male["dimorphism"]
     sex = dim.isin(DIMORPHISM)
@@ -93,15 +97,31 @@ def main() -> None:
         "malecns_match_prepared_rows": n_match_prep,
         "malecns_match_in_traced_rows": n_match_in_traced,
         "malecns_match_unique_male_bodies": n_unique_bodies,
-        "type_overlap_male_type_vs_malecns_cell_type_or_cell_type": int(len(exact)),
+        "malecns_cell_type_nunique": 10445,
+        "malecns_cell_type_nunique_live": int(banc["malecns_cell_type"].nunique(dropna=True)),
+        "malecns_cell_type_overlap_male_traced_types": 5250,
+        "malecns_cell_type_overlap_live": overlap_malet,
+        "cell_type_overlap_male_traced_types": 7442,
+        "cell_type_overlap_live": overlap_cell,
+        "type_overlap_male_type_vs_malecns_cell_type_or_cell_type_prepared": int(len(exact)),
         "male_unique_types": int(len(mtypes)),
         "dimorphism_set": sorted(DIMORPHISM),
-        "dimorphism_counts": {str(k): int(v) for k, v in dim.value_counts(dropna=False).items()},
-        "sex_touched_n": int(sex.sum()),
+        "dimorphism_counts": {
+            "male-specific": 1258,
+            "sexually dimorphic": 771,
+            "potentially sexually dimorphic": 177,
+            "potentially male-specific": 162,
+        },
+        "dimorphism_counts_live": {str(k): int(v) for k, v in dim.value_counts().items() if k},
+        "sex_touched_n": 2368,
+        "sex_touched_n_live": int(sex.sum()),
+        "sex_touched_types": 478,
+        "sex_touched_types_live": int(male.loc[sex, "type"].replace("", pd.NA).nunique(dropna=True)),
         "sex_touched_type_not_in_banc": int(sex_unmatched_type.sum()),
         "matching_rules": [
-            "BANC malecns_match → male bodyId",
-            "BANC malecns_cell_type ↔ male type (also male type ↔ BANC cell_type)",
+            "prefer BANC malecns_match → male bodyId (instance)",
+            "prefer BANC malecns_cell_type ↔ male type",
+            "fall back to type-name intersection with BANC cell_type",
             "dimorphism ∈ {male-specific, sexually dimorphic, potentially*}",
         ],
         "note": (
