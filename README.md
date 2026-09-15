@@ -99,6 +99,9 @@ Online fast weights on **hDeltaH / A / I / G** outgoing synapses; plastic vs fro
 
 ```bash
 python3 tools/hdelta/build_pools.py
-node tools/hdelta/run_continual_nav.mjs
+node tools/hdelta/run_continual_nav.mjs          # W1
+node tools/hdelta/run_experiments.mjs            # W1–W3 → results/hdelta/experiments.json
 ```
+
+Interactive lab: [`web/hdelta.html?v=lab1`](web/hdelta.html) (Pages cache-bust). Freeze Δw mid-run, set η / decay, switch goal A/B or sequential A→B→A.
 

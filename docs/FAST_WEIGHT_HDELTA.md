@@ -17,7 +17,8 @@ curl -L --fail -o data/body-annotations.feather \
 
 python3 tools/hdelta/build_pools.py
 node tools/hdelta/run_continual_nav.mjs --smoke
-node tools/hdelta/run_continual_nav.mjs          # N=8, ticks=32, steps=4
+node tools/hdelta/run_continual_nav.mjs          # N=8, ticks=24, steps=3
+node tools/hdelta/run_experiments.mjs            # W1–W3 → results/hdelta/experiments.json
 ```
 
 Prepared graph: `web/data/neurons.bin` + `connectome.bin` (n = 165122, nnz = 6235682, minWeight 5). Pool index order = `status == Traced` reset, matching `prepare.py`.
@@ -69,18 +70,52 @@ Clamp or intersectionally block plasticity (or output) of hDeltaH/A/I/G in real 
 - Not CVA-SST Exp0 (mixed two-cue) or Exp1 (male Scene F vs M). Those results stay as published failures.
 - Not M1–M3 (sex-swap controllers). Graph edits for dimorphic wiring are not applied here.
 
+## Interactive lab
+
+Live page: [`web/hdelta.html?v=lab1`](../web/hdelta.html) (Pages: `hdelta.html?v=lab1`). Same outer-product rule on the **45 real hΔ cells** (column bump); laterality is the collapsed hΔ→PFL3 L/R projection (261 real synapses). The Node pack runs the same rule on the **2832** outgoing chemical edges inside the full male LIF.
+
+**How to play**
+
+1. The fly walks as soon as the page loads (cyan path = plastic). Goal A (left, green) is armed.
+2. **plastic ON/OFF** — freeze or unfreeze Δw mid-run. Frozen path turns orange. Frozen fly keeps the last mapping (after A it will still prefer left even if you click B).
+3. **η / decay sliders** — learning rate and Δw leak, applied on the next tick. Default η = 0.10, decay = 0.998 (same as `params/hdelta/v1.json`).
+4. **goal A (left)** / **goal B (right)** — switch the current target. If plastic, a short pairing burst writes the new PFL3 laterality; if frozen, weights do not change.
+5. **A→B→A** — continual switch on the same two landmarks every ~7 s (A, B, A). No third heading: PFL3 readout is left/right only.
+6. **clear weights** — zero Δw and respawn. **restart** — respawn, keep Δw.
+7. **W1 overlay** — scripted A → plastic B (cyan) vs frozen B (orange) on the same pad.
+8. Live readouts: **mean |Δw|**, **#edges updated** this tick (45 × 2 laterality slots), **heading error** to the current goal, **decoded goal** from `tanh(R−L)`.
+
+Suggested mid-run experiment (matches headless W3): learn A (plastic) → freeze → click goal B (should fail, still decode A) → unfreeze (should remap to B).
+
+## Experiment pack (headless)
+
+```bash
+node tools/hdelta/run_experiments.mjs --smoke
+node tools/hdelta/run_experiments.mjs
+# writes results/hdelta/experiments.json
+```
+
+Predeclared box: `params/hdelta/v1.json` → `lab`. Do not add η values after seeing results.
+
+| Exp | Question | Protocol | Pass |
+|---|---|---|---|
+| **W1** | Are fast weights *necessary* to remap? | Learn A plastic; B plastic vs B frozen from the A snapshot | Frozen fails B (correct < 0.38 and below plastic); plastic remaps (correct_B ≥ 0.35, gap > 0.15) |
+| **W2** | How does remap depend on η? | Plastic A→B at each η in `{0.02, 0.05, 0.10, 0.25}` | Default η = 0.10 still remaps; table recorded |
+| **W3** | Freeze mid-run, then unfreeze? | Learn A → freeze → switch to B (must fail) → unfreeze on B (recover) | Frozen B fails; unfrozen B remaps |
+
+Locked W1 (N = 8, ticks = 24, steps = 3) remains in `results/hdelta/continual_nav.json`. The lab pack re-runs W1 in the smaller declared box so W1–W3 share one JSON.
+
 ## Files
 
 | Path | Role |
 |---|---|
-| `tools/lib/lif_engine.mjs` | `enableFastW` / Hebbian / freeze |
+| `tools/lib/lif_engine.mjs` | `enableFastW` / Hebbian / freeze / `fastWStats` |
 | `tools/hdelta/build_pools.py` | traced type → idx |
-| `tools/hdelta/run_continual_nav.mjs` | two-context assay |
-| `params/hdelta/v1.json` | claim, η, scene |
+| `tools/hdelta/assay.mjs` | shared phase / W1 |
+| `tools/hdelta/run_continual_nav.mjs` | two-context assay (W1) |
+| `tools/hdelta/run_experiments.mjs` | pack W1–W3 |
+| `params/hdelta/v1.json` | claim, η, scene, lab box |
 | `params/hdelta/pools.json` | committed indices |
-| `results/hdelta/continual_nav.json` | metrics |
-| `web/hdelta.html` | demo |
-
-## Demo
-
-[`web/hdelta.html`](../web/hdelta.html) — plastic vs frozen overlay on the two-landmark pad. Live page uses the same outer-product rule on the 45 real hΔ cells (column bump); the Node assay runs it inside the full male LIF.
+| `results/hdelta/continual_nav.json` | locked W1 N=8 |
+| `results/hdelta/experiments.json` | W1–W3 pack |
+| `web/hdelta.html` | interactive lab (`?v=lab1`) |

@@ -46,5 +46,17 @@
     "kFW": 1.15,
     "walkGain": 2.45,
     "turnGain": 1.45
+  },
+  "lab": {
+    "cache_bust": "lab1",
+    "W1": { "n": 4, "ticks": 20, "steps": 3 },
+    "W2": {
+      "etas": [0.02, 0.05, 0.10, 0.25],
+      "n": 3,
+      "ticks": 18,
+      "steps": 2,
+      "note": "Predeclared η box. Do not add etas after seeing results."
+    },
+    "W3": { "n": 4, "ticks": 18, "steps": 2 }
   }
 }

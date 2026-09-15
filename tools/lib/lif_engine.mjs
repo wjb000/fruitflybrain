@@ -123,6 +123,13 @@ export class LifEngine {
     this.fastWPlastic = !!on;
   }
 
+  setFastWParams(opts = {}) {
+    if (opts.eta != null) this.fastWEta = Number(opts.eta);
+    if (opts.decay != null) this.fastWDecay = Number(opts.decay);
+    if (opts.clip != null) this.fastWClip = Number(opts.clip);
+    if (opts.plastic != null) this.fastWPlastic = !!opts.plastic;
+  }
+
   setFastWTarget(arr) {
     this.fastWTarget = arr || null;
   }
@@ -148,10 +155,11 @@ export class LifEngine {
 
   /** Rate-based outer product: Δw_{i→j} += η * drive[i] * target[j] (plastic only). */
   hebbFromDrive(preScale = 1 / 60) {
-    if (!this.fastW || !this.fastWPlastic || !this.fastWTarget || !this.fastWIds) return;
+    if (!this.fastW || !this.fastWPlastic || !this.fastWTarget || !this.fastWIds) return 0;
     const eta = this.fastWEta;
     const clip = this.fastWClip;
     const tgt = this.fastWTarget;
+    let nUpdated = 0;
     for (let p = 0; p < this.fastWIds.length; p++) {
       const i = this.fastWIds[p];
       const pre = this.drive[i] * preScale;
@@ -165,8 +173,10 @@ export class LifEngine {
         if (v > clip) v = clip;
         else if (v < -clip) v = -clip;
         this.fastW[k] = v;
+        nUpdated++;
       }
     }
+    return nUpdated;
   }
 
   fastWNorm() {
@@ -174,6 +184,21 @@ export class LifEngine {
     let s = 0;
     for (let e = 0; e < this.fastWEdges.length; e++) s += Math.abs(this.fastW[this.fastWEdges[e]]);
     return s;
+  }
+
+  /** mean |Δw| and nonzero count on real hΔ outgoing chemical edges only. */
+  fastWStats() {
+    if (!this.fastW || !this.fastWEdges) {
+      return { nEdges: 0, nNonzero: 0, meanAbs: 0, sumAbs: 0 };
+    }
+    const nEdges = this.fastWEdges.length;
+    let sumAbs = 0, nNonzero = 0;
+    for (let e = 0; e < nEdges; e++) {
+      const v = Math.abs(this.fastW[this.fastWEdges[e]]);
+      sumAbs += v;
+      if (v > 1e-6) nNonzero++;
+    }
+    return { nEdges, nNonzero, meanAbs: nEdges ? sumAbs / nEdges : 0, sumAbs };
   }
 
   _rebuildSign() {
