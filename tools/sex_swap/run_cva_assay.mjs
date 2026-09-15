@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * CVA-SST closed-loop assay (headless), compressed graph edits via edgeScale.
- * Does not require an alternate CSR. Uses tools/lib/lif_engine.mjs as-is.
+ * CVA-SST closed-loop assay (headless).
+ * female_swap loads results/sex_swap/connectome_female_swap.bin (LifEngine + alternate CSR).
+ * iso_only / shuffle_sex edit the male CSR via edgeScale / shuffled indices.
  *
- *   node tools/sex_swap/run_cva_assay.mjs
+ *   node tools/sex_swap/run_cva_assay.mjs              # default --n 16
  *   node tools/sex_swap/run_cva_assay.mjs --smoke
  */
 import fs from "fs";
@@ -16,6 +17,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const DATA = path.join(ROOT, "web", "data");
 const OUT = path.join(ROOT, "results", "sex_swap");
 const PARAMS = JSON.parse(fs.readFileSync(path.join(ROOT, "params/sex_swap_v1.json"), "utf8"));
+const SWAP_BIN = path.join(OUT, "connectome_female_swap.bin");
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -59,11 +61,40 @@ function cueEye(x, z, heading, cue) {
   return { bearing, dist, on, loom: Math.max(0, 1.2 - dist / 9) };
 }
 
+function loadCsr(p) {
+  const buf = fs.readFileSync(p);
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+function bindEngine(engine, poolMap) {
+  engine.bindChannels({
+    vision: poolMap.vision || [],
+    smell: poolMap.smell || poolMap.pherORN || [],
+    courtship: poolMap.courtship || [],
+    touch: poolMap.touch || poolMap.ppk23 || [],
+  });
+  engine.bindEffectors({
+    T1L: poolMap.T1L || [],
+    T1R: poolMap.T1R || [],
+    T2L: poolMap.T2L || [],
+    T2R: poolMap.T2R || [],
+    T3L: poolMap.T3L || [],
+    T3R: poolMap.T3R || [],
+    ADMN: poolMap.ADMN || [],
+    aIPg: poolMap.aIPg || poolMap.aggression_core || [],
+    courtship_core: poolMap.courtship_core || [],
+    pC1: poolMap.pC1 || [],
+    pIP1: poolMap.pIP1 || [],
+    vision: poolMap.vision || [],
+    smell: poolMap.smell || [],
+    courtship: poolMap.courtship || [],
+    touch: poolMap.touch || [],
+  });
+}
+
 function applyController(engine, manifest, controller, seed, indices0) {
   engine.clearLesion();
   if (indices0) engine.indices.set(indices0);
-  const ms = manifest.male_specific_idx.concat(manifest.potentially_male_specific_idx || []);
-  const sd = manifest.sexually_dimorphic_idx.concat(manifest.potentially_sexually_dimorphic_idx || []);
   const dim = manifest.dimorphic_idx;
   const zeroOut = (ids) => {
     for (const i of ids) {
@@ -72,13 +103,9 @@ function applyController(engine, manifest, controller, seed, indices0) {
       for (let k = a; k < b; k++) engine.edgeScale[k] = 0;
     }
   };
-  if (controller === "male") return;
+  if (controller === "male" || controller === "female_swap") return;
   if (controller === "iso_only") {
     zeroOut(dim);
-    return;
-  }
-  if (controller === "female_swap") {
-    zeroOut(ms);
     return;
   }
   if (controller === "shuffle_sex") {
@@ -106,35 +133,12 @@ function runTrial(engine, poolMap, manifest, controller, seed, scene, drive, tic
   engine.rngs = mulberry32(seed >>> 0);
   engine.reset();
   applyController(engine, manifest, controller, seed, indices0);
+  bindEngine(engine, poolMap);
 
   const fem = scene.femaleCue, mal = scene.maleCue;
   let x = scene.spawn.x, z = scene.spawn.z, heading = scene.spawn.heading + ((seed % 17) - 8) * 0.02;
   let orientF = 0, orientM = 0, prefF = 0, disp = 0, lx = x, lz = z;
   const court = [], agr = [], wing = [], visHz = [], smellHz = [];
-
-  engine.bindChannels({
-    vision: poolMap.vision || [],
-    smell: poolMap.smell || poolMap.pherORN || [],
-    courtship: poolMap.courtship || poolMap.courtship_core || [],
-    touch: poolMap.touch || poolMap.ppk23 || [],
-  });
-  engine.bindEffectors({
-    T1L: poolMap.T1L || [],
-    T1R: poolMap.T1R || [],
-    T2L: poolMap.T2L || [],
-    T2R: poolMap.T2R || [],
-    T3L: poolMap.T3L || [],
-    T3R: poolMap.T3R || [],
-    ADMN: poolMap.ADMN || [],
-    aIPg: poolMap.aIPg || poolMap.aggression_core || [],
-    courtship_core: poolMap.courtship_core || [],
-    pC1: poolMap.pC1 || [],
-    pIP1: poolMap.pIP1 || [],
-    vision: poolMap.vision || [],
-    smell: poolMap.smell || [],
-    courtship: poolMap.courtship || [],
-    touch: poolMap.touch || [],
-  });
 
   for (let tick = 0; tick < ticks; tick++) {
     const eyeF = cueEye(x, z, heading, fem);
@@ -146,6 +150,9 @@ function runTrial(engine, poolMap, manifest, controller, seed, scene, drive, tic
     engine.setRates({ vision: vis, smell, courtship: courtHzIn, touch });
     for (let s = 0; s < steps; s++) engine.step();
     const hz = engine.effectorHz(steps);
+    // Second-order: cue → sensory write-in → graph → courtship_core / aIPg rates.
+    const court2 = hz.courtship_core || hz.pC1 || 0;
+    const aipg2 = hz.aIPg || 0;
     const legsL = ((hz.T1L || 0) + (hz.T2L || 0) + (hz.T3L || 0)) / 3;
     const legsR = ((hz.T1R || 0) + (hz.T2R || 0) + (hz.T3R || 0)) / 3;
     const walk = Math.tanh((legsL + legsR) / 30);
@@ -164,16 +171,16 @@ function runTrial(engine, poolMap, manifest, controller, seed, scene, drive, tic
     if (Math.abs(eyeF.bearing) < Math.PI / 4) orientF++;
     if (Math.abs(eyeM.bearing) < Math.PI / 4) orientM++;
     if (Math.abs(eyeF.bearing) < Math.abs(eyeM.bearing)) prefF++;
-    court.push(hz.courtship_core || hz.pC1 || 0);
-    agr.push(hz.aIPg || 0);
+    court.push(court2);
+    agr.push(aipg2);
     wing.push(hz.ADMN || 0);
     visHz.push(hz.vision || 0);
     smellHz.push(hz.smell || 0);
   }
   const fracF = orientF / ticks, fracM = orientM / ticks, fracPrefF = prefF / ticks;
   const wingHz = mean(wing), aipgHz = mean(agr), courtHz = mean(court);
-  const CI = 0.6 * fracPrefF + 0.4 * Math.tanh(wingHz / 3 + courtHz / 6);
-  const AI = 0.6 * (1 - fracPrefF) + 0.4 * Math.tanh(aipgHz / 3);
+  const CI = 0.35 * fracF + 0.65 * Math.tanh(courtHz);
+  const AI = 0.35 * fracM + 0.65 * Math.tanh(aipgHz);
   return {
     controller, seed, CI, AI, delta: CI - AI,
     fracOrientFemale: fracF, fracOrientMale: fracM, fracPrefFemale: fracPrefF,
@@ -200,7 +207,7 @@ function summarize(rows, controller) {
 
 function main() {
   const smoke = Boolean(arg("--smoke", false));
-  const nSeeds = Number(arg("--n", smoke ? 4 : 8));
+  const nSeeds = Number(arg("--n", smoke ? 4 : (PARAMS.n_seeds_default || 16)));
   const ticks = Number(arg("--ticks", smoke ? 12 : PARAMS.scene.ticks));
   const steps = Number(arg("--steps", smoke ? 3 : PARAMS.scene.stepsPerTick));
   const seeds = loadSeeds(nSeeds);
@@ -217,15 +224,22 @@ function main() {
     courtship_core: (poolMap.courtship_core || []).length,
     T1L: (poolMap.T1L || []).length,
   });
-  const engine = new LifEngine(neu, csr);
-  const indices0 = new Uint32Array(engine.indices);
+  if (!fs.existsSync(SWAP_BIN)) {
+    console.error(`missing ${SWAP_BIN} — run python3 tools/sex_swap/build_banc_transplant.py`);
+    process.exit(1);
+  }
+  const maleEngine = new LifEngine(neu, csr);
+  const swapEngine = new LifEngine(neu, loadCsr(SWAP_BIN));
+  const indices0 = new Uint32Array(maleEngine.indices);
   const controllers = PARAMS.controllers;
   const rows = [];
-  console.log(`CVA-SST compressed  seeds=${seeds.length} ticks=${ticks} smoke=${smoke}`);
+  console.log(`CVA-SST BANC transplant v2  seeds=${seeds.length} ticks=${ticks} steps=${steps} smoke=${smoke}`);
   for (const ctl of controllers) {
     process.stdout.write(`${ctl}: `);
+    const engine = ctl === "female_swap" ? swapEngine : maleEngine;
+    const idx0 = ctl === "female_swap" ? null : indices0;
     for (const seed of seeds) {
-      const row = runTrial(engine, poolMap, manifest, ctl, seed, PARAMS.scene, PARAMS.drive_hz, ticks, steps, indices0);
+      const row = runTrial(engine, poolMap, manifest, ctl, seed, PARAMS.scene, PARAMS.drive_hz, ticks, steps, idx0);
       rows.push(row);
       process.stdout.write(row.delta >= 0 ? "C" : "A");
     }
@@ -238,6 +252,7 @@ function main() {
   const shuf = summaries.find((s) => s.controller === "shuffle_sex");
   const signFlip = male && swap && Math.sign(male.meanDelta) !== 0 && Math.sign(swap.meanDelta) !== 0
     && Math.sign(male.meanDelta) !== Math.sign(swap.meanDelta);
+  const claim_status = signFlip ? "PASS_SIGN_FLIP" : "FAILED";
   const out = {
     experiment: "CVA-SST",
     smoke,
@@ -246,8 +261,9 @@ function main() {
     ticks,
     stepsPerTick: steps,
     claim: PARAMS.claim,
-    falsifier: PARAMS.falsifier,
-    compressed_swap: true,
+    claim_status,
+    banc_transplant: true,
+    compressed_swap: false,
     summaries,
     flip: {
       signFlip: Boolean(signFlip),
@@ -255,7 +271,12 @@ function main() {
       femaleSwapDelta: swap?.meanDelta,
       isoDelta: iso?.meanDelta,
       shuffleDelta: shuf?.meanDelta,
-      honest: "Compressed swap smoke does NOT yet flip CI↔AI; scene modulation (vision/smell/courtship/touch write-in) works. Full BANC edge transplant is not applied.",
+      honest: signFlip
+        ? "CI↔AI sign flipped under BANC transplant v2."
+        : "No CI↔AI sign flip under BANC transplant v2 (claim failed).",
+      secondary_finding: iso && swap
+        ? `iso_only collapses aIPg ${male?.meanAipgHz?.toFixed(2)}→${iso.meanAipgHz.toFixed(3)}; transplant restores ~${swap.meanAipgHz.toFixed(2)} without flip`
+        : "",
     },
     rows,
   };
@@ -269,7 +290,7 @@ function main() {
     "controller,seed,CI,AI,delta,fracF,fracM,wingHz,aIPgHz,disp,finalX",
     ...rows.map((r) => [r.controller, r.seed, r.CI, r.AI, r.delta, r.fracOrientFemale, r.fracOrientMale, r.wingHz, r.aIPgHz, r.displacement, r.finalX].join(",")),
   ].join("\n"));
-  console.log(JSON.stringify({ summaries, flip: out.flip }, null, 2));
+  console.log(JSON.stringify({ summaries, flip: out.flip, claim_status }, null, 2));
   console.log("wrote", path.join(OUT, "cva_assay_summary.json"));
 }
 

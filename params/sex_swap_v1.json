@@ -2,7 +2,8 @@
   "name": "CVA-SST",
   "version": "v1",
   "claim": "Sex-specific/dimorphic wiring alone (isomorphic weights, body, sensors fixed) is necessary and sufficient to flip closed-loop courtship vs aggression preference under matched scenes; isomorphic-only and shuffled sex-edges do not flip.",
-  "falsifier": "Intersectional silence of the twin-minimal sex-specific set (P1/aIPg/mAL/TN1/vPR6/pIP1 contributors) abolishes the predicted flip; restoring those nodes' output should restore it. If a specific DN\u2192VNC MN weight change is implicated (pIP1/pIP10 \u2192 wing MN), test with intersectional silencing of that DN type.",
+  "claim_status": "FAILED_NO_SIGN_FLIP",
+  "falsifier": "Not applicable: primary claim failed (no CI\u2194AI sign flip). No silencing falsifier is offered for a failed flip.",
   "graph_seed": 20260915,
   "n_seeds_default": 16,
   "seeds_file": "params/sex_swap_seeds.txt",
@@ -14,14 +15,14 @@
     "stimAmp": 0.11
   },
   "drive_hz": {
-    "vision": 32,
-    "smell": 28,
-    "courtship": 24,
-    "touch": 20
+    "vision": 48,
+    "smell": 42,
+    "courtship": 38,
+    "touch": 32
   },
   "scene": {
-    "ticks": 24,
-    "stepsPerTick": 4,
+    "ticks": 48,
+    "stepsPerTick": 8,
     "dtBody": 0.05,
     "arenaR": 11,
     "femaleCue": {
@@ -89,5 +90,6 @@
     "female_swap",
     "shuffle_sex"
   ],
-  "compressed_swap": true
+  "compressed_swap": false,
+  "banc_transplant": true
 }

@@ -140,8 +140,10 @@ def main() -> None:
             "male": "no edits; full prepared CSR",
             "iso_only": "edgeScale=0 on outgoing of all dimorphic idx (isomorphic-only)",
             "female_swap": (
-                "compressed: edgeScale=0 on male-specific (+potentially male-specific) outgoing; "
-                "sexually-dimorphic outgoing RESTORED (scale=1). Does not transplant BANC edges."
+                "v2 BANC transplant: ablate male-specific (+potentially MS) outs; "
+                "replace body-matched (malecns_match) and type-matched (malecns_cell_type) "
+                "dimorphic outs with BANC-mapped edges; KEEP unmatched sexually-dimorphic male outs. "
+                "CSR: results/sex_swap/connectome_female_swap.bin (rebuild via build_banc_transplant.py)"
             ),
             "shuffle_sex": "shuffle post indices of dimorphic outgoing edges; preserve out-degree; per seed",
         },
@@ -163,7 +165,11 @@ def main() -> None:
         "name": "CVA-SST",
         "version": "v1",
         "claim": CLAIM,
-        "falsifier": FALSIFIER,
+        "claim_status": "FAILED_NO_SIGN_FLIP",
+        "falsifier": (
+            "Not applicable: primary claim failed (no CI↔AI sign flip). "
+            "No silencing falsifier is offered for a failed flip."
+        ),
         "graph_seed": 20260915,
         "n_seeds_default": 16,
         "seeds_file": "params/sex_swap_seeds.txt",
@@ -177,10 +183,10 @@ def main() -> None:
             "inhibGain": 2.15,
             "stimAmp": 0.11,
         },
-        "drive_hz": {"vision": 32, "smell": 28, "courtship": 24, "touch": 20},
+        "drive_hz": {"vision": 48, "smell": 42, "courtship": 38, "touch": 32},
         "scene": {
-            "ticks": 24,
-            "stepsPerTick": 4,
+            "ticks": 48,
+            "stepsPerTick": 8,
             "dtBody": 0.05,
             "arenaR": 11,
             "femaleCue": {"x": -2.4, "z": 6.0},
@@ -193,7 +199,8 @@ def main() -> None:
             "counts": {k: len(v) for k, v in pools.items()},
         },
         "controllers": ["male", "iso_only", "female_swap", "shuffle_sex"],
-        "compressed_swap": True,
+        "compressed_swap": False,
+        "banc_transplant": True,
     }
     PARAMS.parent.mkdir(parents=True, exist_ok=True)
     PARAMS.write_text(json.dumps(params, indent=2))

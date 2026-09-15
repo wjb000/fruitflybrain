@@ -1,0 +1,15 @@
+{
+  "version": "v2",
+  "policy": "v2: ablate male-specific (+potentially MS) outs; replace body-matched (malecns_match) and type-matched (malecns_cell_type) dimorphic outs with BANC-mapped edges; KEEP unmatched sexually-dimorphic male outs",
+  "male_n": 165122,
+  "male_nnz": 6235682,
+  "female_swap_nnz": 6124057,
+  "body_mapped_edges": 22115,
+  "type_transplant_edges": 6247,
+  "neurons_outs_removed": 1678,
+  "sd_unmatched_kept": 690,
+  "ms_ablated": 1420,
+  "male_specific": 1420,
+  "connectome_out": "results/sex_swap/connectome_female_swap.bin",
+  "note": "connectome_female_swap.bin is gitignored; rebuild via tools/sex_swap/build_banc_transplant.py"
+}

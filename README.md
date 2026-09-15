@@ -4,13 +4,14 @@ The **complete adult male *Drosophila* central nervous system** (brain + ventral
 
 ## Sex-swap digital twin (CVA-SST)
 
-Closed-loop **Courtship-vs-Aggression Sex-Swap Twin**: entire male CNS graph, NT-aware LIF, portable MN chassis, compressed sex-specific wiring edits, CI vs AI in one scene. Paper-style methods, claim, and honest failures: **[`docs/SEX_SWAP_TWIN.md`](docs/SEX_SWAP_TWIN.md)**.
+Closed-loop **Courtship-vs-Aggression Sex-Swap Twin**: entire male CNS graph, NT-aware LIF, portable MN chassis, BANC transplant v2, CI vs AI in one scene. **Claim FAILED** (N=16, no CI↔AI sign flip). Methods and results: **[`docs/SEX_SWAP_TWIN.md`](docs/SEX_SWAP_TWIN.md)**.
 
 ```bash
-python3 tools/sex_swap/verify_counts.py      # feathers + MCSR header → results/sex_swap/counts.json
-python3 tools/sex_swap/build_isomorphism.py  # malecns_match / type map
+python3 tools/sex_swap/verify_counts.py
+python3 tools/sex_swap/build_isomorphism.py
 python3 tools/sex_swap/build_sex_swap_graph.py
-node tools/sex_swap/run_cva_assay.mjs --smoke
+python3 tools/sex_swap/build_banc_transplant.py   # v2; gitignored *.bin
+node tools/sex_swap/run_cva_assay.mjs             # default N=16
 ```
 
 Honest MN→body coupling: drone/cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
