@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=drone1";
-import { CompoundEye } from "./eye.js?v=drone1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=drone1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=drone1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=drone1";
-import { spinRotors } from "./chassis.js?v=drone1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=follow1";
+import { CompoundEye } from "./eye.js?v=follow1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=follow1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=follow1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
+import { spinRotors } from "./chassis.js?v=follow1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -238,6 +238,8 @@ export class EmbodiedFly {
     this.lesionMeta = { id: "none", applied: [] };
     /** Manual stim-map inject: pool name → Hz (merged into worker rates each tick). */
     this.stimInject = {};
+    /** Webcam/synthetic blob boost (follow-me). Null on the main sim unless ?cam=1. */
+    this.camBoost = null;
     this.world = { food: { x: 6.5, z: 4.2 }, water: { x: -5.5, z: -3.8 }, other: null };
 
     body.position.set(x, this.y, z);
@@ -531,6 +533,43 @@ export class EmbodiedFly {
   clearStimInject() {
     if (!this.stimInject) this.stimInject = {};
     for (const k of Object.keys(this.stimInject)) this.stimInject[k] = 0;
+  }
+
+  /**
+   * Merge a thin cam encoding into optic/vision write-in (Hz). Does not set chassis
+   * velocity — steering still comes from LIF → MN → portable drone axes.
+   */
+  setCamBoost(boost) {
+    this.camBoost = boost && typeof boost === "object" ? boost : null;
+    return this.camBoost;
+  }
+
+  mergeCamBoost(visionL, visionR, opticRates) {
+    const b = this.camBoost;
+    if (!b) return { visionL, visionR, opticRates };
+    const add = (k, v) => {
+      if (!v) return;
+      opticRates[k] = Math.max(0, Math.min(140, (opticRates[k] || 0) + v));
+    };
+    visionL = Math.max(0, Math.min(140, visionL + (b.visionL || 0)));
+    visionR = Math.max(0, Math.min(140, visionR + (b.visionR || 0)));
+    add("HSL", b.HSL);
+    add("HSR", b.HSR);
+    add("VSL", b.VSL);
+    add("VSR", b.VSR);
+    if (b.optic) {
+      for (const [k, v] of Object.entries(b.optic)) add(k, v);
+    }
+    const loom = b.loom || 0;
+    if (loom) {
+      for (const side of ["L", "R"]) {
+        add("T4a" + side, loom * 0.45);
+        add("T5a" + side, loom * 0.45);
+        add("L1" + side, loom * 0.35);
+        add("L2" + side, loom * 0.28);
+      }
+    }
+    return { visionL, visionR, opticRates };
   }
 
   /** Robot-facing vision→steering snapshot (+ stub chassis setpoints). */
@@ -999,7 +1038,8 @@ export class EmbodiedFly {
     let joL = 5 + spdL * 28 + Math.max(0, -sideL) * 24 + Math.max(0, fwdL) * 8;
     let joR = 5 + spdR * 28 + Math.max(0, sideR) * 24 + Math.max(0, fwdR) * 8;
     ({ L: joL, R: joR } = lrKlinotaxis(joL, joR, 0.28));
-    const distF = Math.hypot(this.world.food.x - x, this.world.food.z - z);
+    const beacon = this.world.person || this.world.food || { x: 0, z: 0 };
+    const distF = Math.hypot(beacon.x - x, beacon.z - z);
     const distW = Math.hypot(this.world.water.x - x, this.world.water.z - z);
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
@@ -1010,18 +1050,26 @@ export class EmbodiedFly {
     if (head) head.getWorldPosition(_head);
     else _head.set(x + Math.sin(this.heading) * 0.7, this.y + 1.28, z + Math.cos(this.heading) * 0.7);
     const bombPos = odors && odors.bombEnabled ? odors.getBombPos() : null;
+    let landmarks = this.world.landmarks || [];
+    if (this.world.person) {
+      const p = this.world.person;
+      landmarks = [
+        { x: p.x, y: 2.05, z: p.z, r: p.r || 0.5, kind: "food" },
+        ...landmarks.filter((L) => L.kind !== "food"),
+      ];
+    }
     const eye = this.eye.sample({
       origin: { x: _head.x, y: _head.y, z: _head.z },
       heading: this.heading,
       day,
       t,
-      food: this.world.food,
+      food: beacon,
       water: this.world.water,
       bitter: this.world.bitter,
       perch: this.world.perch,
       bomb: bombPos,
       // Procgen landmarks — required for vision→walk toward chunk targets.
-      landmarks: this.world.landmarks || [],
+      landmarks,
       other: other ? { pos: other.body.position, heading: other.heading } : null,
       otherColor: [0.23, 0.47, 0.91],
       others: (this.world.others || []).map((o) => ({
@@ -1050,7 +1098,6 @@ export class EmbodiedFly {
     };
     const extraV = (this.extra && this.extra.vision) || 0;
     const opticRates = this.opticRates(eye, extraV);
-    this.lastOptic = opticRates;
     // Broad visionL/R pools were bound but never eye-driven (only UI `vision` button).
     // Fill them from compound-eye salience so connectome sees L/R visual asymmetry.
     const visFromEye = (side) => {
@@ -1063,6 +1110,10 @@ export class EmbodiedFly {
     let visionL = visFromEye("L") + extraV;
     let visionR = visFromEye("R") + extraV;
     ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.78));
+    const camMerged = this.mergeCamBoost(visionL, visionR, opticRates);
+    visionL = camMerged.visionL;
+    visionR = camMerged.visionR;
+    this.lastOptic = opticRates;
     this.lastVisionSal = {
       L: visionL, R: visionR,
       salFoodL: eye.L?.salFood || 0,
@@ -1099,6 +1150,12 @@ export class EmbodiedFly {
 
     const proprio = this.readProprio(wall, grounded);
     const extra = this.extra || {};
+    const inj = { ...(this.stimInject || {}) };
+    // visionL/R teaching (follow hΔ overlay) adds; other stim-map keys still override.
+    const teachL = inj.visionL; delete inj.visionL;
+    const teachR = inj.visionR; delete inj.visionR;
+    visionL = Math.max(0, Math.min(140, visionL + (teachL || 0)));
+    visionR = Math.max(0, Math.min(140, visionR + (teachR || 0)));
     this.worker.postMessage({
       type: "rates",
       rates: {
@@ -1133,7 +1190,7 @@ export class EmbodiedFly {
         ...proprio,
         ...opticRates,
         // Stim-map inject last so causal buttons override closed-loop write-in.
-        ...(this.stimInject || {}),
+        ...inj,
       },
     });
   }

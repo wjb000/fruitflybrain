@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Follow me — Male CNS drone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=follow1" />
+  <style>
+    .banner {
+      pointer-events: none; position: absolute; left: 50%; top: calc(18px + var(--safe-t));
+      transform: translateX(-50%); z-index: 5;
+      padding: 8px 18px; border-radius: 999px; letter-spacing: 0.16em;
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      background: rgba(12, 16, 22, 0.82); border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted);
+    }
+    .banner.on { color: #d9fbff; border-color: rgba(77,228,255,0.55); background: rgba(20, 48, 56, 0.88); }
+    .follow-left { width: min(380px, calc(100% - 32px)); }
+    .cam-thumb {
+      width: 220px; height: 160px; border-radius: 10px; background: #07080d;
+      border: 1px solid var(--line); display: block; cursor: grab; touch-action: none;
+    }
+    .stick { margin-top: 8px; }
+    .stick .barline .name { width: 58px; }
+    .honesty { color: var(--muted); font-size: 11px; line-height: 1.45; margin-top: 8px; }
+    .cam-mode { position: absolute; right: calc(16px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); z-index: 4; display: flex; gap: 6px; }
+    @media (min-width: 901px) {
+      .cam-mode { bottom: calc(24px + var(--safe-b)); }
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="loader" id="loader">
+    <div class="kicker">Follow-me · simulation</div>
+    <h2>Male CNS → drone</h2>
+    <p>Webcam or drag-the-blob → vision pools → LIF → MNs → quadrotor. Not a real FPV quad in the room.</p>
+    <div class="progress"><i id="bar"></i></div>
+    <p id="loadmsg">fetching male CNS…</p>
+  </div>
+  <div class="hud">
+    <div class="banner" id="flyBanner">loading male CNS</div>
+    <div class="panel top-left follow-left" id="panelL">
+      <button class="collapse" type="button" title="collapse">–</button>
+      <div class="kicker">Follow me · follow1</div>
+      <div class="panel-body">
+        <h1>Fly in a drone</h1>
+        <div class="sub">
+          Thin encoding only: blob centroid + area → virtual person beacon + <code>sensoryBoost</code> Hz.
+          Steering is <b>compound eye → optic/visionL/R → LIF → MN → portable drone axes</b> — not PID-to-pixel.
+          Cache <code>?v=follow1</code> · <a href="index.html?v=follow1" style="color:#4de4ff">main sim</a>
+          · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ lab</a>
+        </div>
+        <div class="stats">
+          <div><b id="nNeurons">—</b><span>♂ map</span></div>
+          <div><b id="gait">…</b><span>mode</span></div>
+          <div><b id="steerHint">—</b><span>portable</span></div>
+          <div><b id="fwHint">plastic</b><span>hΔ overlay</span></div>
+          <div><b id="camSrc">synthetic</b><span>cam cue</span></div>
+          <div><b id="dwHint">0</b><span>mean |Δw|</span></div>
+        </div>
+        <div class="kicker">cam thumbnail · drag “you”</div>
+        <canvas id="camThumb" class="cam-thumb" width="220" height="160" aria-label="Camera thumbnail"></canvas>
+        <div class="row">
+          <button type="button" id="btnPlastic" class="on">hΔ plastic ON</button>
+          <button type="button" id="btnJump">jump side</button>
+          <button type="button" id="pause">pause</button>
+        </div>
+        <div class="honesty" id="fwNote">
+          Fast weights: <b>client teaching overlay</b> on real hDeltaH/A/I/G column prefs (same compact set as hdelta.html).
+          Biases visionL/R stimInject. <code>sim.worker.js</code> has no <code>enableFastW</code> — not the 2832-edge LIF pack.
+        </div>
+        <div class="kicker" style="margin-top:10px">sticks (MN → portable)</div>
+        <div class="stick" id="sticks">
+          <div class="barline"><div class="name">forward</div><div class="track"><i id="st-fwd" style="background:#3dff9a"></i></div></div>
+          <div class="barline"><div class="name">yaw</div><div class="track"><i id="st-yaw" style="background:#4de4ff"></i></div></div>
+          <div class="barline"><div class="name">strafe</div><div class="track"><i id="st-str" style="background:#b07cff"></i></div></div>
+          <div class="barline"><div class="name">climb</div><div class="track"><i id="st-clb" style="background:#ffd166"></i></div></div>
+        </div>
+        <p class="honesty">Simulation following a cam blob on the pad. No props, no hardware bridge.</p>
+      </div>
+    </div>
+    <div class="cam-mode">
+      <button type="button" id="camChase" class="on">chase</button>
+      <button type="button" id="camFpv">FPV</button>
+      <button type="button" id="camOrbit">orbit</button>
+    </div>
+  </div>
+  <script type="module" src="follow.js?v=follow1"></script>
+</body>
+</html>

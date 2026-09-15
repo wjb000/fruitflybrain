@@ -17,7 +17,16 @@ node tools/sex_swap/run_exp1_male_scenes.mjs      # Exp1 male Scene F vs M (no f
 
 Honest MN→body coupling: drone/cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
-**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` → pitch, `yawRate` → yaw; T2 strafe; wing MNs climb). Hard-refresh with `?v=drone1`. **Stim map** (default on drone, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch drone pitch/yaw/throttle — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
+**Follow-me (webcam blob):** [`web/follow.html?v=follow1`](web/follow.html) puts the male CNS in the drone and follows a webcam / synthetic “you” blob. Thin encoding only (centroid + area → virtual person beacon + `sensoryBoost` Hz on visionL/R / optic). Steering is still eye → LIF → MN → portable drone axes — **not** a PID go-to-pixel. No webcam? Drag the blob on the thumbnail. Optional hΔ plastic/frozen teaching overlay (client-side; worker has no `enableFastW`). Honest: **simulation** of a cam blob on the pad, not a real FPV quad. One-pager: [`docs/FOLLOW_ME.md`](docs/FOLLOW_ME.md).
+
+How to use:
+
+1. Open `follow.html?v=follow1` (allow webcam or drag the synthetic blob).
+2. Wait for male CNS load; drone hovers — **FLY IN CONTROL** when MNs drive axes.
+3. Move / drag the blob; drone yaws toward it and advances when centered via the brain path.
+4. Toggle fast weights ON to adapt while you move; freeze and jump sides to see worse reacquisition.
+
+**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` → pitch, `yawRate` → yaw; T2 strafe; wing MNs climb). Hard-refresh with `?v=follow1`. **Stim map** (default on drone, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch drone pitch/yaw/throttle — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 

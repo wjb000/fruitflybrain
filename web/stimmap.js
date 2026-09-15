@@ -7,9 +7,8 @@
  *
  * Enable: default on drone/cube, or ?stim=1 / ?map=1. Disable: ?stim=0.
  */
-
-import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=drone1";
-import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=drone1";
+import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
+import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=follow1";
 
 export function stimMapWanted(bodyMode = "drone") {
   try {

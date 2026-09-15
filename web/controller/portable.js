@@ -237,7 +237,7 @@ Hardware:
 
 Sanity: silence:HS or silence optic pools should weaken beacon-directed yaw.
 Default embodiment: drone chassis (?body=drone). Fallbacks ?body=cube|fly.
-Cache-bust ?v=drone1.
+Cache-bust ?v=follow1. Follow-me: follow.html?v=follow1 (cam blob → vision pools → LIF → drone).
 `.trim();
 
 function num(a, b) {

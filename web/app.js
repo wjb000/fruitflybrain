@@ -1,16 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=drone1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=drone1";
-import { createOpenWorld } from "./world/procgen.js?v=drone1";
-import { EmbodiedFly } from "./agent.js?v=drone1";
-import { drawOmmatidia } from "./eye.js?v=drone1";
-import { OdorWorld } from "./plume.js?v=drone1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=drone1";
-import { parseLesionFlag } from "./lesion.js?v=drone1";
-import { mountAssayPanel } from "./assay/panel.js?v=drone1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=drone1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=drone1";
+import { loadNmf, createMaleFly } from "./fly.js?v=follow1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=follow1";
+import { createOpenWorld } from "./world/procgen.js?v=follow1";
+import { EmbodiedFly } from "./agent.js?v=follow1";
+import { drawOmmatidia } from "./eye.js?v=follow1";
+import { OdorWorld } from "./plume.js?v=follow1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=follow1";
+import { parseLesionFlag } from "./lesion.js?v=follow1";
+import { mountAssayPanel } from "./assay/panel.js?v=follow1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=follow1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=follow1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=follow1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "drone"; ?body=cube|fly fallbacks
 
@@ -336,10 +337,28 @@ function paintFlock() {
 }
 
 let worldTick = 0;
+const wantCam = camWanted();
+let handCam = null;
+if (wantCam) {
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:absolute;right:calc(16px + var(--safe-r));top:calc(16px + var(--safe-t));z-index:6;pointer-events:auto";
+  const thumb = document.createElement("canvas");
+  thumb.width = 200; thumb.height = 146;
+  thumb.style.cssText = "width:200px;height:146px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:#07080d;cursor:grab;touch-action:none";
+  thumb.title = "Drag synthetic you · ?cam=1";
+  wrap.appendChild(thumb);
+  (document.querySelector(".hud") || document.body).appendChild(wrap);
+  handCam = createHandCam({ canvas: thumb, forceOn: false });
+  handCam.start();
+}
+
 function onAny() {
   if (++worldTick % 2 === 0) {
     refreshNeighbors();
-    for (const f of flies) f.pushWorldDrive();
+    for (const f of flies) {
+      if (handCam) applyCamToFly(handCam, f);
+      f.pushWorldDrive();
+    }
   }
   const focus = selected || flies[0];
   if (!focus) return;
