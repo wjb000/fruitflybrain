@@ -1,0 +1,112 @@
+{
+  "name": "hDelta-fastW-continual-nav",
+  "version": "v1",
+  "claim": "Online fast weights on hDeltaH/A/I/G outgoing synapses are necessary to remap a context→goal heading. After learning context A (left landmark), freezing those weights causes failure on context B (right landmark); keeping them plastic remaps.",
+  "falsifier": "Clamping or silencing hDeltaH/A/I/G synaptic plasticity (or the cells) in real flies should prevent reversing a learned heading goal when the rewarded landmark switches, while leaving first-context heading largely intact. PFL3 laterality is the readout, not a new motor neuron.",
+  "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+  "smoke": true,
+  "n": 2,
+  "ticks": 16,
+  "steps": 2,
+  "plastic_types": [
+    "hDeltaH",
+    "hDeltaA",
+    "hDeltaI",
+    "hDeltaG"
+  ],
+  "n_plastic": 45,
+  "n_plastic_out_edges": 2832,
+  "n_PFL3": 24,
+  "fastW": {
+    "eta": 0.1,
+    "decay": 0.998,
+    "clip": 1.6,
+    "hebbFromDrive": true
+  },
+  "scene": {
+    "ticks": 16,
+    "steps": 2,
+    "evalLast": 6,
+    "left": {
+      "x": -4.2,
+      "z": 6.2
+    },
+    "right": {
+      "x": 4.2,
+      "z": 6.2
+    }
+  },
+  "plastic": {
+    "condition": "plastic",
+    "n": 2,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectB": 0.6,
+    "sdCorrectB": 0,
+    "meanWrongB": 0.5,
+    "meanDeltaB": 0.1,
+    "meanFwB": 0.06876702234862636
+  },
+  "frozen": {
+    "condition": "frozen",
+    "n": 2,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectB": 0,
+    "sdCorrectB": 0,
+    "meanWrongB": 0.6,
+    "meanDeltaB": -0.6,
+    "meanFwB": -0.4799361097344494
+  },
+  "gapB": 0.6,
+  "frozenFailsB": true,
+  "plasticRemaps": true,
+  "pass": true,
+  "verdict": "PASS: frozen fails on context B; plastic remaps",
+  "rows": [
+    {
+      "seed": 2000,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.6,
+      "deltaB": 0,
+      "fwA": 125.26332464069128,
+      "fwB": 54.12056262418628,
+      "fwMeanB": 0.07080194748947599
+    },
+    {
+      "seed": 2000,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 125.26332464069128,
+      "fwB": 125.26332464069128,
+      "fwMeanB": -0.4799361097344494
+    },
+    {
+      "seed": 2001,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.39999999999999997,
+      "deltaB": 0.2,
+      "fwA": 125.26332464069128,
+      "fwB": 57.66795925050974,
+      "fwMeanB": 0.06673209720777673
+    },
+    {
+      "seed": 2001,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 125.26332464069128,
+      "fwB": 125.26332464069128,
+      "fwMeanB": -0.4799361097344494
+    }
+  ]
+}

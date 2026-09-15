@@ -1,0 +1,244 @@
+{
+  "name": "hDelta-fastW-continual-nav",
+  "version": "v1",
+  "claim": "Online fast weights on hDeltaH/A/I/G outgoing synapses are necessary to remap a context→goal heading. After learning context A (left landmark), freezing those weights causes failure on context B (right landmark); keeping them plastic remaps.",
+  "falsifier": "Clamping or silencing hDeltaH/A/I/G synaptic plasticity (or the cells) in real flies should prevent reversing a learned heading goal when the rewarded landmark switches, while leaving first-context heading largely intact. PFL3 laterality is the readout, not a new motor neuron.",
+  "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+  "smoke": false,
+  "n": 8,
+  "ticks": 24,
+  "steps": 3,
+  "plastic_types": [
+    "hDeltaH",
+    "hDeltaA",
+    "hDeltaI",
+    "hDeltaG"
+  ],
+  "n_plastic": 45,
+  "n_plastic_out_edges": 2832,
+  "n_PFL3": 24,
+  "fastW": {
+    "eta": 0.1,
+    "decay": 0.998,
+    "clip": 1.6,
+    "hebbFromDrive": true
+  },
+  "scene": {
+    "ticks": 24,
+    "steps": 3,
+    "evalLast": 9,
+    "left": {
+      "x": -4.2,
+      "z": 6.2
+    },
+    "right": {
+      "x": 4.2,
+      "z": 6.2
+    }
+  },
+  "plastic": {
+    "condition": "plastic",
+    "n": 8,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectB": 0.575,
+    "sdCorrectB": 0.04639803635691684,
+    "meanWrongB": 0.4333333333333333,
+    "meanDeltaB": 0.14166666666666666,
+    "meanFwB": 0.19907903040691244
+  },
+  "frozen": {
+    "condition": "frozen",
+    "n": 8,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectB": 0,
+    "sdCorrectB": 0,
+    "meanWrongB": 0.6,
+    "meanDeltaB": -0.6,
+    "meanFwB": -0.5317137636147962
+  },
+  "gapB": 0.575,
+  "frozenFailsB": true,
+  "plasticRemaps": true,
+  "pass": true,
+  "verdict": "PASS: frozen fails on context B; plastic remaps",
+  "rows": [
+    {
+      "seed": 2000,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.13333333333333333,
+      "deltaB": 0.4666666666666667,
+      "fwA": 138.12782180305476,
+      "fwB": 84.78946863934834,
+      "fwMeanB": 0.17759471005033614
+    },
+    {
+      "seed": 2000,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.12782180305476,
+      "fwB": 138.12782180305476,
+      "fwMeanB": -0.5292253708929301
+    },
+    {
+      "seed": 2001,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0,
+      "deltaB": 0.6,
+      "fwA": 138.0602622377869,
+      "fwB": 90.58594020576311,
+      "fwMeanB": 0.17771961803679134
+    },
+    {
+      "seed": 2001,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.0602622377869,
+      "fwB": 138.0602622377869,
+      "fwMeanB": -0.5289665219838579
+    },
+    {
+      "seed": 2002,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.4666666666666667,
+      "wrongB": 0.6,
+      "deltaB": -0.1333333333333333,
+      "fwA": 138.07410284876823,
+      "fwB": 74.74762482196093,
+      "fwMeanB": 0.22194839984324444
+    },
+    {
+      "seed": 2002,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.07410284876823,
+      "fwB": 138.07410284876823,
+      "fwMeanB": -0.5290195511447059
+    },
+    {
+      "seed": 2003,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.5333333333333333,
+      "wrongB": 0.6,
+      "deltaB": -0.06666666666666665,
+      "fwA": 141.5522938966751,
+      "fwB": 76.63103439845145,
+      "fwMeanB": 0.21426836522848167
+    },
+    {
+      "seed": 2003,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 141.5522938966751,
+      "fwB": 141.5522938966751,
+      "fwMeanB": -0.5423459536271077
+    },
+    {
+      "seed": 2004,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.6,
+      "deltaB": 0,
+      "fwA": 139.82741686834197,
+      "fwB": 75.74335057371718,
+      "fwMeanB": 0.2062435418232217
+    },
+    {
+      "seed": 2004,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 139.82741686834197,
+      "fwB": 139.82741686834197,
+      "fwMeanB": -0.5357372293806205
+    },
+    {
+      "seed": 2005,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.6,
+      "deltaB": 0,
+      "fwA": 138.43918092615786,
+      "fwB": 76.42179222209961,
+      "fwMeanB": 0.20278533769486648
+    },
+    {
+      "seed": 2005,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.43918092615786,
+      "fwB": 138.43918092615786,
+      "fwMeanB": -0.5304183177247427
+    },
+    {
+      "seed": 2006,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.5333333333333333,
+      "deltaB": 0.06666666666666665,
+      "fwA": 138.06745092299752,
+      "fwB": 76.8347099704115,
+      "fwMeanB": 0.1985352489567346
+    },
+    {
+      "seed": 2006,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.06745092299752,
+      "fwB": 138.06745092299752,
+      "fwMeanB": -0.528994064839071
+    },
+    {
+      "seed": 2007,
+      "condition": "plastic",
+      "correctA": 0.6,
+      "correctB": 0.6,
+      "wrongB": 0.39999999999999997,
+      "deltaB": 0.2,
+      "fwA": 138.0698089239122,
+      "fwB": 77.77186771508423,
+      "fwMeanB": 0.19353702162162312
+    },
+    {
+      "seed": 2007,
+      "condition": "frozen",
+      "correctA": 0.6,
+      "correctB": 0,
+      "wrongB": 0.6,
+      "deltaB": -0.6,
+      "fwA": 138.0698089239122,
+      "fwB": 138.0698089239122,
+      "fwMeanB": -0.5290030993253341
+    }
+  ]
+}

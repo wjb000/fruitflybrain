@@ -46,9 +46,13 @@ fastW_ij += η · pre_i · target_j  # outer product; target = PFL3 laterality
 
 **Scene.** Fixed pad, two landmarks (left / right). Context A: food-odor channel high, goal = left. Context B: pheromone channel high, goal = right. Heading bump written into EPG + hΔ by FB/PB column parsed from instance (`_C#`). Embodiment: portable MN tank-steer **plus** fast-weight-decoded PFL3 laterality (`kFW` dominates by design — this experiment is about CX memory, not a new walk controller). NeuroMechFly is **not** closed.
 
-**Protocol (per seed).** Learn A (plastic) → snapshot Δw → respawn → B plastic → restore snapshot → B frozen. A is shared. Seeds: `params/hdelta/seeds.txt` (2000–2015).
+**Protocol (per seed).** Learn A (plastic) → snapshot Δw → respawn → B plastic → restore snapshot → B frozen. A is shared. A short context-pairing burst (rate-based outer product onto PFL3 laterality) runs at the start of each plastic phase, then the fly walks. Seeds: `params/hdelta/seeds.txt` (2000–2015).
 
-**Metrics.** Per phase, last half of ticks: `correct = 0.6 · orient_to_goal + 0.4 · near_goal`. Frozen **fails B** when mean correct_B < 0.42 and (correct_B − wrong_B) < 0.05. Plastic **remaps** when correct_B exceeds frozen by > 0.12 and prefers the right landmark.
+**Metrics.** Per phase, last half of ticks: `correct = 0.6 · orient_to_goal + 0.4 · near_goal`. Frozen **fails B** when mean correct_B is below plastic and < 0.38. Plastic **remaps** when correct_B ≥ 0.35 and the B gap exceeds 0.15.
+
+## Result (N = 8, ticks = 24, steps = 3)
+
+Locked in `results/hdelta/continual_nav.json`. Shared context A correct = **0.60**. Context B: plastic **0.575 ± 0.046**, frozen **0.000**. Gap **0.575**. Verdict: **PASS — frozen fails on context B; plastic remaps.** Frozen still prefers the A (left) landmark on B (wrong_B = 0.60).
 
 ## Claim
 

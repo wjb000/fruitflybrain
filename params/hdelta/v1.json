@@ -15,9 +15,9 @@
     "stimAmp": 0.11
   },
   "fastW": {
-    "eta": 0.12,
-    "decay": 0.994,
-    "clip": 2.5,
+    "eta": 0.10,
+    "decay": 0.998,
+    "clip": 1.6,
     "hebbFromDrive": true
   },
   "drive_hz": {
@@ -28,9 +28,10 @@
     "hDeltaBump": 28
   },
   "scene": {
-    "ticks": 32,
-    "evalLast": 16,
-    "stepsPerTick": 4,
+    "ticks": 24,
+    "evalLast": 12,
+    "learnTicks": 6,
+    "stepsPerTick": 3,
     "dtBody": 0.05,
     "arenaR": 11,
     "approachR": 2.8,
@@ -40,10 +41,10 @@
     "spawn": { "x": 0, "z": 0, "heading": 0 }
   },
   "steering": {
-    "kMN": 0.28,
-    "kPFL": 0.22,
-    "kFW": 1.35,
-    "walkGain": 2.6,
-    "turnGain": 1.35
+    "kMN": 0.22,
+    "kPFL": 0.18,
+    "kFW": 1.15,
+    "walkGain": 2.45,
+    "turnGain": 1.45
   }
 }

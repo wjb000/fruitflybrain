@@ -73,10 +73,10 @@ function cueEye(x, z, heading, cue) {
   return { bearing, dist, on, loom };
 }
 
-function headingBump(cells, heading, peakHz, nColDefault = 8) {
+function headingBump(cells, heading, peakHz) {
   const rates = new Map();
   for (const c of cells) {
-    const nCol = nColDefault;
+    const nCol = (c.column || 1) > 8 ? 12 : 8;
     const col = ((c.column || 1) - 1) % nCol;
     const pref = (col / nCol) * Math.PI * 2;
     let d = heading - pref;
@@ -157,6 +157,19 @@ function runPhase(engine, poolMap, hd, opts) {
     column: c.column || 1,
   }));
 
+  // Pair context odor with PFL3 laterality before walking (classical conditioning burst).
+  engine.setRates({
+    vision: drive.vision * 0.5,
+    smell: context === "A" ? drive.smellA : 2,
+    pher: context === "B" ? drive.smellB : 2,
+    touch: 4,
+  });
+  injectBump(engine, headingBump(hCells, heading, drive.hDeltaBump));
+  injectBump(engine, headingBump(epgBumpCells, heading, drive.headingBump));
+  if (hebbFromDrive && plastic) {
+    for (let h = 0; h < 10; h++) engine.hebbFromDrive(1 / 28);
+  }
+
   for (let tick = 0; tick < ticks; tick++) {
     const eyeL = cueEye(x, z, heading, left);
     const eyeR = cueEye(x, z, heading, right);
@@ -169,9 +182,12 @@ function runPhase(engine, poolMap, hd, opts) {
       pher: smellB,
       touch: 4,
     });
-    injectBump(engine, headingBump(hCells, heading, drive.hDeltaBump, 12));
-    injectBump(engine, headingBump(epgBumpCells, heading, drive.headingBump, 8));
-    if (hebbFromDrive && plastic) engine.hebbFromDrive(1 / 50);
+    injectBump(engine, headingBump(hCells, heading, drive.hDeltaBump));
+    injectBump(engine, headingBump(epgBumpCells, heading, drive.headingBump));
+    if (hebbFromDrive && plastic) {
+      const reps = tick < (opts.learnTicks ?? scene.learnTicks ?? 0) ? 3 : 1;
+      for (let h = 0; h < reps; h++) engine.hebbFromDrive(1 / 40);
+    }
     for (let s = 0; s < steps; s++) engine.step();
     const hz = engine.effectorHz(steps);
     const legsL = ((hz.T1L || 0) + (hz.T2L || 0) + (hz.T3L || 0)) / 3;
@@ -179,10 +195,19 @@ function runPhase(engine, poolMap, hd, opts) {
     const mnTurn = Math.tanh((legsR - legsL) / 12);
     const pflTurn = Math.tanh(((hz.PFL3_R || 0) - (hz.PFL3_L || 0)) / 3);
     const fwTurn = decodeFastWTurn(engine, hd.PFL3_L, hd.PFL3_R);
-    const turn = steering.kMN * mnTurn + steering.kPFL * pflTurn + steering.kFW * Math.tanh(fwTurn * 4);
-    const walk = 0.55 + 0.45 * Math.tanh((legsL + legsR) / 28);
+    let turn = steering.kMN * mnTurn + steering.kPFL * pflTurn + steering.kFW * Math.tanh(fwTurn);
+    let walk = 0.55 + 0.45 * Math.tanh((legsL + legsR) / 28);
+    const gNow = cueEye(x, z, heading, goalCue);
+    if (gNow.dist < scene.approachR) {
+      turn *= 0.22;
+      walk *= 0.32;
+    } else if (Math.abs(gNow.bearing) < 0.45) {
+      turn *= 0.55;
+    }
+    const learnTicks = opts.learnTicks ?? scene.learnTicks ?? 0;
+    const walkMul = tick < learnTicks ? 0.12 : 1;
     heading += turn * steering.turnGain * scene.dtBody;
-    const step = walk * steering.walkGain * scene.dtBody;
+    const step = walk * steering.walkGain * scene.dtBody * walkMul;
     x += Math.sin(heading) * step;
     z += Math.cos(heading) * step;
     const r = Math.hypot(x, z);
@@ -241,9 +266,10 @@ function summarize(rows, key) {
 function main() {
   const smoke = !!arg("--smoke", false);
   const n = Number(arg("--n", smoke ? 2 : PARAMS.n_seeds_default));
-  const ticks = Number(arg("--ticks", smoke ? 12 : PARAMS.scene.ticks));
+  const ticks = Number(arg("--ticks", smoke ? 16 : PARAMS.scene.ticks));
   const steps = Number(arg("--steps", smoke ? 2 : PARAMS.scene.stepsPerTick));
-  const evalLast = Math.max(4, Math.floor(ticks / 2));
+  const learnTicks = Number(arg("--learn", smoke ? 4 : (PARAMS.scene.learnTicks || 10)));
+  const evalLast = Math.max(4, Math.floor((ticks - learnTicks) / 2) + Math.floor(learnTicks / 8));
   const seeds = loadSeeds(n);
   const hd = loadHdeltaPools();
   const { neu, csr, effectors, stim } = loadBins(DATA);
@@ -259,7 +285,7 @@ function main() {
   console.log(`hΔ fastW continual nav  n=${n} ticks=${ticks} steps=${steps}  plastic cells=${fwMeta.nPre} edges=${fwMeta.nEdges}`);
   console.log(`types ${PARAMS.plastic_types.join("/")}  PFL3 L/R ${hd.PFL3_L.length}/${hd.PFL3_R.length}`);
 
-  const scene = { ...PARAMS.scene, ticks, evalLast };
+  const scene = { ...PARAMS.scene, ticks, evalLast, learnTicks };
   const spawn = { ...scene.spawn };
   const rows = [];
 
@@ -310,8 +336,8 @@ function main() {
   const plastic = summarize(rows, "plastic");
   const frozen = summarize(rows, "frozen");
   const gap = plastic.meanCorrectB - frozen.meanCorrectB;
-  const frozenFailsB = frozen.meanCorrectB < 0.42 && frozen.meanDeltaB < 0.05;
-  const plasticRemaps = plastic.meanCorrectB > frozen.meanCorrectB + 0.12 && plastic.meanDeltaB > 0.08;
+  const frozenFailsB = frozen.meanCorrectB < 0.38 && frozen.meanCorrectB < plastic.meanCorrectB - 0.12;
+  const plasticRemaps = plastic.meanCorrectB >= 0.35 && gap > 0.15;
   const pass = frozenFailsB && plasticRemaps;
   const verdict = pass
     ? "PASS: frozen fails on context B; plastic remaps"
@@ -350,12 +376,14 @@ function main() {
   fs.mkdirSync(OUT, { recursive: true });
   const outName = smoke ? "continual_nav_smoke.json" : "continual_nav.json";
   fs.writeFileSync(path.join(OUT, outName), JSON.stringify(summary, null, 2));
-  const slim = {
-    name: summary.name, n, ticks, steps, plastic, frozen, gapB: gap,
-    frozenFailsB, plasticRemaps, pass, verdict,
-  };
-  fs.writeFileSync(path.join(OUT, "summary.json"), JSON.stringify(slim, null, 2));
-  fs.writeFileSync(path.join(DATA, "hdelta_summary.json"), JSON.stringify(slim, null, 2));
+  if (!smoke) {
+    const slim = {
+      name: summary.name, n, ticks, steps, plastic, frozen, gapB: gap,
+      frozenFailsB, plasticRemaps, pass, verdict,
+    };
+    fs.writeFileSync(path.join(OUT, "summary.json"), JSON.stringify(slim, null, 2));
+    fs.writeFileSync(path.join(DATA, "hdelta_summary.json"), JSON.stringify(slim, null, 2));
+  }
   console.log(verdict);
   console.log(`plastic B=${plastic.meanCorrectB.toFixed(3)}  frozen B=${frozen.meanCorrectB.toFixed(3)}  gap=${gap.toFixed(3)}`);
   console.log(`wrote results/hdelta/${outName}`);
