@@ -15,17 +15,18 @@ Dish (light, odor, contact, proprio)
     → LIF worker (sim.worker.js): Poisson drive + connectome synapses
       → MN / effector pool rates (Hz → soft 0–1)
         → agent.js cmd.walk/turn (+ muscle/wing/…) from bilateral leg + descending EMAs
-          → DEFAULT: portable.js steering.forward/yawRate → cube chassis (kinematic)
+          → DEFAULT: portable.js steering.forward/yawRate → droneSetpoints (quadrotor axes)
+          → ?body=cube: portable.js → cube chassis (kinematic box)
           → ?body=fly: MuJoCo plant (physics.py) OR kinematic NMF (fly.js)
 ```
 
-## Robot controller — cube chassis (Pages default)
+## Robot controller — drone chassis (Pages default)
 
-Embodiment is a box+arrow on the small pad (`web/chassis.js`). The male
-connectome, compound eye, and optional odor still run. This **is** the robot
-controller: the same `v` / `omega` a hardware driver would consume.
+Embodiment is a visual quadrotor on the small pad (`web/chassis.js` `createDroneChassis`).
+The male connectome, compound eye, stim-map, and optional odor still run. Cube
+(`?body=cube`) and fly (`?body=fly`) remain fallbacks.
 
-**Control law (connectome-only):**
+**Control law (connectome-only; stim-map → drone axes — no beacon-chase gain tweaks):**
 
 ```
 eye L/R salience (beacon)
@@ -34,22 +35,27 @@ eye L/R salience (beacon)
       → descending + leg MN EMAs
         → cmd.walk / cmd.turn
           → portableControls → steering.forward / yawRate
-            → chassisSetpoints → { v, omega }
-              → cube integrate (or your robot base)
+            → droneSetpoints → { pitch, yaw, strafe, throttle }
+              → stepDroneChassis (or your quadrotor)
 ```
 
-1. `cmd.walk` / `cmd.turn` from neuromere MN EMAs (`T1L…T3R`) + `DNa` (walk)
-   in `agent.js` — same as fly mode UI labels. **No** bearing-to-food thruster.
-2. `portableControls()` → `steering.forward` / `steering.yawRate` (+ vision
-   salience diagnostics for HUD / logging).
-3. `chassisSetpoints()` scales to `v` / `omega` (readability / hardware gains;
-   cube uses lower `vGain`, higher `yawGain` so MN L/R yaw is visible).
-4. Portable steering **gates forward by `|yawRate|`** (turn-then-approach) and
-   amplifies MN-derived turn — still no bearing-to-food thruster.
-5. `EmbodiedFly.stepCubeChassis`: integrate heading and XY with soft rim;
-   **no** MuJoCo, **no** nmf mesh FK, **no** free-joint thrusters.
+| MN / portable signal | Drone axis |
+|---|---|
+| `cmd.walk` / DNa / T1–T3 → `steering.forward` | pitch (+ forward `v`) |
+| `cmd.turn` (T1L vs T1R) → `steering.yawRate` | yaw |
+| T2L / T2R (+ mild vision Δ) → `steering.strafe` | lateral |
+| DLM / DVM / ADMN + DNa → `steering.climb` | climb; hover throttle **~1.45** |
 
-Restore fly body: `?body=fly`. Cache-bust: `?v=stimmap1`.
+1. `cmd.walk` / `cmd.turn` from neuromere MN EMAs (`T1L…T3R`) + `DNa` (walk)
+   in `agent.js` — same as fly/cube UI labels. **No** bearing-to-food thruster.
+2. `portableControls()` → `steering.forward` / `steering.yawRate` (unchanged
+   cube/robot mapping) plus drone extras `strafe` / `climb`.
+3. `droneSetpoints()` maps those to quadrotor axes. Cube still uses
+   `chassisSetpoints()` with the same `vGain` / `yawGain` as before.
+4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
+   visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
+
+Restore cube: `?body=cube`. Restore fly body: `?body=fly`. Cache-bust: `?v=drone1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick; silence
@@ -63,7 +69,7 @@ preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 
 ## Stim-map mode (causal motor mapping)
 
-Open the sim (cube default) or `?stim=1` / `?map=1` (HUD link always). Hold or toggle a named pool button (e.g. **T1L**, **T1R**, **DNa**, **HS**, **visionL/R**). That **Hz-injects** those neuron IDs on the LIF worker (optional lesion **boost** gain), so they spike → synapses / effector readout → `cmd.walk`/`cmd.turn` → portable `forward`/`yawRate` → cube. Live HUD shows forward, yawRate, and a left/right hint; **pulse all** fills a small table of peak fwd vs yaw. This is causal stim mapping — not closed-loop beacon-chase gain tweaks. Do not bypass with direct chassis velocity from the button.
+Open the sim (drone default) or `?stim=1` / `?map=1` (HUD link always). Hold or toggle a named pool button (e.g. **T1L**, **T1R**, **DNa**, **HS**, **visionL/R**). That **Hz-injects** those neuron IDs on the LIF worker (optional lesion **boost** gain), so they spike → synapses / effector readout → `cmd.walk`/`cmd.turn` → portable `forward`/`yawRate` → **drone axes** (pitch/yaw/throttle). Live HUD shows throttle, yaw, pitch; **pulse all** fills a small table of peak fwd vs yaw. This is causal stim mapping — not closed-loop beacon-chase gain tweaks. Do not bypass with direct chassis velocity from the button.
 
 ## Sensory channels → neuron pools
 

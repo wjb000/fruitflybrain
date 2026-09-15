@@ -1,10 +1,10 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is a **robot controller**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → `{v, ω}` **cube chassis** (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=fly` to restore the NeuroMechFly / MuJoCo path. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is a **robot controller**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → **quadrotor axes** (`pitch` / `yaw` / `strafe` / `throttle`, hover ~1.45) on a visual drone chassis (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=cube` for the box plant or `?body=fly` to restore NeuroMechFly / MuJoCo. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
 
-Honest MN→body coupling: cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
+Honest MN→body coupling: drone/cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
-**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` / `yawRate` → `v` / `omega`). Hard-refresh with `?v=stimmap1`. **Stim map** (default on cube, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch cube fwd/yaw — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
+**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` → pitch, `yawRate` → yaw; T2 strafe; wing MNs climb). Hard-refresh with `?v=drone1`. **Stim map** (default on drone, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch drone pitch/yaw/throttle — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -50,11 +50,11 @@ Closed loop:
 1. Light and odor from procedural landmarks drive the real sensory neurons.
 2. Spikes propagate through the connectome (LIF + short-term depression, fast EPSP vs slow neuromod).
 3. Descending + VNC **motor neurons** produce portable chassis commands (`forward`, `yawRate`).
-4. **Default (Pages):** a simple **cube chassis** translates/yaws from those commands on the small pad. **`?body=fly`:** NeuroMechFly mesh + MuJoCo (local/remote plant) or kinematic MN→pose→stance-slip.
+4. **Default (Pages):** a visual **quadrotor** maps those commands to pitch / yaw / strafe / throttle (hover ~1.45) on the small pad. **`?body=cube`:** box plant. **`?body=fly`:** NeuroMechFly mesh + MuJoCo (local/remote plant) or kinematic MN→pose→stance-slip.
 
 **x-ray CNS** shows the reconstructed brain (inside the cube or cuticle). Stim buttons bias sensory channels — motion still only emerges if MNs fire.
 
-See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actuator map, cube steering math, and annotation gaps.
+See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actuator map, drone/cube steering math, and annotation gaps.
 
 ## Lesion assay + robot controller
 
@@ -64,6 +64,7 @@ Virtual surgeries on the LIF connectome (silence / boost / cut / swap L/R / dela
 // In the browser console after load:
 ffbPortable.snapshot(); // vision + MN steering
 ffbPortable.stub();     // { v, omega } for a robot driver
+ffbPortable.drone();    // { pitch, yaw, strafe, throttle } quadrotor
 ffbPortable.howto;      // control-law text
 ```
 

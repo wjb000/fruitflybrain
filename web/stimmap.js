@@ -1,24 +1,24 @@
 /**
- * Stim-map mode — causal pool activation → chassis forward/yaw.
+ * Stim-map mode — causal pool activation → chassis forward/yaw (drone axes default).
  *
  * Path stays honest: button → Hz inject (and optional lesion boost) on named
- * pools → LIF spikes → MN / descending effectors → portable steering → cube.
- * Never calls cube.setVelocity / thrusters from the UI.
+ * pools → LIF spikes → MN / descending effectors → portable steering → drone.
+ * Never calls chassis.setVelocity / thrusters from the UI.
  *
- * Enable: default on cube, or ?stim=1 / ?map=1. Disable: ?stim=0.
+ * Enable: default on drone/cube, or ?stim=1 / ?map=1. Disable: ?stim=0.
  */
 
-import { portableControls, chassisSetpoints } from "./controller/portable.js?v=stimmap1";
-import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=stimmap1";
+import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=drone1";
+import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=drone1";
 
-export function stimMapWanted(bodyMode = "cube") {
+export function stimMapWanted(bodyMode = "drone") {
   try {
     const q = new URLSearchParams(location.search);
     if (q.get("stim") === "0" || q.get("map") === "0") return false;
     if (q.get("stim") === "1" || q.get("map") === "1") return true;
-    return bodyMode === "cube";
+    return bodyMode === "drone" || bodyMode === "cube";
   } catch {
-    return bodyMode === "cube";
+    return bodyMode === "drone" || bodyMode === "cube";
   }
 }
 
@@ -30,7 +30,7 @@ export function stimMapUrl(on = true) {
   } else {
     u.searchParams.set("stim", "0");
   }
-  u.searchParams.set("v", "stimmap1");
+  u.searchParams.set("v", "drone1");
   return u.pathname + u.search + u.hash;
 }
 
@@ -45,10 +45,12 @@ export function mountStimMapPanel({ getFly, root } = {}) {
     <button class="collapse" type="button" title="collapse">–</button>
     <div class="kicker">stim map · causal</div>
     <div class="panel-body">
-      <div class="hint">Boost named pools (Hz inject through LIF). Watch chassis <b>fwd</b> / <b>yaw</b>. T1L vs T1R should yaw opposite. Path: stim → spikes → MNs → portable → cube.</div>
+      <div class="hint">Boost named pools (Hz inject through LIF). Watch chassis <b>pitch</b> / <b>yaw</b> / <b>throttle</b>. T1L vs T1R should yaw opposite. Path: stim → spikes → MNs → portable → drone axes.</div>
       <div class="stim-readouts" id="stimReadouts">
         <div><b id="stimFwd">—</b><span>forward</span></div>
         <div><b id="stimYaw">—</b><span>yawRate</span></div>
+        <div><b id="stimPitch">—</b><span>pitch</span></div>
+        <div><b id="stimThr">—</b><span>throttle</span></div>
         <div><b id="stimTurn">—</b><span>turn hint</span></div>
         <div><b id="stimActive">off</b><span>active</span></div>
       </div>
@@ -159,7 +161,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
     active = pool;
     setBtnOn(pool, true);
     const g = boostG();
-    log(`inject ${pool} @ ${hz()} Hz${g > 1.01 ? ` · boost×${g}` : ""} → LIF → MNs → cube`);
+    log(`inject ${pool} @ ${hz()} Hz${g > 1.01 ? ` · boost×${g}` : ""} → LIF → MNs → drone`);
   }
 
   for (const pool of STIM_MAP_POOLS) {
@@ -236,10 +238,15 @@ export function mountStimMapPanel({ getFly, root } = {}) {
 
   function sampleChassis(f) {
     const snap = portableControls(f);
-    const set = chassisSetpoints(snap, { vGain: 2.35, yawGain: 9.4 });
+    const mode = f?.bodyMode || "drone";
+    const set = mode === "drone"
+      ? droneSetpoints(snap)
+      : chassisSetpoints(snap, { vGain: 2.35, yawGain: 9.4 });
     return {
       forward: snap.steering?.forward ?? 0,
       yawRate: snap.steering?.yawRate ?? 0,
+      pitch: set.pitch ?? 0,
+      throttle: set.throttle ?? 0,
       v: set.v ?? 0,
       omega: set.omega ?? 0,
     };
@@ -300,10 +307,14 @@ export function mountStimMapPanel({ getFly, root } = {}) {
     const s = sampleChassis(f);
     const fwd = el.querySelector("#stimFwd");
     const yaw = el.querySelector("#stimYaw");
+    const pitch = el.querySelector("#stimPitch");
+    const thr = el.querySelector("#stimThr");
     const turn = el.querySelector("#stimTurn");
     const act = el.querySelector("#stimActive");
     if (fwd) fwd.textContent = s.forward.toFixed(2);
     if (yaw) yaw.textContent = s.yawRate.toFixed(2);
+    if (pitch) pitch.textContent = s.pitch.toFixed(2);
+    if (thr) thr.textContent = s.throttle.toFixed(2);
     if (turn) {
       const ay = Math.abs(s.yawRate);
       turn.textContent = ay < 0.06 ? "—" : s.yawRate > 0 ? "RIGHT" : "LEFT";
@@ -314,7 +325,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
       const hint = ay < 0.06 ? (s.forward > 0.08 ? "forward" : "quiet") : s.yawRate > 0 ? "yaw RIGHT" : "yaw LEFT";
       // keep log fresh but don't thrash during pulse-all
       if (!pulsing && logEl && !logEl.textContent.startsWith("pulse")) {
-        logEl.textContent = `${active} → fwd ${s.forward.toFixed(2)} · yaw ${s.yawRate.toFixed(2)} (${hint})`;
+        logEl.textContent = `${active} → fwd ${s.forward.toFixed(2)} · yaw ${s.yawRate.toFixed(2)} · pitch ${s.pitch.toFixed(2)} · thr ${s.throttle.toFixed(2)} (${hint})`;
       }
     }
   }

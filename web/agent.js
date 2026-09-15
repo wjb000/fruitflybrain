@@ -1,9 +1,10 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=stimmap1";
-import { CompoundEye } from "./eye.js?v=stimmap1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=stimmap1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=stimmap1";
-import { portableControls, stubRobotDriver, chassisSetpoints } from "./controller/portable.js?v=stimmap1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=drone1";
+import { CompoundEye } from "./eye.js?v=drone1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=drone1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=drone1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=drone1";
+import { spinRotors } from "./chassis.js?v=drone1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -174,12 +175,21 @@ function bodyModeFromUrl() {
   try {
     const q = new URLSearchParams(location.search).get("body");
     if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
-    return "cube";
+    if (q === "cube" || q === "box") return "cube";
+    return "drone";
   } catch (_) {
-    return "cube";
+    return "drone";
   }
 }
-export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "cube";
+export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "drone";
+function isKinematicChassis(mode) {
+  return mode === "drone" || mode === "cube";
+}
+function plantLabelFor(mode) {
+  if (mode === "drone") return "drone chassis";
+  if (mode === "cube") return "cube chassis";
+  return "fly";
+}
 const READOUT_POOLS = [
   // Optic / descending readouts for assay + portable controller (not muscles).
   "HS", "VS", "R16", "L1", "L2", "L3",
@@ -201,10 +211,10 @@ export class EmbodiedFly {
   }) {
     this.sex = "male"; // public sim: male CNS only
     this.body = body;
-    // Default cube chassis; ?body=fly restores NeuroMechFly / MuJoCo path.
-    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "cube";
-    this.plantLabel = this.bodyMode === "cube" ? "cube chassis" : "fly";
-    this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0 };
+    // Default drone chassis; ?body=cube keeps box; ?body=fly restores NMF / MuJoCo.
+    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "drone";
+    this.plantLabel = plantLabelFor(this.bodyMode);
+    this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0, pitch: 0, throttle: 1.45 };
     this.onReady = onReady;
     this.onFrame = onFrame;
     this.heading = yaw != null ? yaw : Math.random() * Math.PI * 2;
@@ -263,7 +273,7 @@ export class EmbodiedFly {
     this.physId = `${sex}-${Math.random().toString(36).slice(2, 8)}`;
     this.mjPose = null;
     this._ensurePlant = () => {
-      if (this.bodyMode === "cube") return; // cube chassis: no MuJoCo plant
+      if (isKinematicChassis(this.bodyMode)) return; // drone/cube: no MuJoCo plant
       if (!physics.ok) return;
       spawnPhysics(this.physId, this.body.position.x, this.body.position.z, this.heading).then((pose) => {
         if (!pose) return;
@@ -277,7 +287,7 @@ export class EmbodiedFly {
     };
     this._ensurePlant();
     this._onPhysicsResume = () => this._ensurePlant();
-    if (typeof window !== "undefined" && this.bodyMode !== "cube") {
+    if (typeof window !== "undefined" && !isKinematicChassis(this.bodyMode)) {
       window.addEventListener("ffb-physics-resume", this._onPhysicsResume);
     }
     this.lastOdor = { foodL: 0, foodR: 0, pherL: 0, pherR: 0 };
@@ -540,7 +550,7 @@ export class EmbodiedFly {
     this.body.rotation.set(0, this.heading, 0);
     this.life.hunger = 0.7;
     this.life.crop = 0.2; this.life.energy = 1; this.life.sleep = 0.1;
-    if (physics.ok && this.bodyMode !== "cube") {
+    if (physics.ok && !isKinematicChassis(this.bodyMode)) {
       resetPhysics(this.physId, x, z, this.heading).then((pose) => {
         if (pose) this.mjPose = pose;
       }).catch(() => {});
@@ -679,9 +689,12 @@ export class EmbodiedFly {
     this.clock = m.t * 0.001;
     this.body.userData.perch = this.world.perch;
 
-    if (this.bodyMode === "cube") {
-      // Cube chassis: MN/descending → portable steering → kinematic translate/yaw.
+    if (this.bodyMode === "drone") {
+      // Drone chassis: MN/descending → portable forward/yaw → quadrotor pitch/yaw/strafe/climb.
       // No MuJoCo, no nmf mesh posing, no thrusters that bypass the brain.
+      this.stepDroneChassis(dt);
+    } else if (this.bodyMode === "cube") {
+      // Cube chassis: MN/descending → portable steering → kinematic translate/yaw.
       this.stepCubeChassis(dt);
     } else if (physics.ok) {
       // Brain fires motor neurons only. MuJoCo is the flesh.
@@ -780,6 +793,71 @@ export class EmbodiedFly {
       this.hzMean = w ? s / w : 0;
     }
     if (this.onFrame) this.onFrame(this);
+  }
+
+  /**
+   * Kinematic quadrotor from portable MN steering (stim-map → drone axes).
+   * forward→pitch, yawRate→yaw (T1L vs T1R), T2 strafe, wing MNs climb.
+   * Hover throttle baseline ~1.45. Does not change cube/beacon-chase gains.
+   */
+  stepDroneChassis(dt) {
+    const snap = portableControls(this);
+    const drive = droneSetpoints(snap);
+    const forward = drive.forward || 0;
+    const yawRate = drive.yawRate || 0;
+    const v = drive.v || 0;
+    const omega = drive.omega || 0;
+    const pitch = drive.pitch || 0;
+    const strafe = drive.strafe || 0;
+    const vx = drive.vx ?? drive.strafeV ?? 0;
+    const climb = drive.climb || 0;
+    const vyCmd = drive.vy ?? 0;
+    const throttle = drive.throttle ?? 1.45;
+    const hoverZ = this.body.userData.hoverZ ?? drive.hoverZ ?? 1.45;
+    const sal = this.lastVisionSal || this.eye?.lastSummary || {};
+    this.lastSteering = {
+      forward, yawRate, v, omega, pitch, strafe, vx, vy: vyCmd, climb, throttle,
+      salTarget: sal.salTarget ?? 0,
+      asymFood: sal.asymFood ?? 0,
+    };
+    this.heading += omega * dt;
+    const sh = Math.sin(this.heading);
+    const ch = Math.cos(this.heading);
+    // Body +Z forward, +X right (same as cube/fly). T2→vx strafe; wings→vy climb.
+    this.body.position.x += (sh * v + ch * vx) * dt;
+    this.body.position.z += (ch * v - sh * vx) * dt;
+    this.vy = this.vy * 0.82 + vyCmd * 0.18;
+    this.y += this.vy * dt;
+    this.y += (hoverZ - this.y) * Math.min(1, 2.4 * dt);
+    const yMin = 0.38;
+    const yMax = 6.5;
+    if (this.y < yMin) { this.y = yMin; this.vy = Math.max(0, this.vy); }
+    if (this.y > yMax) { this.y = yMax; this.vy = Math.min(0, this.vy); }
+    if (OPEN_WORLD) {
+      const rad = Math.hypot(this.body.position.x, this.body.position.z);
+      if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
+        const s = (WORLD_SOFT_LIMIT - 0.6) / rad;
+        this.body.position.x *= s;
+        this.body.position.z *= s;
+        const nx = this.body.position.x / Math.max(1e-6, Math.hypot(this.body.position.x, this.body.position.z));
+        const nz = this.body.position.z / Math.max(1e-6, Math.hypot(this.body.position.x, this.body.position.z));
+        const inward = Math.atan2(-nx, -nz);
+        this.heading = this.heading * 0.7 + inward * 0.3;
+      }
+    }
+    this.body.position.y = this.y;
+    this.body.rotation.order = "YXZ";
+    this.body.rotation.y = this.heading;
+    this.body.rotation.x = -pitch; // nose-down when forward command > 0
+    this.body.rotation.z = THREE.MathUtils.clamp(-strafe * 0.45, -0.55, 0.55);
+    spinRotors(this.body, dt, throttle);
+    this.speedS = this.speedS * 0.25 + Math.min(1.4, Math.abs(v) / 2.5) * 0.75;
+    this.plantLabel = "drone chassis";
+    this.planted = true;
+    this.plantNLeg = 0;
+    this.onPerch = false;
+    this.lastSlipAbs = Math.hypot(v, vx) * dt;
+    this.slipMeanAbs = (this.slipMeanAbs || 0) * 0.88 + Math.hypot(v, vx) * 0.12;
   }
 
   /**

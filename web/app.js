@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=stimmap1";
-import { createCubeChassis, bodyModeFromUrl } from "./chassis.js?v=stimmap1";
-import { createOpenWorld } from "./world/procgen.js?v=stimmap1";
-import { EmbodiedFly } from "./agent.js?v=stimmap1";
-import { drawOmmatidia } from "./eye.js?v=stimmap1";
-import { OdorWorld } from "./plume.js?v=stimmap1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=stimmap1";
-import { parseLesionFlag } from "./lesion.js?v=stimmap1";
-import { mountAssayPanel } from "./assay/panel.js?v=stimmap1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=stimmap1";
-import { portableControls, stubRobotDriver, chassisSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=stimmap1";
+import { loadNmf, createMaleFly } from "./fly.js?v=drone1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=drone1";
+import { createOpenWorld } from "./world/procgen.js?v=drone1";
+import { EmbodiedFly } from "./agent.js?v=drone1";
+import { drawOmmatidia } from "./eye.js?v=drone1";
+import { OdorWorld } from "./plume.js?v=drone1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=drone1";
+import { parseLesionFlag } from "./lesion.js?v=drone1";
+import { mountAssayPanel } from "./assay/panel.js?v=drone1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=drone1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=drone1";
 
-const BODY_MODE = bodyModeFromUrl(); // default "cube"; ?body=fly for NeuroMechFly
+const BODY_MODE = bodyModeFromUrl(); // default "drone"; ?body=cube|fly fallbacks
 
 /** Local flight URL gate for HUD — do not import FLIGHT_ENABLED (stale module cache). Default OFF. */
 function flightEnabled() {
@@ -171,7 +171,11 @@ function spawn(sex, x, z, yaw) {
     x = s.x; z = s.z; if (yaw == null) yaw = s.yaw;
   }
   if (yaw == null) yaw = Math.random() * Math.PI * 2;
-  const body = BODY_MODE === "fly" ? createMaleFly() : createCubeChassis();
+  const body = BODY_MODE === "fly"
+    ? createMaleFly()
+    : BODY_MODE === "cube"
+      ? createCubeChassis()
+      : createDroneChassis();
   const fly = new EmbodiedFly({
     sex,
     body,
@@ -256,13 +260,13 @@ if (BODY_MODE === "fly") {
     try { await clearPhysics(); } catch (_) {}
   }
 } else {
-  setLoad(0.88, "cube chassis");
+  setLoad(0.88, BODY_MODE === "cube" ? "cube chassis" : "drone chassis");
   setLoad(0.92, "brain → robot controller");
-  // Cube mode: no MuJoCo plant, no nmf mesh load (avoids seize).
+  // Drone/cube: no MuJoCo plant, no nmf mesh load (avoids seize).
 }
 if ($("flesh")) {
-  if (BODY_MODE === "cube") {
-    $("flesh").textContent = "cube chassis";
+  if (isKinematicChassis(BODY_MODE)) {
+    $("flesh").textContent = BODY_MODE === "cube" ? "cube chassis" : "drone chassis";
   } else {
     const origin = physics.plantOrigin || "";
     $("flesh").textContent = physics.ok
@@ -271,8 +275,10 @@ if ($("flesh")) {
   }
 }
 if ($("info")) {
-  if (BODY_MODE === "cube") {
-    $("info").textContent = "Robot controller (cube default): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → {v,ω} cube on small pad. No food-bearing thruster; no MuJoCo/nmf (?body=fly to restore). See web/controller/portable.js.";
+  if (BODY_MODE === "drone") {
+    $("info").textContent = "Robot controller (drone default): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → quadrotor pitch/yaw/strafe/throttle (hover ~1.45). Stim-map → drone axes only. ?body=cube|fly fallbacks. See web/controller/portable.js.";
+  } else if (BODY_MODE === "cube") {
+    $("info").textContent = "Robot controller (cube): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → {v,ω} cube on small pad. No food-bearing thruster; no MuJoCo/nmf (?body=fly to restore). See web/controller/portable.js.";
   } else {
     const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
       ? (" Plant @ " + physics.plantOrigin + ".")
@@ -356,8 +362,9 @@ function onAny() {
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;
   if ($("hunger")) $("hunger").textContent = Math.round(focus.life.hunger * 100) + "%";
   if ($("selName")) $("selName").textContent = focus.name;
-  const flesh = (focus.bodyMode === "cube" || BODY_MODE === "cube")
-    ? "cube chassis"
+  const kinMode = focus.bodyMode || BODY_MODE;
+  const flesh = isKinematicChassis(kinMode)
+    ? (kinMode === "cube" ? "cube chassis" : "drone chassis")
     : (physics.ok
       ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
       : "kinematic MN");
@@ -365,22 +372,37 @@ function onAny() {
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
-  const steer = focus.lastSteering || chassisSetpoints(portableControls(focus));
+  const steer = focus.lastSteering || (kinMode === "drone"
+    ? droneSetpoints(portableControls(focus))
+    : chassisSetpoints(portableControls(focus)));
   if ($("steerHint")) {
     const salT = steer.salTarget ?? focus.lastVisionSal?.salTarget ?? focus.eye?.lastSummary?.salTarget ?? 0;
     const asym = steer.asymFood ?? focus.lastVisionSal?.asymFood ?? focus.eye?.lastSummary?.asymFood ?? 0;
-    $("steerHint").textContent =
-      "fwd " + (steer.forward ?? 0).toFixed(2) +
-      "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
-      "  | v=" + (steer.v ?? 0).toFixed(2) +
-      " ω=" + (steer.omega ?? 0).toFixed(2) +
-      "  sal " + Number(salT).toFixed(2) +
-      " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+    if (kinMode === "drone") {
+      $("steerHint").textContent =
+        "thr " + (steer.throttle ?? 1.45).toFixed(2) +
+        "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
+        "  pitch " + (steer.pitch ?? 0).toFixed(2) +
+        "  | v=" + (steer.v ?? 0).toFixed(2) +
+        " ω=" + (steer.omega ?? 0).toFixed(2) +
+        "  sal " + Number(salT).toFixed(2) +
+        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+    } else {
+      $("steerHint").textContent =
+        "fwd " + (steer.forward ?? 0).toFixed(2) +
+        "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
+        "  | v=" + (steer.v ?? 0).toFixed(2) +
+        " ω=" + (steer.omega ?? 0).toFixed(2) +
+        "  sal " + Number(salT).toFixed(2) +
+        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+    }
   }
   if ($("lifeHint")) {
     const ps = procWorld.stats();
     let plantBit;
-    if (focus.bodyMode === "cube" || BODY_MODE === "cube") {
+    if (kinMode === "drone") {
+      plantBit = "plant=drone · MN→pitch/yaw/strafe/thr";
+    } else if (kinMode === "cube") {
       plantBit = "plant=cube · robot controller MN→v/ω";
     } else {
       const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
@@ -390,7 +412,9 @@ function onAny() {
         : ("|slip|=" + Number(slip).toFixed(3));
     }
     $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs +
-      " · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2) +
+      (kinMode === "drone"
+        ? (" · steer thr=" + (steer.throttle ?? 1.45).toFixed(2) + " yaw=" + (steer.yawRate ?? 0).toFixed(2) + " pitch=" + (steer.pitch ?? 0).toFixed(2))
+        : (" · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2))) +
       " · " + flies.map((f) => f.name + " " + f.life.mode).join(" · ");
   }
   const e = focus.motEma || {};
@@ -786,7 +810,7 @@ function loop() {
   controls.update();
   renderer.render(scene, camera);
 }
-// --- Stim-map mode (causal pool → chassis; default on cube, ?stim=1 / ?map=1) ---
+// --- Stim-map mode (causal pool → drone axes; default on drone/cube, ?stim=1 / ?map=1) ---
 const wantStimMap = stimMapWanted(BODY_MODE);
 let stimMapPanel = null;
 {
@@ -810,7 +834,7 @@ let stimMapPanel = null;
     a.href = stimMapUrl(true);
     a.textContent = "open stim map";
     a.className = "stim-map-link";
-    a.title = "Causal stim → LIF → MNs → cube (not beacon-chase tuning)";
+    a.title = "Causal stim → LIF → MNs → drone axes (not beacon-chase tuning)";
     linkRow.appendChild(a);
     if (panelL) panelL.appendChild(linkRow);
   }
@@ -855,6 +879,10 @@ window.ffbPortable = {
   chassis: () => {
     const f = selected || flies[0];
     return f ? chassisSetpoints(portableControls(f)) : null;
+  },
+  drone: () => {
+    const f = selected || flies[0];
+    return f ? droneSetpoints(portableControls(f)) : null;
   },
   howto: ROBOT_HOWTO,
   signals: PORTABLE_SIGNAL_DOC,
