@@ -1,0 +1,33 @@
+{
+  "male_n": 165122,
+  "female_prepared_n": 139458,
+  "banc_meta_rows": 188508,
+  "malecns_match_nonnull": 23608,
+  "malecns_match_nonnull_live": 23608,
+  "malecns_match_prepared_rows": 23106,
+  "malecns_match_in_traced_rows": 23106,
+  "malecns_match_unique_male_bodies": 17105,
+  "type_overlap_male_type_vs_malecns_cell_type_or_cell_type": 7572,
+  "male_unique_types": 11751,
+  "dimorphism_set": [
+    "male-specific",
+    "potentially male-specific",
+    "potentially sexually dimorphic",
+    "sexually dimorphic"
+  ],
+  "dimorphism_counts": {
+    "": 162754,
+    "male-specific": 1258,
+    "sexually dimorphic": 771,
+    "potentially sexually dimorphic": 177,
+    "potentially male-specific": 162
+  },
+  "sex_touched_n": 2368,
+  "sex_touched_type_not_in_banc": 2006,
+  "matching_rules": [
+    "BANC malecns_match \u2192 male bodyId",
+    "BANC malecns_cell_type \u2194 male type (also male type \u2194 BANC cell_type)",
+    "dimorphism \u2208 {male-specific, sexually dimorphic, potentially*}"
+  ],
+  "note": "1:1 morphology partners are incomplete (17105 unique traced bodies with malecns_match). Unmatched male-specific types are ablated in the compressed female-swap, not invented."
+}

@@ -2,6 +2,17 @@
 
 The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is a **robot controller**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → **quadrotor axes** (`pitch` / `yaw` / `strafe` / `throttle`, hover ~1.45) on a visual drone chassis (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=cube` for the box plant or `?body=fly` to restore NeuroMechFly / MuJoCo. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
 
+## Sex-swap digital twin (CVA-SST)
+
+Closed-loop **Courtship-vs-Aggression Sex-Swap Twin**: entire male CNS graph, NT-aware LIF, portable MN chassis, compressed sex-specific wiring edits, CI vs AI in one scene. Paper-style methods, claim, and honest failures: **[`docs/SEX_SWAP_TWIN.md`](docs/SEX_SWAP_TWIN.md)**.
+
+```bash
+python3 tools/sex_swap/verify_counts.py      # feathers + MCSR header → results/sex_swap/counts.json
+python3 tools/sex_swap/build_isomorphism.py  # malecns_match / type map
+python3 tools/sex_swap/build_sex_swap_graph.py
+node tools/sex_swap/run_cva_assay.mjs --smoke
+```
+
 Honest MN→body coupling: drone/cube velocity comes **only** from MN-derived portable steering (gains for readability). Quiet pools → quiet chassis. No thrusters that bypass the brain (no “point at food” cheat). Optional fly mode keeps MN→pose→stance-slip / MuJoCo contact with the same rule.
 
 **Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` → pitch, `yawRate` → yaw; T2 strafe; wing MNs climb). Hard-refresh with `?v=drone1`. **Stim map** (default on drone, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch drone pitch/yaw/throttle — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).

@@ -1,0 +1,93 @@
+{
+  "name": "CVA-SST",
+  "version": "v1",
+  "claim": "Sex-specific/dimorphic wiring alone (isomorphic weights, body, sensors fixed) is necessary and sufficient to flip closed-loop courtship vs aggression preference under matched scenes; isomorphic-only and shuffled sex-edges do not flip.",
+  "falsifier": "Intersectional silence of the twin-minimal sex-specific set (P1/aIPg/mAL/TN1/vPR6/pIP1 contributors) abolishes the predicted flip; restoring those nodes' output should restore it. If a specific DN\u2192VNC MN weight change is implicated (pIP1/pIP10 \u2192 wing MN), test with intersectional silencing of that DN type.",
+  "graph_seed": 20260915,
+  "n_seeds_default": 16,
+  "seeds_file": "params/sex_swap_seeds.txt",
+  "embodiment": "portable MN\u2192{v, omega} cube chassis (web/controller/portable.js). NeuroMechFly plant is not closed in this experiment.",
+  "lif": {
+    "dt": 0.5,
+    "wScale": 0.012,
+    "inhibGain": 2.15,
+    "stimAmp": 0.11
+  },
+  "drive_hz": {
+    "vision": 32,
+    "smell": 28,
+    "courtship": 24,
+    "touch": 20
+  },
+  "scene": {
+    "ticks": 24,
+    "stepsPerTick": 4,
+    "dtBody": 0.05,
+    "arenaR": 11,
+    "femaleCue": {
+      "x": -2.4,
+      "z": 6.0
+    },
+    "maleCue": {
+      "x": 2.4,
+      "z": 6.0
+    },
+    "spawn": {
+      "x": 0,
+      "z": 0,
+      "heading": 0
+    }
+  },
+  "pools": {
+    "courtship": [
+      "P1a",
+      "P1b",
+      "pC1",
+      "TN1",
+      "vPR6",
+      "pIP1",
+      "mAL_m1",
+      "mAL_m8",
+      "aSP10"
+    ],
+    "aggression": [
+      "aIPg1",
+      "aIPg2",
+      "aIPg3",
+      "aIPg4",
+      "aIPg5",
+      "aIPg6",
+      "aIPg7"
+    ],
+    "counts": {
+      "P1a": 0,
+      "P1b": 0,
+      "pC1": 156,
+      "TN1": 35,
+      "vPR6": 8,
+      "pIP1": 2,
+      "pIP10": 2,
+      "mAL_m1": 12,
+      "mAL_m8": 16,
+      "aSP10": 42,
+      "aIPg": 56,
+      "aIPg1": 8,
+      "aIPg2": 6,
+      "aIPg3": 0,
+      "aIPg4": 2,
+      "aIPg5": 6,
+      "aIPg6": 5,
+      "aIPg7": 7,
+      "fru_high": 2611,
+      "courtship_core": 271,
+      "aggression_core": 56
+    }
+  },
+  "controllers": [
+    "male",
+    "iso_only",
+    "female_swap",
+    "shuffle_sex"
+  ],
+  "compressed_swap": true
+}

@@ -1,0 +1,181 @@
+{
+  "experiment": "Courtship-vs-Aggression Sex-Swap Twin (CVA-SST)",
+  "verified": {
+    "male_prepared": {
+      "n": 165122,
+      "nEdges": 6235682,
+      "minWeight": 5
+    },
+    "female_prepared": {
+      "n": 139458,
+      "nEdges": 3372365,
+      "minWeight": 3
+    },
+    "male_annotations_feather": {
+      "rows": 211577,
+      "Traced": 165122
+    },
+    "banc_meta": {
+      "rows": 188508,
+      "malecns_match_nonnull": 23608
+    },
+    "neck": {
+      "descending_neuron": 1314,
+      "ascending_neuron": 1846,
+      "prepared_groups_descending": 1326,
+      "prepared_groups_ascending": 2393,
+      "same_CSR_has": "optic + central brain + VNC (intact neck connective)"
+    },
+    "dimorphic_in_graph": {
+      "neurons": 2368,
+      "out_edges": 176325
+    },
+    "urls": {
+      "neuprint_dataset": "male-cns:v1.0",
+      "neuprint": "https://neuprint.janelia.org",
+      "male_https": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/",
+      "male_files": [
+        "body-annotations-male-cns-v1.0-minconf-0.5.feather",
+        "body-neurotransmitters-male-cns-v1.0.feather",
+        "connectome-weights-male-cns-v1.0-minconf-0.5.feather"
+      ],
+      "banc_https": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/",
+      "banc_files": [
+        "banc_888_meta.feather",
+        "banc_888_edgelist_simple_v2.feather"
+      ],
+      "dataverse": "10.7910/DVN/7WTH1N"
+    }
+  },
+  "live": {
+    "male_annotations_rows": 211577,
+    "male_traced": 165122,
+    "descending_neuron": 1314,
+    "ascending_neuron": 1846,
+    "banc_meta_rows": 188508,
+    "banc_malecns_match_nonnull": 23608,
+    "banc_prepared_filter_n": 139458,
+    "male_meta_n": 165122,
+    "male_meta_nEdges": 6235682,
+    "male_mcsr": {
+      "path": "web/data/connectome.bin",
+      "magic": "MCSR",
+      "n": 165122,
+      "nnz": 6235682,
+      "bytes": 38074596
+    },
+    "female_meta_n": 139458,
+    "female_meta_nEdges": 3372365,
+    "female_mcsr": {
+      "path": "web/data/female/connectome.bin",
+      "magic": "MCSR",
+      "n": 139458,
+      "nnz": 3372365,
+      "bytes": 20792038
+    },
+    "male_groups_descending": 1326,
+    "male_groups_ascending": 2393,
+    "female_groups_descending": 1312,
+    "female_groups_ascending": 2356,
+    "male_filter": "status == Traced (prepare.py); Berg ~166700 includes additional non-Traced / lower-conf bodies",
+    "female_filter": "proofread==TRUE and super_class not in {glia, not_a_neuron, trachea, empty}; BANC meta ~188k includes glia/unproofread"
+  },
+  "public_urls": {
+    "title": "CVA-SST public source tables (do not invent neurons)",
+    "updated": "2026-09-15",
+    "license": "CC-BY (FlyEM Male CNS v1.0; BANC / Lee lab compiled_data)",
+    "note": "Large feathers are gitignored. Download into data/ (male) and data/banc/ (female). Prepared web/data bins are the filtered graphs used by the twin.",
+    "male_cns": {
+      "paper": "Berg et al. Sexual dimorphism in the complete connectome of the Drosophila male central nervous system. Cell 3 Sept 2026.",
+      "portal": "https://male-cns.janelia.org/",
+      "neuprint": "https://neuprint.janelia.org",
+      "neuprint_dataset": "male-cns:v1.0",
+      "gcs_prefix": "gs://flyem-male-cns/v1.0/connectome-data/flat-connectome/",
+      "https_prefix": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/",
+      "files": [
+        {
+          "id": "body-annotations",
+          "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
+          "dest": "data/body-annotations.feather",
+          "bytes": 14483314,
+          "required_for": [
+            "verify_counts",
+            "build_isomorphism",
+            "export_effectors",
+            "prepare.py"
+          ]
+        },
+        {
+          "id": "body-neurotransmitters",
+          "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
+          "dest": "data/body-neurotransmitters.feather",
+          "bytes": 43282834,
+          "required_for": [
+            "prepare.py",
+            "NT-aware signs"
+          ]
+        },
+        {
+          "id": "connectome-weights",
+          "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+          "dest": "data/connectome-weights.feather",
+          "bytes": 1051241946,
+          "required_for": [
+            "prepare.py rebuild of web/data/connectome.bin"
+          ],
+          "optional_if": "web/data/connectome.bin already present (prepared CSR, minWeight 5)"
+        }
+      ]
+    },
+    "female_banc": {
+      "paper": "Bates et al. A connectome of the adult Drosophila central nervous system (BANC). Nature 2026. FlyWire FAFB v783 + BANC v888.",
+      "dataverse": "https://doi.org/10.7910/DVN/7WTH1N",
+      "gcs_prefix": "gs://lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/",
+      "https_prefix": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/",
+      "files": [
+        {
+          "id": "banc_888_meta",
+          "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
+          "dest": "data/banc/banc_888_meta.feather",
+          "bytes": 57503026,
+          "required_for": [
+            "verify_counts",
+            "build_isomorphism",
+            "prepare_banc.py"
+          ]
+        },
+        {
+          "id": "banc_888_edgelist_simple_v2",
+          "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v2.feather",
+          "dest": "data/banc/banc_888_edgelist_simple_v2.feather",
+          "bytes": 305250378,
+          "required_for": [
+            "prepare_banc.py if rebuilding female CSR"
+          ],
+          "optional_if": "web/data/female/connectome.bin already present (prepared CSR, minWeight 3)"
+        },
+        {
+          "id": "banc_888_edgelist_simple_v3",
+          "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v3.feather",
+          "dest": "data/banc/banc_888_edgelist_simple_v3.feather",
+          "bytes": 359161658,
+          "required_for": [
+            "optional newer edgelist"
+          ],
+          "optional_if": "v2 or prepared female CSR present"
+        }
+      ]
+    },
+    "download_commands": [
+      "mkdir -p data/banc",
+      "curl -L --fail -o data/body-annotations.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
+      "curl -L --fail -o data/body-neurotransmitters.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
+      "curl -L --fail -o data/banc/banc_888_meta.feather https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
+      "# optional full weights (~1.1 GB) only to rebuild male CSR:",
+      "curl -L --fail -o data/connectome-weights.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+      "# optional BANC edges (~305 MB) only to rebuild female CSR:",
+      "curl -L --fail -o data/banc/banc_888_edgelist_simple_v2.feather https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v2.feather"
+    ]
+  },
+  "neck_method": "Berg et al. Cell 2026 reconstructed the complete adult male CNS with an intact neck connective (brain + optic lobe + neck + VNC in one volume). prepare.py maps superclass descending_neuron|sensory_descending \u2192 group 8 (n=1326) and ascending_neuron|sensory_ascending|efferent_ascending \u2192 group 9 (n=2393). Those DN/AN nodes sit in the SAME MCSR as optic sensory (4114) and VNC motor (806)."
+}

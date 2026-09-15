@@ -1,0 +1,86 @@
+{
+  "experiment": "CVA-SST",
+  "smoke": true,
+  "nSeeds": 4,
+  "seeds": [
+    1000,
+    1001,
+    1002,
+    1003
+  ],
+  "ticks": 12,
+  "stepsPerTick": 3,
+  "claim": "Sex-specific/dimorphic wiring alone (isomorphic weights, body, sensors fixed) is necessary and sufficient to flip closed-loop courtship vs aggression preference under matched scenes; isomorphic-only and shuffled sex-edges do not flip.",
+  "falsifier": "Intersectional silence of the twin-minimal sex-specific set (P1/aIPg/mAL/TN1/vPR6/pIP1 contributors) abolishes the predicted flip; restoring those nodes' output should restore it. If a specific DN→VNC MN weight change is implicated (pIP1/pIP10 → wing MN), test with intersectional silencing of that DN type.",
+  "compressed_swap": true,
+  "summaries": [
+    {
+      "controller": "male",
+      "n": 4,
+      "meanCI": 0.15,
+      "sdCI": 0.25980762113533157,
+      "meanAI": 0.44999999999999996,
+      "sdAI": 0.25980762113533157,
+      "meanDelta": -0.29999999999999993,
+      "sdDelta": 0.5196152422706631,
+      "meanWingHz": 0,
+      "meanAipgHz": 0,
+      "meanVisionHz": 2.018851617782099,
+      "meanSmellHz": 0.010525872594838113,
+      "meanDisp": 0
+    },
+    {
+      "controller": "iso_only",
+      "n": 4,
+      "meanCI": 0.15,
+      "sdCI": 0.25980762113533157,
+      "meanAI": 0.44999999999999996,
+      "sdAI": 0.25980762113533157,
+      "meanDelta": -0.29999999999999993,
+      "sdDelta": 0.5196152422706631,
+      "meanWingHz": 0,
+      "meanAipgHz": 0,
+      "meanVisionHz": 2.018851617782099,
+      "meanSmellHz": 0.010525872594838113,
+      "meanDisp": 0
+    },
+    {
+      "controller": "female_swap",
+      "n": 4,
+      "meanCI": 0.15,
+      "sdCI": 0.25980762113533157,
+      "meanAI": 0.44999999999999996,
+      "sdAI": 0.25980762113533157,
+      "meanDelta": -0.29999999999999993,
+      "sdDelta": 0.5196152422706631,
+      "meanWingHz": 0,
+      "meanAipgHz": 0,
+      "meanVisionHz": 2.018851617782099,
+      "meanSmellHz": 0.010525872594838113,
+      "meanDisp": 0
+    },
+    {
+      "controller": "shuffle_sex",
+      "n": 4,
+      "meanCI": 0.15,
+      "sdCI": 0.25980762113533157,
+      "meanAI": 0.44999999999999996,
+      "sdAI": 0.25980762113533157,
+      "meanDelta": -0.29999999999999993,
+      "sdDelta": 0.5196152422706631,
+      "meanWingHz": 0,
+      "meanAipgHz": 0,
+      "meanVisionHz": 2.018851617782099,
+      "meanSmellHz": 0.010525872594838113,
+      "meanDisp": 0
+    }
+  ],
+  "flip": {
+    "signFlip": false,
+    "maleDelta": -0.29999999999999993,
+    "femaleSwapDelta": -0.29999999999999993,
+    "isoDelta": -0.29999999999999993,
+    "shuffleDelta": -0.29999999999999993,
+    "honest": "Compressed swap smoke does NOT yet flip CI↔AI; scene modulation (vision/smell/courtship/touch write-in) works. Full BANC edge transplant is not applied."
+  }
+}

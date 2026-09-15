@@ -1,0 +1,79 @@
+{
+  "title": "CVA-SST public source tables (do not invent neurons)",
+  "updated": "2026-09-15",
+  "license": "CC-BY (FlyEM Male CNS v1.0; BANC / Lee lab compiled_data)",
+  "note": "Large feathers are gitignored. Download into data/ (male) and data/banc/ (female). Prepared web/data bins are the filtered graphs used by the twin.",
+  "male_cns": {
+    "paper": "Berg et al. Sexual dimorphism in the complete connectome of the Drosophila male central nervous system. Cell 3 Sept 2026.",
+    "portal": "https://male-cns.janelia.org/",
+    "neuprint": "https://neuprint.janelia.org",
+    "neuprint_dataset": "male-cns:v1.0",
+    "gcs_prefix": "gs://flyem-male-cns/v1.0/connectome-data/flat-connectome/",
+    "https_prefix": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/",
+    "files": [
+      {
+        "id": "body-annotations",
+        "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
+        "dest": "data/body-annotations.feather",
+        "bytes": 14483314,
+        "required_for": ["verify_counts", "build_isomorphism", "export_effectors", "prepare.py"]
+      },
+      {
+        "id": "body-neurotransmitters",
+        "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
+        "dest": "data/body-neurotransmitters.feather",
+        "bytes": 43282834,
+        "required_for": ["prepare.py", "NT-aware signs"]
+      },
+      {
+        "id": "connectome-weights",
+        "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+        "dest": "data/connectome-weights.feather",
+        "bytes": 1051241946,
+        "required_for": ["prepare.py rebuild of web/data/connectome.bin"],
+        "optional_if": "web/data/connectome.bin already present (prepared CSR, minWeight 5)"
+      }
+    ]
+  },
+  "female_banc": {
+    "paper": "Bates et al. A connectome of the adult Drosophila central nervous system (BANC). Nature 2026. FlyWire FAFB v783 + BANC v888.",
+    "dataverse": "https://doi.org/10.7910/DVN/7WTH1N",
+    "gcs_prefix": "gs://lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/",
+    "https_prefix": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/",
+    "files": [
+      {
+        "id": "banc_888_meta",
+        "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
+        "dest": "data/banc/banc_888_meta.feather",
+        "bytes": 57503026,
+        "required_for": ["verify_counts", "build_isomorphism", "prepare_banc.py"]
+      },
+      {
+        "id": "banc_888_edgelist_simple_v2",
+        "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v2.feather",
+        "dest": "data/banc/banc_888_edgelist_simple_v2.feather",
+        "bytes": 305250378,
+        "required_for": ["prepare_banc.py if rebuilding female CSR"],
+        "optional_if": "web/data/female/connectome.bin already present (prepared CSR, minWeight 3)"
+      },
+      {
+        "id": "banc_888_edgelist_simple_v3",
+        "url": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v3.feather",
+        "dest": "data/banc/banc_888_edgelist_simple_v3.feather",
+        "bytes": 359161658,
+        "required_for": ["optional newer edgelist"],
+        "optional_if": "v2 or prepared female CSR present"
+      }
+    ]
+  },
+  "download_commands": [
+    "mkdir -p data/banc",
+    "curl -L --fail -o data/body-annotations.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
+    "curl -L --fail -o data/body-neurotransmitters.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
+    "curl -L --fail -o data/banc/banc_888_meta.feather https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather",
+    "# optional full weights (~1.1 GB) only to rebuild male CSR:",
+    "curl -L --fail -o data/connectome-weights.feather https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+    "# optional BANC edges (~305 MB) only to rebuild female CSR:",
+    "curl -L --fail -o data/banc/banc_888_edgelist_simple_v2.feather https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v2.feather"
+  ]
+}
