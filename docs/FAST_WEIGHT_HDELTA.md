@@ -55,6 +55,16 @@ fastW_ij += η · pre_i · target_j  # outer product; target = PFL3 laterality
 
 Locked in `results/hdelta/continual_nav.json`. Shared context A correct = **0.60**. Context B: plastic **0.575 ± 0.046**, frozen **0.000**. Gap **0.575**. Verdict: **PASS — frozen fails on context B; plastic remaps.** Frozen still prefers the A (left) landmark on B (wrong_B = 0.60).
 
+## Lab pack results (`results/hdelta/experiments.json`)
+
+Declared box in `params/hdelta/v1.json` → `lab`. Plastic set unchanged (45 hΔ cells, 2832 outgoing edges).
+
+| Exp | n | Result |
+|---|---|---|
+| W1 | 4 | plastic B **0.557**, frozen B **0.000**, gap **0.557** — PASS |
+| W2 | 3 × 4 η | Remap saturates across `{0.02, 0.05, 0.10, 0.25}` (correct_B = 0.60); **mean \|Δw\|** scales with η (0.0008 → 0.0023 → 0.020 → 0.051). Pairing burst is enough even at 0.02 in this tick budget — recorded, not p-hacked. |
+| W3 | 4 | After A, frozen B **0.000** (fail); unfreeze recover **0.600** — PASS |
+
 ## Claim
 
 Online fast weights on hDeltaH/A/I/G outgoing synapses are necessary to remap a context→goal heading. After learning context A (left), freezing those weights causes failure on context B (right); keeping them plastic remaps.

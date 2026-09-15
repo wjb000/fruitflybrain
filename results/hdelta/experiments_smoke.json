@@ -1,0 +1,391 @@
+{
+  "name": "hDelta-fastW-experiment-lab",
+  "version": "lab1",
+  "plastic_types": [
+    "hDeltaH",
+    "hDeltaA",
+    "hDeltaI",
+    "hDeltaG"
+  ],
+  "n_plastic": 45,
+  "n_plastic_out_edges": 2832,
+  "n_PFL3": 24,
+  "readout": "hDelta → PFL3 (real Male CNS edges; 261 synapses from all 45 plastic cells). Assay steering mixes MN tank-steer with fast-weight-decoded PFL3 laterality. NeuroMechFly is not closed.",
+  "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+  "smoke": true,
+  "box": {
+    "W1": {
+      "n": 2,
+      "ticks": 12,
+      "steps": 2
+    },
+    "W2": {
+      "etas": [
+        0.02,
+        0.05,
+        0.1,
+        0.25
+      ],
+      "n": 2,
+      "ticks": 12,
+      "steps": 2
+    },
+    "W3": {
+      "n": 2,
+      "ticks": 12,
+      "steps": 2
+    }
+  },
+  "W1": {
+    "experiment": "W1",
+    "n": 2,
+    "ticks": 12,
+    "steps": 2,
+    "plastic": {
+      "condition": "plastic",
+      "n": 2,
+      "meanCorrectA": 0.6,
+      "sdCorrectA": 0,
+      "meanCorrectB": 0.6,
+      "sdCorrectB": 0,
+      "meanWrongB": 0.6,
+      "meanDeltaB": 0,
+      "meanFwB": 0.08398222766987895
+    },
+    "frozen": {
+      "condition": "frozen",
+      "n": 2,
+      "meanCorrectA": 0.6,
+      "sdCorrectA": 0,
+      "meanCorrectB": 0.075,
+      "sdCorrectB": 0.075,
+      "meanWrongB": 0.6,
+      "meanDeltaB": -0.5249999999999999,
+      "meanFwB": -0.4789462636770873
+    },
+    "gapB": 0.525,
+    "frozenFailsB": true,
+    "plasticRemaps": true,
+    "pass": true,
+    "verdict": "PASS: frozen fails on context B; plastic remaps",
+    "rows": [
+      {
+        "seed": 2000,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.6,
+        "wrongB": 0.6,
+        "deltaB": 0,
+        "fwA": 125.00497481971979,
+        "fwB": 51.776184191927314,
+        "fwMeanB": 0.08610744594499983,
+        "meanAbsDwB": 0.01828255091522857,
+        "nNonzeroB": 156,
+        "decodedGoalB": "undecided"
+      },
+      {
+        "seed": 2000,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0,
+        "wrongB": 0.6,
+        "deltaB": -0.6,
+        "fwA": 125.00497481971979,
+        "fwB": 125.00497481971979,
+        "fwMeanB": -0.4789462636770873,
+        "meanAbsDwB": 0.04414017472447733,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      },
+      {
+        "seed": 2001,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.6,
+        "wrongB": 0.6,
+        "deltaB": 0,
+        "fwA": 125.00497481971979,
+        "fwB": 55.38188557699323,
+        "fwMeanB": 0.08185700939475805,
+        "meanAbsDwB": 0.01955575055684789,
+        "nNonzeroB": 156,
+        "decodedGoalB": "undecided"
+      },
+      {
+        "seed": 2001,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0.15,
+        "wrongB": 0.6,
+        "deltaB": -0.44999999999999996,
+        "fwA": 125.00497481971979,
+        "fwB": 125.00497481971979,
+        "fwMeanB": -0.4789462636770873,
+        "meanAbsDwB": 0.04414017472447733,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      }
+    ]
+  },
+  "W2": {
+    "experiment": "W2",
+    "name": "hDelta-fastW-eta-sweep",
+    "box": {
+      "etas": [
+        0.02,
+        0.05,
+        0.1,
+        0.25
+      ],
+      "n": 2,
+      "ticks": 12,
+      "steps": 2
+    },
+    "note": "Predeclared before looking at results. Plastic hDeltaH/A/I/G edges only; PFL3 laterality readout.",
+    "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+    "byEta": [
+      {
+        "eta": 0.02,
+        "n": 2,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.0004882323950071001,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0004882323950071001,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0004882323950071001,
+            "decodedGoalB": "undecided"
+          }
+        ]
+      },
+      {
+        "eta": 0.05,
+        "n": 2,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.001294013483733949,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.001294013483733949,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.001294013483733949,
+            "decodedGoalB": "undecided"
+          }
+        ]
+      },
+      {
+        "eta": 0.1,
+        "n": 2,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.01353996810450687,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.01353996810450687,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.01353996810450687,
+            "decodedGoalB": "undecided"
+          }
+        ]
+      },
+      {
+        "eta": 0.25,
+        "n": 2,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0,
+        "meanAbsDwB": 0.046819989202480955,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0,
+            "meanAbsDwB": 0.04681998879338304,
+            "decodedGoalB": "B (right)"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0,
+            "meanAbsDwB": 0.04681998961157886,
+            "decodedGoalB": "B (right)"
+          }
+        ]
+      }
+    ],
+    "defaultEta": 0.1,
+    "defaultRemaps": true,
+    "lowestWeaker": true,
+    "pass": true,
+    "verdict": "W2: predeclared η box recorded; default η=0.1 remaps B (correct=0.600)",
+    "smoke": true
+  },
+  "W3": {
+    "experiment": "W3",
+    "name": "hDelta-fastW-freeze-midrun",
+    "claim": "After learning A, freezing hΔ Δw and switching to B fails; unfreezing those same edges recovers the B remap.",
+    "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+    "n": 2,
+    "ticks": 12,
+    "steps": 2,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectBfrozen": 0,
+    "sdCorrectBfrozen": 0,
+    "meanCorrectBrecover": 0.6,
+    "sdCorrectBrecover": 0,
+    "frozenFailsB": true,
+    "unfreezeRecovers": true,
+    "pass": true,
+    "verdict": "PASS: freeze after A, switch to B fails; unfreeze recovers remap",
+    "rows": [
+      {
+        "seed": 2000,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.4687133007700701,
+          "fastWNorm": 125.00497481971979,
+          "meanAbsDw": 0.04414017472447733,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.3251927641865417,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.4789462636770873,
+          "fastWNorm": 125.00497481971979,
+          "meanAbsDw": 0.04414017472447733,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.090851714654022,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.10154322590821661,
+          "fastWNorm": 38.34518967196345,
+          "meanAbsDw": 0.01353996810450687,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "undecided",
+          "headingError": 0.6326768583837992,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.04414017472447733,
+        "nNonzeroAfterA": 131
+      },
+      {
+        "seed": 2001,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.4687133007700701,
+          "fastWNorm": 125.00497481971979,
+          "meanAbsDw": 0.04414017472447733,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.3251927641865417,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.4789462636770873,
+          "fastWNorm": 125.00497481971979,
+          "meanAbsDw": 0.04414017472447733,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.090851714654022,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.10154322590821661,
+          "fastWNorm": 38.34518967196345,
+          "meanAbsDw": 0.01353996810450687,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "undecided",
+          "headingError": 0.6326768583837992,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.04414017472447733,
+        "nNonzeroAfterA": 131
+      }
+    ],
+    "smoke": true
+  },
+  "pass": true,
+  "verdict": "PASS: frozen fails on context B; plastic remaps | W2: predeclared η box recorded; default η=0.1 remaps B (correct=0.600) | PASS: freeze after A, switch to B fails; unfreeze recovers remap"
+}

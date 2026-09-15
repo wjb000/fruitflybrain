@@ -1,0 +1,580 @@
+{
+  "name": "hDelta-fastW-experiment-lab",
+  "version": "lab1",
+  "plastic_types": [
+    "hDeltaH",
+    "hDeltaA",
+    "hDeltaI",
+    "hDeltaG"
+  ],
+  "n_plastic": 45,
+  "n_plastic_out_edges": 2832,
+  "n_PFL3": 24,
+  "readout": "hDelta → PFL3 (real Male CNS edges; 261 synapses from all 45 plastic cells). Assay steering mixes MN tank-steer with fast-weight-decoded PFL3 laterality. NeuroMechFly is not closed.",
+  "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+  "smoke": false,
+  "box": {
+    "W1": {
+      "n": 4,
+      "ticks": 20,
+      "steps": 3
+    },
+    "W2": {
+      "etas": [
+        0.02,
+        0.05,
+        0.1,
+        0.25
+      ],
+      "n": 3,
+      "ticks": 18,
+      "steps": 2,
+      "note": "Predeclared η box. Do not add etas after seeing results."
+    },
+    "W3": {
+      "n": 4,
+      "ticks": 18,
+      "steps": 2
+    }
+  },
+  "W1": {
+    "experiment": "W1",
+    "n": 4,
+    "ticks": 20,
+    "steps": 3,
+    "plastic": {
+      "condition": "plastic",
+      "n": 4,
+      "meanCorrectA": 0.6,
+      "sdCorrectA": 0,
+      "meanCorrectB": 0.5571428571428572,
+      "sdCorrectB": 0.07423074889580902,
+      "meanWrongB": 0.3857142857142857,
+      "meanDeltaB": 0.17142857142857143,
+      "meanFwB": 0.17025542041998507
+    },
+    "frozen": {
+      "condition": "frozen",
+      "n": 4,
+      "meanCorrectA": 0.6,
+      "sdCorrectA": 0,
+      "meanCorrectB": 0,
+      "sdCorrectB": 0,
+      "meanWrongB": 0.6,
+      "meanDeltaB": -0.6,
+      "meanFwB": -0.5127205355271297
+    },
+    "gapB": 0.5571428571428572,
+    "frozenFailsB": true,
+    "plasticRemaps": true,
+    "pass": true,
+    "verdict": "PASS: frozen fails on context B; plastic remaps",
+    "rows": [
+      {
+        "seed": 2000,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.6,
+        "wrongB": 0.2571428571428571,
+        "deltaB": 0.34285714285714286,
+        "fwA": 133.82350340485573,
+        "fwB": 76.04944443702698,
+        "fwMeanB": 0.15103769483331225,
+        "meanAbsDwB": 0.026853617385955854,
+        "nNonzeroB": 156,
+        "decodedGoalB": "B (right)"
+      },
+      {
+        "seed": 2000,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0,
+        "wrongB": 0.6,
+        "deltaB": -0.6,
+        "fwA": 133.82350340485573,
+        "fwB": 133.82350340485573,
+        "fwMeanB": -0.51273372952052,
+        "meanAbsDwB": 0.04725406193674284,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      },
+      {
+        "seed": 2001,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.6,
+        "wrongB": 0.0857142857142857,
+        "deltaB": 0.5142857142857142,
+        "fwA": 133.80037426948547,
+        "fwB": 81.00349699705839,
+        "fwMeanB": 0.14805045600554365,
+        "meanAbsDwB": 0.028602929730599715,
+        "nNonzeroB": 156,
+        "decodedGoalB": "B (right)"
+      },
+      {
+        "seed": 2001,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0,
+        "wrongB": 0.6,
+        "deltaB": -0.6,
+        "fwA": 133.80037426948547,
+        "fwB": 133.80037426948547,
+        "fwMeanB": -0.5126451121436225,
+        "meanAbsDwB": 0.0472458948691686,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      },
+      {
+        "seed": 2002,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.42857142857142855,
+        "wrongB": 0.6,
+        "deltaB": -0.17142857142857143,
+        "fwA": 133.85260535776615,
+        "fwB": 62.57857640006114,
+        "fwMeanB": 0.1930238168078618,
+        "meanAbsDwB": 0.022096954943524413,
+        "nNonzeroB": 131,
+        "decodedGoalB": "B (right)"
+      },
+      {
+        "seed": 2002,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0,
+        "wrongB": 0.6,
+        "deltaB": -0.6,
+        "fwA": 133.85260535776615,
+        "fwB": 133.85260535776615,
+        "fwMeanB": -0.512845231255809,
+        "meanAbsDwB": 0.04726433805005867,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      },
+      {
+        "seed": 2003,
+        "condition": "plastic",
+        "correctA": 0.6,
+        "correctB": 0.6,
+        "wrongB": 0.6,
+        "deltaB": 0,
+        "fwA": 133.8037560582161,
+        "fwB": 63.31210136413574,
+        "fwMeanB": 0.1889097140332226,
+        "meanAbsDwB": 0.022355967995810643,
+        "nNonzeroB": 131,
+        "decodedGoalB": "B (right)"
+      },
+      {
+        "seed": 2003,
+        "condition": "frozen",
+        "correctA": 0.6,
+        "correctB": 0,
+        "wrongB": 0.6,
+        "deltaB": -0.6,
+        "fwA": 133.8037560582161,
+        "fwB": 133.8037560582161,
+        "fwMeanB": -0.5126580691885674,
+        "meanAbsDwB": 0.04724708900360738,
+        "nNonzeroB": 131,
+        "decodedGoalB": "A (left)"
+      }
+    ]
+  },
+  "W2": {
+    "experiment": "W2",
+    "name": "hDelta-fastW-eta-sweep",
+    "box": {
+      "etas": [
+        0.02,
+        0.05,
+        0.1,
+        0.25
+      ],
+      "n": 3,
+      "ticks": 18,
+      "steps": 2
+    },
+    "note": "Predeclared before looking at results. Plastic hDeltaH/A/I/G edges only; PFL3 laterality readout.",
+    "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+    "byEta": [
+      {
+        "eta": 0.02,
+        "n": 3,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.0008468821842864457,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0008309099418413693,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0008788266691765984,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2002,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0008309099418413693,
+            "decodedGoalB": "undecided"
+          }
+        ]
+      },
+      {
+        "eta": 0.05,
+        "n": 3,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.0023407561466862532,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0023005179236090536,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0024212325928406526,
+            "decodedGoalB": "undecided"
+          },
+          {
+            "seed": 2002,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.0023005179236090536,
+            "decodedGoalB": "undecided"
+          }
+        ]
+      },
+      {
+        "eta": 0.1,
+        "n": 3,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0.6,
+        "meanAbsDwB": 0.02042198499358591,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.020341640142251597,
+            "decodedGoalB": "B (right)"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.020582674696254535,
+            "decodedGoalB": "B (right)"
+          },
+          {
+            "seed": 2002,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0.6,
+            "meanAbsDwB": 0.020341640142251597,
+            "decodedGoalB": "B (right)"
+          }
+        ]
+      },
+      {
+        "eta": 0.25,
+        "n": 3,
+        "meanCorrectA": 0.6,
+        "meanCorrectB": 0.6,
+        "sdCorrectB": 0,
+        "meanWrongB": 0,
+        "meanAbsDwB": 0.050684082141170615,
+        "remaps": true,
+        "rows": [
+          {
+            "seed": 2000,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0,
+            "meanAbsDwB": 0.05068933381830568,
+            "decodedGoalB": "B (right)"
+          },
+          {
+            "seed": 2001,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0,
+            "meanAbsDwB": 0.050681439991303756,
+            "decodedGoalB": "B (right)"
+          },
+          {
+            "seed": 2002,
+            "correctA": 0.6,
+            "correctB": 0.6,
+            "wrongB": 0,
+            "meanAbsDwB": 0.05068147261390241,
+            "decodedGoalB": "B (right)"
+          }
+        ]
+      }
+    ],
+    "defaultEta": 0.1,
+    "defaultRemaps": true,
+    "lowestWeaker": true,
+    "pass": true,
+    "verdict": "W2: predeclared η box recorded; default η=0.1 remaps B (correct=0.600)",
+    "smoke": false
+  },
+  "W3": {
+    "experiment": "W3",
+    "name": "hDelta-fastW-freeze-midrun",
+    "claim": "After learning A, freezing hΔ Δw and switching to B fails; unfreezing those same edges recovers the B remap.",
+    "not_this_experiment": "Does not reopen CVA-SST Exp0/Exp1 or M1–M3.",
+    "n": 4,
+    "ticks": 18,
+    "steps": 2,
+    "meanCorrectA": 0.6,
+    "sdCorrectA": 0,
+    "meanCorrectBfrozen": 0,
+    "sdCorrectBfrozen": 0,
+    "meanCorrectBrecover": 0.6,
+    "sdCorrectBrecover": 0,
+    "frozenFailsB": true,
+    "unfreezeRecovers": true,
+    "pass": true,
+    "verdict": "PASS: freeze after A, switch to B fails; unfreeze recovers remap",
+    "rows": [
+      {
+        "seed": 2000,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.4998641698686632,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.2131408350905457,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.5107459325443281,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.4058578612841142,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.14869576314131452,
+          "fastWNorm": 58.20752502590767,
+          "meanAbsDw": 0.02055350459954367,
+          "nNonzero": 156,
+          "nEdges": 2832,
+          "decodedGoal": "B (right)",
+          "headingError": 0.6249312058578044,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.047070864545928556,
+        "nNonzeroAfterA": 131
+      },
+      {
+        "seed": 2001,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.4998641698686632,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.2131408350905457,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.5107459325443281,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.4189273452375628,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.1483126212875143,
+          "fastWNorm": 57.607524882856524,
+          "meanAbsDw": 0.020341640142251597,
+          "nNonzero": 156,
+          "nEdges": 2832,
+          "decodedGoal": "B (right)",
+          "headingError": 0.6251178139738433,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.047070864545928556,
+        "nNonzeroAfterA": 131
+      },
+      {
+        "seed": 2002,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.4998641698686632,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.2131408350905457,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.5107459325443281,
+          "fastWNorm": 133.30468839406967,
+          "meanAbsDw": 0.047070864545928556,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.4058578612841142,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.1483126212875143,
+          "fastWNorm": 57.607524882856524,
+          "meanAbsDw": 0.020341640142251597,
+          "nNonzero": 156,
+          "nEdges": 2832,
+          "decodedGoal": "B (right)",
+          "headingError": 0.6251178139738433,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.047070864545928556,
+        "nNonzeroAfterA": 131
+      },
+      {
+        "seed": 2003,
+        "A": {
+          "correct": 0.6,
+          "wrong": 0,
+          "delta": 0.6,
+          "fwMean": -0.49987233867856884,
+          "fastWNorm": 133.30469588935375,
+          "meanAbsDw": 0.047070867192568415,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 0.21313896963713505,
+          "plastic": true,
+          "context": "A",
+          "goal": -1
+        },
+        "Bfrozen": {
+          "correct": 0,
+          "wrong": 0.6,
+          "delta": -0.6,
+          "fwMean": -0.5107459612618918,
+          "fastWNorm": 133.30469588935375,
+          "meanAbsDw": 0.047070867192568415,
+          "nNonzero": 131,
+          "nEdges": 2832,
+          "decodedGoal": "A (left)",
+          "headingError": 1.4058578957521066,
+          "plastic": false,
+          "context": "B",
+          "goal": 1
+        },
+        "Brecover": {
+          "correct": 0.6,
+          "wrong": 0.6,
+          "delta": 0,
+          "fwMean": 0.14831561033883492,
+          "fastWNorm": 57.6053444973295,
+          "meanAbsDw": 0.02034087023210787,
+          "nNonzero": 156,
+          "nEdges": 2832,
+          "decodedGoal": "B (right)",
+          "headingError": 0.6331736455247586,
+          "plastic": true,
+          "context": "B",
+          "goal": 1
+        },
+        "meanAbsDwAfterA": 0.047070867192568415,
+        "nNonzeroAfterA": 131
+      }
+    ],
+    "smoke": false
+  },
+  "pass": true,
+  "verdict": "PASS: frozen fails on context B; plastic remaps | W2: predeclared η box recorded; default η=0.1 remaps B (correct=0.600) | PASS: freeze after A, switch to B fails; unfreeze recovers remap"
+}
