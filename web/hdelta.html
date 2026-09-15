@@ -346,7 +346,7 @@ function stepBody(state, cells, goal, plastic, eta, decay, tick, cue) {
 function updateReadouts(nUp, turn, err) {
   const st = weightStats(lab.cells);
   document.getElementById("mAbs").textContent = st.meanAbs.toFixed(3);
-  document.getElementById("mEdges").textContent = `${nUp} / ${N_EDGES}`;
+  document.getElementById("mEdges").textContent = `${st.nNonzero} / ${N_EDGES}`;
   document.getElementById("mErr").textContent = `${((err * 180) / Math.PI).toFixed(0)}°`;
   document.getElementById("mDec").textContent = decodedGoal(turn);
   lab.lastHebb = nUp;
@@ -394,7 +394,10 @@ function restartLive(clearW) {
 async function runOverlay() {
   lab.overlay = true;
   lab.running = false;
+  lab.paths = [];
   document.getElementById("overlay").disabled = true;
+  document.getElementById("pause").textContent = "play";
+  document.getElementById("pause").classList.add("on");
   let cells = makeCells();
   const eta = lab.eta, decay = lab.decay;
   const ticks = 36, evalLast = 12;
@@ -435,7 +438,8 @@ async function runOverlay() {
   document.getElementById("mGap").textContent = (correctP - correctF).toFixed(2);
   phaseEl.textContent = `overlay done · frozen ${correctF < correctP - 0.12 ? "fails B" : "contrast weak"}`;
   lab.overlay = false;
-  lab.running = true;
+  lab.running = false;
+  lab.paths = [];
   document.getElementById("overlay").disabled = false;
 }
 
