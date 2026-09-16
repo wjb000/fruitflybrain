@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """MuJoCo flesh for the connectome.
 
-The brain only fires motor neurons. This module is the body: NeuroMechFly
-position actuators on 42 leg DoFs, contact, adhesion, gravity. Thorax pose
-is whatever physics does — no slip kinematics, no scripted gait.
+The brain only fires motor neurons. This module is gap-fill plant: NeuroMechFly
+position actuators on 42 leg DoFs, contact, adhesion, gravity, vault-settle.
+Thorax pose is whatever physics does — no slip kinematics, no scripted gait,
+no walk thruster.
 """
 
 from __future__ import annotations

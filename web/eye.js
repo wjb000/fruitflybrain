@@ -2,8 +2,9 @@
  * Drosophila compound eye: hexagonal ommatidia, R1–R6 luminance, R7 UV,
  * L1 ON / L2 OFF, T4/T5 Hassenstein–Reichardt motion (A/B/C/D).
  *
- * Each ommatidium is a Gaussian-acceptance ray into the garden
- * (warm sky, moss floor, fruit, dew, perch, blossoms).
+ * Gap-fill: cameras/landmarks → acceptance rays → Hz on *real* optic pools
+ * (R16/L1–L3/T4/T5/HS/VS). Not a behavior tree; not a bearing thruster.
+ * Garden: warm sky, moss floor, fruit, dew, perch, blossoms.
  */
 
 const DA = 3.8 * Math.PI / 180;

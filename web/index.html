@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=utopia1" />
+  <link rel="stylesheet" href="style.css?v=cns1" />
   <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}.stim-map-panel{position:fixed;right:12px;bottom:88px;max-width:360px;z-index:6;max-height:min(70vh,560px);overflow:auto}.stim-map-panel.collapsed .panel-body{display:none}</style>
   <script type="importmap">
   {
@@ -23,7 +23,7 @@
   <div class="loader" id="loader">
     <div class="kicker">FlyEM · Janelia · Cambridge · Google</div>
     <h2>Male fruit fly CNS</h2>
-    <p>Closing a healthy loop — male connectome in his NeuroMechFly body, at home in a fly utopia. Cube or drone chassis via ?body=cube / ?body=drone.</p>
+    <p>Full Male CNS connectome (LIF) in his NeuroMechFly body, at home in a fly utopia. Gap-fill is encoding + plant only — no CPG, no thrusters. Cube or drone via ?body=cube / ?body=drone.</p>
     <div class="progress"><i id="bar"></i></div>
     <p id="loadmsg">fetching maps…</p>
   </div>
@@ -33,7 +33,7 @@
       <div class="kicker">Thrive · home</div>
       <div class="panel-body">
         <h1>He lives in a fly utopia</h1>
-                <div class="sub"><b>Closed loop</b> (fly body default): garden home → eye → optic/visionL/R → LIF → leg MNs → NeuroMechFly pose → planted walk. Warm light, fruit, dew, shade. Flight off. Empty annotation pools stay quiet. <code>?body=cube</code> box · <code>?body=drone</code> quadrotor. Cache <code>?v=utopia1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=utopia1" style="color:#4de4ff">stim map</a>.</div>
+                <div class="sub"><b>Connectome first</b> (fly body default): garden → eye → optic/visionL/R → <b>full Male CNS LIF</b> → annotated leg MNs → NeuroMechFly pose → planted walk. Gap-fill = encoding + plant/adhesion only — empty MN pools stay empty; no CPG, no thrusters. Warm light, fruit, dew, shade. Flight off. <code>?body=cube</code> box · <code>?body=drone</code> quadrotor. Cache <code>?v=cns1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=cns1" style="color:#4de4ff">stim map</a>.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
@@ -104,7 +104,7 @@
         <button class="collapse" type="button" title="collapse">–</button>
         <div class="kicker">His home</div>
         <div class="panel-body">
-          <div class="hint">Thrive in a fly utopia: garden → sensory → connectome LIF → MNs → fly body (Pages default). Optional ?body=cube or ?body=drone. Light/scent/taste/touch are gentle extras, not puppet strings. Scent bomb stays off.</div>
+          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. Gap-fill writes cameras/odor/proprio into real pools and keeps the plant calm — it does not puppet the body. Optional ?body=cube or ?body=drone. Scent bomb stays off.</div>
         </div>
       </div>
     </div>
@@ -115,6 +115,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=utopia1"></script>
+  <script type="module" src="app.js?v=cns1"></script>
 </body>
 </html>

@@ -2,11 +2,18 @@
 
 The public sim is a **living male CNS in the body he was mapped for**, at home in a **fly utopia**. Default language and defaults should help him **function well**, not treat him as a surgical subject or an aggression assay.
 
+## Architecture
+
+**Full Male CNS connectome** (LIF + real synapses) drives behavior. **Coded logic fills gaps only** — sensory encoding into existing pools, calm plant adhesion/settle, utopia world, proprio fallbacks, optional hΔ on real hDelta types. It does **not** replace the connectome with a behavior tree, CPG gait, or walk thrusters.
+
+Table of connectome vs gap-fill: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md#architecture--connectome-vs-gap-fill).
+
 ## Do
 
 - Start intact: NeuroMechFly mesh, MN drive, planted walk, flight off, garden home.
 - Keep sensory channels (vision, proprio, touch, odor) closed and honest.
 - Leave empty annotation pools empty. No invented MNs, cosmetic CPG gait, or walk thrusters.
+- Let the traced graph be primary; helpers only write into real pools or plant state.
 - Offer labs as **links**: hΔ mid-run learning, follow-me (drone), stim-map exploration.
 - Prefer kinematic NMF on Pages if a remote plant would hang, vault, or seize.
 - Speak **home / utopia / thrive** — not lab cage, dish, or pad.

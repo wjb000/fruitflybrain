@@ -4,6 +4,63 @@
 
 **Ethic:** thriving, healthy closed-loop function. See [`THRIVE.md`](THRIVE.md). Quiet annotated pools → quiet actuators. Empty annotation pools stay empty (no invented MNs, no neuromere fill-in, no cosmetic wing idle / CPG gait / free-joint walk–turn thrusters).
 
+## Architecture — connectome vs gap-fill
+
+He needs the **full Male CNS connectome**, plus **coded logic only where the map or the plant is incomplete**. Behavior is not a hand-coded tree.
+
+```
+  CONNECTOME (primary)                         GAP-FILL (helpers only)
+  ────────────────────                         ──────────────────────
+  web/data/{neurons,connectome}.bin            world → Hz into *existing* pools
+  ~166k Traced cells, real synapses            (eye, ORN, proprio, clock)
+  sim.worker.js LIF + STD + neuromod           kinematic plant / adhesion / settle
+                                               utopia garden affordances
+                                               optional hΔ Δw on real hDelta types
+         │                                              │
+         └──────── annotated MN / effector Hz ──────────┘
+                           │
+                           ▼
+              NeuroMechFly pose → stance-slip / MuJoCo contact
+```
+
+### What is the connectome (do not replace)
+
+| Piece | Where | Role |
+|---|---|---|
+| Traced Male CNS graph | `web/data/neurons.bin`, `connectome.bin` | Berg et al. 2026; somas + chemical edges |
+| Pool ID lists | `web/data/{stim,effectors}.json` | Real type/instance labels from FlyEM |
+| LIF + synapses | `web/sim.worker.js` | Poisson drive, sqrt-compressed weights, STD, DA/OA/5HT |
+| MN / effector readout | `agent.js` `motEma` | Hz on annotated muscle / descending / wing / neck pools |
+| Optional hΔ | `hdelta.html` / `tools/hdelta/` | Fast weights on **real** hDeltaH/A/I/G outgoing edges |
+
+`cmd.walk` / `cmd.turn` are **UI labels** derived from those MN EMAs. They are never free-joint thrusters and never a CPG clock.
+
+### What is gap-fill code (documented helpers)
+
+Coded logic is allowed **only** to bridge missing annotations or missing physics — always writing into **existing** pools or plant state. Empty MN IDs stay empty.
+
+| Helper | Gap it fills | Honest limit |
+|---|---|---|
+| `eye.js` + `agent.js` `opticRates` / `visFromEye` | Cameras / garden landmarks have no native ommatidial spike trains | Hz into real `R16*` `L1–L3` `T4*/T5*` `HS`/`VS` `visionL/R` — **not** a bearing-to-food chassis PID |
+| `plume.js` + ORN write-in | World odor is not an EM filament | Hz into real `foodORN` / `pherORN` / `co2ORN` / `aversiveORN` / `JO` |
+| `readProprio` / `readProprioMj` | Browser kinematic path has no campaniform organs | Joint/contact → existing `cho*` `hp*` `csa*` `tact*` `prop*` |
+| Clock / neuromod calm Hz | No circadian photodiode on l-LNv except CRY path | Low Hz on real `sLNv` `lLNv` `LNd` `DN1*` `DAN` `OA` `HT` `pep` |
+| `antagPair` / `softDrive` | Co-contraction of real flex/ext would cancel DoF | Contrast from **those** pool EMAs — no invented antagonists, no CPG |
+| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; `y` held at `standZ`; generous stance band |
+| Adhesion / vault settle (`physics.py`) | NMF plant vaults without sticky feet | `set_leg_adhesion_states`; bleed upward vault; **no** walk thruster |
+| Utopia garden (`world/procgen.js`) | Lab dish is aversive and empty | Fruit, dew, shade, blossoms, hedge bounce — sensory world only |
+| Hedge bounce (`WORLD_SOFT_LIMIT`) | Open ground has no ethological rim | Redirect velocity; never shock / punish / wall GRNs |
+| Optional cam / follow encoding | Webcam is not an ommatidium | Centroid → `visionL/R` + optic Hz (follow-me lab) |
+| Optional mid-run hΔ | Static connectome has no fast weights | Δw on traced hDelta types only |
+
+### What we will not add
+
+- Behavior trees, finite-state “seek food / flee bitter” controllers
+- CPG / tripod gait oscillators that pose legs without MN rates
+- Walk/turn/climb thrusters that set `{v,ω}` from food bearing
+- Invented MN IDs to fill empty T2/T3 `coxaProm` / `taDep` / `taLev`
+- Cosmetic wing idle when `DLM`/`DVM`/`ADMN` are quiet
+
 ## Pipeline
 
 ```
@@ -33,7 +90,7 @@ eye L/R salience (ripe fruit + garden landmarks)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=utopia1`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns1`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -70,7 +127,7 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=utopia1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -157,7 +214,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (utopia1)
+### Embodiment status (cns1 / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -173,7 +230,7 @@ Closed or kept honest on the homepage fly body:
 | Flight | Off unless `?flight=1` |
 | Plant / mesh sync | `applyMujoco` copies thorax XYZ + bones when a plant is live; Pages skips auto-tunnel |
 | Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev) |
-| No thrusters / CPG gait | Stance-slip / contact only |
+| Connectome vs gap-fill | LIF + real synapses primary; helpers listed above. No CPG / thruster / invented MNs |
 
 Still open (not invented around):
 
