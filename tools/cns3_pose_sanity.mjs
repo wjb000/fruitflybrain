@@ -80,12 +80,27 @@ async function main() {
   assert(flex.pos > flex.neg * 2, "flex should dominate ext when clearly larger");
   assert(Math.abs(both.pos - both.neg) < 0.15, "near-equal co-con stays near balanced (rest-ish)");
 
-  console.log("--- spans exist ---");
+  console.log("--- idle wings/mouth stay still (cns4) ---");
+  const { wingFromEma, feedFromEma, WING_FLAP_GATE } = m;
+  const idleW = wingFromEma({ DLM: 0.18, DVM: 0.16, ADMN: 0.14 });
+  const midW = wingFromEma({ DLM: 0.22, DVM: 0.20, ADMN: 0.18 });
+  const strongW = wingFromEma({ DLM: 0.82, DVM: 0.78, ADMN: 0.70 });
+  console.log("idle wing", idleW, "mid", midW, "strong", strongW);
+  assert(idleW.power === 0 && idleW.fly === 0, "idle DLM/DVM/ADMN must not flap");
+  assert(midW.power === 0, "modest wing MN noise must stay below flap gate");
+  assert(strongW.power >= WING_FLAP_GATE && strongW.fly > 0.45, "strong wing MNs may still flap");
+  const idleM = feedFromEma({ MN9: 0.40, proboscis: 0.12 });
+  const spikeM = feedFromEma({ MN9: 0.45, proboscis: 0.20 });
+  const eatM = feedFromEma({ MN9: 0.92, proboscis: 0.80 });
+  console.log("idle/spike/eat mouth", idleM, spikeM, eatM);
+  assert(idleM === 0, "MN9 2-cell Poisson (~0.4) must not mouth");
+  assert(spikeM === 0, "single-spike MN9 must not mouth");
+  assert(eatM > 0.25, "sustained MN9+proboscis may still extend");
   assert(MUSCLE_SPAN["coxa-pitch"][2] <= 0.62, "calmer coxa-pitch span");
   assert(NECK_SPAN.yaw <= 0.28 && NECK_SPAN.pitch <= 0.22, "calmer neck spans");
   assert(softDrive(0, 2.15) === 0, "softDrive quiet");
 
-  console.log("cns3 pose sanity OK");
+  console.log("cns4 pose sanity OK");
 }
 
 main().catch((err) => {

@@ -6,17 +6,17 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=cns3";
-import { CompoundEye } from "./eye.js?v=cns3";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns3";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns3";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns3";
-import { spinRotors } from "./chassis.js?v=cns3";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=cns4";
+import { CompoundEye } from "./eye.js?v=cns4";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns4";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns4";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns4";
+import { spinRotors } from "./chassis.js?v=cns4";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   softDrive, muscleFromEma, neckFromEma, walkDriveFromEma,
-  proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=cns3";
+  wingFromEma, feedFromEma, proprioJointHz, POSE_EMA_ALPHA,
+} from "./poseMap.js?v=cns4";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -658,14 +658,11 @@ export class EmbodiedFly {
       + ((e.T1R || 0) - (e.T1L || 0)) * 0.8;
     cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.55), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
-    const wingRaw = e.DLM * 1.05 + e.DVM * 0.95 + e.ADMN * 0.8;
-    cmd.fly = softDrive(wingRaw, 2.35);
-    cmd.wing = {
-      dlm: softDrive(e.DLM, 2.6),
-      dvm: softDrive(e.DVM, 2.6),
-      admn: softDrive(e.ADMN, 2.4),
-    };
-    cmd.feed = softDrive(e.MN9 * 1.1 + e.proboscis * 0.9, 2.4);
+    // High gate: idle Poisson must not tap/flap the mesh (cns4).
+    const wing = wingFromEma(e);
+    cmd.fly = wing.fly;
+    cmd.wing = { dlm: wing.dlm, dvm: wing.dvm, admn: wing.admn, power: wing.power };
+    cmd.feed = feedFromEma(e);
     cmd.court = softDrive(
       e.aIPg * 0.95 + e.pIP1 * 1.0 + e.DNg02 * 0.8,
       2.7

@@ -50,6 +50,8 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
 | Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` |
 | Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate |
+| Wing mesh gate (`wingFromEma`) | DLM/DVM/ADMN idle Poisson + 10 Hz sine read as tapping | Visual flap only above `WING_FLAP_GATE` (~0.48); low amp; rest quat below. No cosmetic CPG. Flight translation still `?flight=1` only |
+| Mouth / MN9 (`feedFromEma`) | MN9 is 2 cells — one spike saturates `softDrive` into constant mouthing | Dead-zone + low gain; proboscis/haustellum stay at rest unless sustained MN9/proboscis |
 | Adhesion / vault settle (`physics.py`) | NMF plant vaults without sticky feet | `set_leg_adhesion_states`; bleed upward vault; **no** walk thruster |
 | Utopia garden (`world/procgen.js`) | Lab dish is aversive and empty | Fruit, dew, shade, blossoms, hedge bounce — sensory world only |
 | Hedge bounce (`WORLD_SOFT_LIMIT`) | Open ground has no ethological rim | Redirect velocity; never shock / punish / wall GRNs |
@@ -93,7 +95,7 @@ eye L/R salience (ripe fruit + garden landmarks)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns3`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns4`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -130,7 +132,7 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns3`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns4`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -163,8 +165,8 @@ Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold 
 | `*_taDep` / `*_taLev` | Tarsus pitch (empty on male T2/T3 — see gaps) |
 | Neuromere aggregates `T1L`…`T3R` | UI walk label + adhesion lift bias via muscle |
 | `DNa` | Contributes to walk mode label only |
-| `DLM`, `DVM`, `ADMN` | Wing power / flap (kinematic); plant flight force gated on same |
-| `MN9`, `proboscis` | Proboscis / haustellum extension |
+| `DLM`, `DVM`, `ADMN` | Wing mesh flap **only above a high gate**; plant flight force still `?flight=1` |
+| `MN9`, `proboscis` | Proboscis / haustellum — dead-zoned; idle MN9 does not mouth |
 | `neck`, `neckL`, `neckR` | Head **pitch** from pooled CvN; **yaw/roll** from L/R (smoothed, dead-zoned) |
 | `abdomen`, courtship (`aIPg`/`pIP1`/`DNg02`/`fru`) | Abdomen curl |
 | `DNp01` | Mode label only (arousal path; not a default stim) |
@@ -217,7 +219,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (cns3 / utopia garden)
+### Embodiment status (cns4 / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -229,6 +231,7 @@ Closed or kept honest on the homepage fly body:
 | Vision → legs | Eye → `visionL/R` + optic Hz → LIF → annotated MNs → pose → stance-slip. Spawn faces ripe fruit. No bearing thruster |
 | Proprio / touch | `readProprio` / `readProprioMj` write `cho*` `hp*` `csa*` `tact*` `prop*` including L/R soma-X splits of existing IDs |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
+| Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
 | Soft home | Clearing radius 12.5, hedge bounce/redirect (never punish), `WORLD_SOFT_LIMIT` ~10.8 |
 | Aversives | Bitter / assay pole / scent bomb **off** unless `?bitter=1` / `?assay=1` / HUD toggle |
 | Flight | Off unless `?flight=1` |
