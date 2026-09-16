@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=dynw1" />
+  <link rel="stylesheet" href="style.css?v=linked1" />
   <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}.stim-map-panel{position:fixed;right:12px;bottom:88px;max-width:360px;z-index:6;max-height:min(70vh,560px);overflow:auto}.stim-map-panel.collapsed .panel-body{display:none}</style>
   <script type="importmap">
   {
@@ -33,7 +33,7 @@
       <div class="kicker">Thrive · home</div>
       <div class="panel-body">
         <h1>He lives in a fly utopia</h1>
-                <div class="sub"><b>Connectome first</b> (full fly body): garden → compound eye (R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS) + ORN/JO/proprio → <b>full Male CNS LIF</b> with <b>time-varying synaptic weights</b> (connectome edge counts × NT-aware Tsodyks–Markram STD/STF) → annotated MNs → NeuroMechFly. Quiet abdomen unless phasic; walk slip is not a constant T2/T3 push. Empty T2/T3 coxaProm/Ta* stay empty. No CPG, no thrusters. Cache <code>?v=dynw1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=dynw1" style="color:#4de4ff">stim map</a>.</div>
+                <div class="sub"><b>Connectome first</b> (full fly body): garden → compound eye (R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS) + ORN/JO/proprio → <b>full Male CNS LIF</b> with <b>time-varying synaptic weights</b> (connectome edge counts × NT-aware Tsodyks–Markram STD/STF) → annotated MNs → NeuroMechFly. Antennae, halteres, abdomen segments, and neck are linked from existing IDs. Empty T2/T3 coxaProm/Ta* stay empty. No CPG, no thrusters. Cache <code>?v=linked1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=linked1" style="color:#4de4ff">stim map</a>.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
@@ -101,6 +101,9 @@
           <div class="barline"><div class="name">food R</div><div class="track"><i id="odorFR" style="background:#f0c040"></i></div></div>
           <div class="barline"><div class="name">pher L</div><div class="track"><i id="odorPL" style="background:#ff4fd8"></i></div></div>
           <div class="barline"><div class="name">pher R</div><div class="track"><i id="odorPR" style="background:#ff4fd8"></i></div></div>
+          <div class="barline"><div class="name">JO L</div><div class="track"><i id="odorJL" style="background:#9ad8ff"></i></div></div>
+          <div class="barline"><div class="name">JO R</div><div class="track"><i id="odorJR" style="background:#9ad8ff"></i></div></div>
+          <div class="barline"><div class="name">hygro</div><div class="track"><i id="odorHY" style="background:#7ecbff"></i></div></div>
         </div>
         <div class="hint" id="stimHint">every fly closed-loop</div>
         <div class="hint" id="lifeHint">loading</div>
@@ -111,7 +114,7 @@
         <button class="collapse" type="button" title="collapse">–</button>
         <div class="kicker">His home</div>
         <div class="panel-body">
-          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. Chemical synapse strength varies over time (connectome weights × short-term depression/facilitation). Six-leg planted gait from T1–T3 MN pools; abdomen quiet unless phasic. Empty pools stay empty.</div>
+          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. Coverage of parts/senses is in <code>docs/LINKAGE.md</code>. Chemical synapse strength varies over time (connectome weights × STD). Six-leg planted gait from T1–T3 MN pools; antennae/halteres/abdomen/neck from existing IDs. Empty pools stay empty.</div>
         </div>
       </div>
     </div>
@@ -122,6 +125,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=dynw1"></script>
+  <script type="module" src="app.js?v=linked1"></script>
 </body>
 </html>
