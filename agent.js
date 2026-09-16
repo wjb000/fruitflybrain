@@ -1,10 +1,17 @@
+/**
+ * Embodied male fly: sensory encoding → LIF worker → annotated MN readout → body.
+ *
+ * Connectome (sim.worker.js) is primary. This file is gap-fill + readout:
+ * world/cameras → Hz on *existing* pools; motEma → muscle/pose; planted slip.
+ * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
+ */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=utopia1";
-import { CompoundEye } from "./eye.js?v=utopia1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=utopia1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=utopia1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=utopia1";
-import { spinRotors } from "./chassis.js?v=utopia1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=cns1";
+import { CompoundEye } from "./eye.js?v=cns1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns1";
+import { spinRotors } from "./chassis.js?v=cns1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [

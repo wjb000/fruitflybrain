@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=utopia1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=utopia1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=utopia1";
-import { EmbodiedFly } from "./agent.js?v=utopia1";
-import { drawOmmatidia } from "./eye.js?v=utopia1";
-import { OdorWorld } from "./plume.js?v=utopia1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=utopia1";
-import { parseLesionFlag } from "./lesion.js?v=utopia1";
-import { mountAssayPanel } from "./assay/panel.js?v=utopia1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=utopia1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=utopia1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=utopia1";
+import { loadNmf, createMaleFly } from "./fly.js?v=cns1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns1";
+import { EmbodiedFly } from "./agent.js?v=cns1";
+import { drawOmmatidia } from "./eye.js?v=cns1";
+import { OdorWorld } from "./plume.js?v=cns1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns1";
+import { parseLesionFlag } from "./lesion.js?v=cns1";
+import { mountAssayPanel } from "./assay/panel.js?v=cns1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -311,8 +311,8 @@ if ($("info")) {
       ? (" Plant @ " + physics.plantOrigin + ".")
       : "";
     $("info").textContent = physics.ok
-      ? ("Home: a fly utopia. Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
-      : ("Home: a fly utopia. Eyes → optic/visionL/R → LIF → leg MNs → pose → planted stance-slip. Fruit, dew, shade, blossoms. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
+      ? ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
+      : ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → LIF → annotated MNs → pose → planted stance-slip. Fruit, dew, shade, blossoms. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
   }
 }
 

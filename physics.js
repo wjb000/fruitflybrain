@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase } from "./plantConfig.js?v=utopia1";
+import { plantUrl, plantBase } from "./plantConfig.js?v=cns1";
 
 export const physics = {
   ok: false,

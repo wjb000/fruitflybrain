@@ -307,8 +307,8 @@ function poseLegFromMuscle(leg, muscle, dt) {
 
 /**
  * Pose the NeuroMechFly skeleton from connectome motor neurons.
- * cmd: {walk, turn, fly, feed, court, groom, escape, rest, head, abdomen, muscle}
- * Body translation comes from stance slip (MN foot motion), not cmd.walk.
+ * Gap-fill: kinematic hinges + stance-slip so Pages can walk without MuJoCo.
+ * Body translation comes from MN foot motion, not cmd.walk, not a CPG.
  */
 export function stepLife(fly, dt, t, cmd) {
   const d = fly.userData;
