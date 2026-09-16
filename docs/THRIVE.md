@@ -13,7 +13,7 @@ Table of connectome vs gap-fill: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md#architect
 - Start intact: NeuroMechFly mesh, MN drive, planted walk, flight off, garden home.
 - Keep sensory channels (vision, proprio, touch, odor) closed and honest.
 - Leave empty annotation pools empty. No invented MNs, cosmetic CPG gait, or walk thrusters.
-- Let the traced graph be primary; helpers only write into real pools or plant state.
+- Let the traced graph be primary; helpers only write into real pools or plant state (`poseMap.js` is readout, not a behavior tree).
 - Offer labs as **links**: hΔ mid-run learning, follow-me (drone), stim-map exploration.
 - Prefer kinematic NMF on Pages if a remote plant would hang, vault, or seize.
 - Speak **home / utopia / thrive** — not lab cage, dish, or pad.

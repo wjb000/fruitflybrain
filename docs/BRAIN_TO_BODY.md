@@ -43,10 +43,13 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 |---|---|---|
 | `eye.js` + `agent.js` `opticRates` / `visFromEye` | Cameras / garden landmarks have no native ommatidial spike trains | Hz into real `R16*` `L1–L3` `T4*/T5*` `HS`/`VS` `visionL/R` — **not** a bearing-to-food chassis PID |
 | `plume.js` + ORN write-in | World odor is not an EM filament | Hz into real `foodORN` / `pherORN` / `co2ORN` / `aversiveORN` / `JO` |
-| `readProprio` / `readProprioMj` | Browser kinematic path has no campaniform organs | Joint/contact → existing `cho*` `hp*` `csa*` `tact*` `prop*` |
+| `readProprio` / `readProprioMj` | Browser kinematic path has no campaniform organs | Joint/contact → existing `cho*` `hp*` `csa*` `tact*` `prop*` (L/R = soma-X split of those IDs) |
 | Clock / neuromod calm Hz | No circadian photodiode on l-LNv except CRY path | Low Hz on real `sLNv` `lLNv` `LNd` `DN1*` `DAN` `OA` `HT` `pep` |
-| `antagPair` / `softDrive` | Co-contraction of real flex/ext would cancel DoF | Contrast from **those** pool EMAs — no invented antagonists, no CPG |
-| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; `y` held at `standZ`; generous stance band |
+| `poseMap.js` `antagPair` / `softDrive` | Co-contraction of real flex/ext would cancel DoF; small pools saturate | Contrast from **those** pool EMAs; unipolar empty partner stays a modest rest offset — no invented antagonists, no CPG |
+| T1 (foreleg) pose scale | T1 has coxaProm + Ta* (T2/T3 do not); sparse 2–8 cell pools were saturating | Scale T1 hinges down so reach/groom stays, arm-flail dies. Same real MN IDs |
+| Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
+| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` |
+| Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate |
 | Adhesion / vault settle (`physics.py`) | NMF plant vaults without sticky feet | `set_leg_adhesion_states`; bleed upward vault; **no** walk thruster |
 | Utopia garden (`world/procgen.js`) | Lab dish is aversive and empty | Fruit, dew, shade, blossoms, hedge bounce — sensory world only |
 | Hedge bounce (`WORLD_SOFT_LIMIT`) | Open ground has no ethological rim | Redirect velocity; never shock / punish / wall GRNs |
@@ -90,7 +93,7 @@ eye L/R salience (ripe fruit + garden landmarks)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns2`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns3`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -127,7 +130,7 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns2`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns3`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -162,7 +165,7 @@ Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold 
 | `DNa` | Contributes to walk mode label only |
 | `DLM`, `DVM`, `ADMN` | Wing power / flap (kinematic); plant flight force gated on same |
 | `MN9`, `proboscis` | Proboscis / haustellum extension |
-| `neck`, `neckL`, `neckR` | Head pitch magnitude + yaw from L/R CvN |
+| `neck`, `neckL`, `neckR` | Head **pitch** from pooled CvN; **yaw/roll** from L/R (smoothed, dead-zoned) |
 | `abdomen`, courtship (`aIPg`/`pIP1`/`DNg02`/`fru`) | Abdomen curl |
 | `DNp01` | Mode label only (arousal path; not a default stim) |
 
@@ -214,7 +217,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (cns2 / utopia garden)
+### Embodiment status (cns3 / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -222,14 +225,15 @@ Closed or kept honest on the homepage fly body:
 |---|---|
 | Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
 | Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
-| Planted walk | Kinematic: no T1-extensor hop; y held at `standZ`; stance band slightly generous. MuJoCo: existing vault/weak-plant settle in `physics.py` |
+| Planted walk | Kinematic: T2/T3 + DNa gate slip; T1 feet down-weighted; y held at `standZ`. MuJoCo: vault/weak-plant settle in `physics.py` |
 | Vision → legs | Eye → `visionL/R` + optic Hz → LIF → annotated MNs → pose → stance-slip. Spawn faces ripe fruit. No bearing thruster |
-| Proprio / touch | `readProprio` / `readProprioMj` + graded `tact*` / `ppk*` / GRNs remain bound |
+| Proprio / touch | `readProprio` / `readProprioMj` write `cho*` `hp*` `csa*` `tact*` `prop*` including L/R soma-X splits of existing IDs |
+| Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Soft home | Clearing radius 12.5, hedge bounce/redirect (never punish), `WORLD_SOFT_LIMIT` ~10.8 |
 | Aversives | Bitter / assay pole / scent bomb **off** unless `?bitter=1` / `?assay=1` / HUD toggle |
 | Flight | Off unless `?flight=1` |
 | Plant / mesh sync | `applyMujoco` copies thorax XYZ + bones when a plant is live; Pages skips auto-tunnel |
-| Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev) |
+| Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev). Unipolar remotor is a modest rest offset, not a slam |
 | Connectome vs gap-fill | LIF + real synapses primary; helpers listed above. No CPG / thruster / invented MNs |
 
 Still open (not invented around):

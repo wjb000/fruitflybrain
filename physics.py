@@ -38,20 +38,21 @@ OUR_LEGS = ["L1", "L2", "L3", "R1", "R2", "R3"]  # maps 1:1 onto NMF lf,lm,lh,rf
 NMF_TO_OUR = dict(zip(NMF_LEGS, OUR_LEGS))
 OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 
-# Antagonist → DoF. Same pairing as the connectome muscle pools / fly.js.
+# Antagonist → DoF. Same pairing as the connectome muscle pools / poseMap.js.
 # (nmf child-link, axis) → (flex/positive MN, ext/negative MN, range rad, extra)
 # MANC muscle → NeuroMechFly DoF (Azevedo et al.; Soler et al.).
 # Promotor/remotor swing the coxa (pitch). Adductor vs remotor/abductor
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
+# cns3: calmer spans — T1 already scaled in JS muscle cmds; plant must not
+# re-amplify neck-less T1 arm-flail via large coxa/tr pitch.
 DOF_MAP = [
-    # Walkable spans: MN-only contact locomotion (restore after calm2 twitch).
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.78, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.58, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.55, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.98, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.36, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.78, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.50, 0.0),
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.58, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.40, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.34, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.62, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.26, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.60, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.32, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.
@@ -81,11 +82,13 @@ def antagonist(pos: float, neg: float) -> float:
     p = float(pos or 0.0)
     n = float(neg or 0.0)
     mag = p + n
-    # Quiet pools stay limp. Stronger flex/ext so contact can push the body.
-    if mag < 0.01:
+    # Quiet pools stay limp. Unipolar (empty coxaProm) is a modest offset.
+    if mag < 0.02:
         return 0.0
-    raw = (p - n) / (mag + 0.045)
-    return float(math.tanh(raw * 1.75))
+    unipolar = (p < 0.045) != (n < 0.045)
+    raw = (p - n) / (mag + 0.05)
+    d = math.tanh(raw * 1.55)
+    return d * (0.52 if unipolar else 1.0)
 
 
 def three_to_mj(x: float, z: float, y: float = SPAWN_Z) -> tuple[float, float, float]:
@@ -416,7 +419,7 @@ class Plant:
             pos = float(m.get(pos_name, 0.0) or 0.0)
             neg = float(m.get(neg_name, 0.0) or 0.0) if neg_name else 0.0
             if link == "trochanterfemur" and axis == "pitch":
-                pos = pos + 0.6 * float(m.get("feRed", 0.0) or 0.0)
+                pos = pos + 0.35 * float(m.get("feRed", 0.0) or 0.0)
             tgt[i] = body.rest[i] + span * antagonist(pos, neg)
         return tgt
 

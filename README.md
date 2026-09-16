@@ -16,7 +16,7 @@ world (light, odor, contact, proprio)
 
 Quiet annotated pools → quiet actuators. Empty annotation pools stay empty (no invented MNs, no cosmetic gait, no free-joint walk thrusters). Flight translation is **off** unless `?flight=1`.
 
-Hard-refresh: [`?v=cns2`](https://wjb000.github.io/fruitflybrain/?v=cns2). Optional labs stay as links: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=cns2).
+Hard-refresh: [`?v=cns3`](https://wjb000.github.io/fruitflybrain/?v=cns3). Optional labs stay as links: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=cns3).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -31,7 +31,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python prepare.py          # first time: builds web/data from the public Male CNS files
 python export_effectors.py # MN→muscle + proprio pools → web/data/effectors.json
-python serve.py            # opens http://127.0.0.1:8787/?v=cns2
+python serve.py            # opens http://127.0.0.1:8787/?v=cns3
 ```
 
 `prepare.py` expects the public tables already under `data/` (annotations, neurotransmitters, connectome-weights, brain/VNC meshes). Those are CC-BY from [male-cns.janelia.org](https://male-cns.janelia.org/).
@@ -74,7 +74,7 @@ See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actu
 
 **hΔ fast-weight lab:** [`web/hdelta.html?v=lab1`](web/hdelta.html). Freeze Δw mid-run. Methods: [`docs/FAST_WEIGHT_HDELTA.md`](docs/FAST_WEIGHT_HDELTA.md).
 
-**Stim map:** `?stim=1&v=cns2` — gentle Hz inject through the LIF onto named pools. Not surgery; not a chassis cheat.
+**Stim map:** `?stim=1&v=cns3` — gentle Hz inject through the LIF onto named pools. Not surgery; not a chassis cheat.
 
 **Portable robot API** (cube / drone / hardware):
 
