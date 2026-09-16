@@ -2,7 +2,7 @@
  * Robot controller API — vision → steering from the male CNS connectome.
  *
  * Control law (no food-bearing cheat):
- *   compound eye salience (L/R)
+ *   compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
  *     → optic / visionL/R sensory write-in (Hz)
  *       → LIF connectome (sim.worker)
  *         → descending + leg MN pool EMAs
@@ -59,7 +59,8 @@ export function portableControls(fly) {
   const t2L = e.T2L || 0;
   const t2R = e.T2R || 0;
   const t2sum = t2L + t2R + 0.045;
-  const strafe = clamp(Math.tanh(((t2R - t2L) / t2sum) * 1.85 + asymFood * 0.12), -1, 1);
+  const asymFlow = hsR - hsL;
+  const strafe = clamp(Math.tanh(((t2R - t2L) / t2sum) * 1.85 + asymFlow * 0.12), -1, 1);
   // Wing power MNs + DNa → climb above hover (throttle baseline applied in droneSetpoints).
   const wingMean = mean([cmd.wing?.dlm ?? e.DLM, cmd.wing?.dvm ?? e.DVM, cmd.wing?.admn ?? e.ADMN]);
   const climb = clamp(Math.tanh(wingMean * 1.55 + dna * 0.6 + clamp01(cmd.fly) * 0.45), -0.35, 1);
@@ -205,9 +206,9 @@ export function droneSetpoints(controls, {
 }
 
 export const PORTABLE_SIGNAL_DOC = {
-  "vision.HS_L/R": "Horizontal system pool rates (L/R) from eye write-in → LIF",
-  "vision.VS_L/R": "Vertical system pool rates (L/R)",
-  "vision.salTarget / asymFood": "Compound-eye food/beacon salience (diagnostic; not a thruster)",
+  "vision.HS_L/R": "Horizontal system pool rates (L/R) from T4/T5 wide-field flow → LIF",
+  "vision.VS_L/R": "Vertical system pool rates (L/R), including loom/expansion",
+  "vision.salTarget / asymFood": "HUD object tags (fruit/dew) — diagnostic only, not written into T4/T5/HS",
   "descending.*": "Descending neuron pool EMAs",
   "motor.walk/turn/fly": "MN-derived body labels (not free-joint thrusters)",
   "steering.forward/yawRate": "Clean chassis commands for a robot driver (−1…1 yaw)",
@@ -237,7 +238,7 @@ Hardware:
 
 Sanity: silence:HS or silence optic pools should weaken beacon-directed yaw.
 Default embodiment: fly body (NeuroMechFly mesh + MN drive). Optional ?body=cube|drone.
-Cache-bust ?v=cns4. Follow-me (optional): follow.html?v=follow1. hΔ lab: hdelta.html?v=lab1. Default home: fly utopia garden.
+Cache-bust ?v=cns4sense. Follow-me (optional): follow.html?v=follow1. hΔ lab: hdelta.html?v=lab1. Default home: fly utopia garden.
 `.trim();
 
 function num(a, b) {

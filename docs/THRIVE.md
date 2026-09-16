@@ -11,7 +11,7 @@ Table of connectome vs gap-fill: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md#architect
 ## Do
 
 - Start intact: NeuroMechFly mesh, MN drive, planted walk, flight off, garden home.
-- Keep sensory channels (vision, proprio, touch, odor) closed and honest.
+- Keep sensory channels closed and honest: compound-eye R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS, plus ORN / JO / proprio / hygro / taste / clock into **existing** pools. See [`SENSORY.md`](SENSORY.md).
 - Leave empty annotation pools empty. No invented MNs, cosmetic CPG gait, or walk thrusters.
 - Let the traced graph be primary; helpers only write into real pools or plant state (`poseMap.js` is readout, not a behavior tree).
 - Offer labs as **links**: hΔ mid-run learning, follow-me (drone), stim-map exploration.

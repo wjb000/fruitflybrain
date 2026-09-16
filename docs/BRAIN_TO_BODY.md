@@ -41,7 +41,7 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 
 | Helper | Gap it fills | Honest limit |
 |---|---|---|
-| `eye.js` + `agent.js` `opticRates` / `visFromEye` | Cameras / garden landmarks have no native ommatidial spike trains | Hz into real `R16*` `L1–L3` `T4*/T5*` `HS`/`VS` `visionL/R` — **not** a bearing-to-food chassis PID |
+| `eye.js` + `encodeOpticRates` / `visFromEye` | Cameras / garden have no native ommatidial spike trains | Compound-eye R1–R6 / R7 / R8 → L1 ON / L2 OFF → T4/T5 (HR + parallax/loom) → HS/VS Hz on **real** IDs. **Not** RGB frames, **not** food-salience blobs into motion cells, **not** a bearing PID. See [`SENSORY.md`](SENSORY.md). |
 | `plume.js` + ORN write-in | World odor is not an EM filament | Hz into real `foodORN` / `pherORN` / `co2ORN` / `aversiveORN` / `JO` |
 | `readProprio` / `readProprioMj` | Browser kinematic path has no campaniform organs | Joint/contact → existing `cho*` `hp*` `csa*` `tact*` `prop*` (L/R = soma-X split of those IDs) |
 | Clock / neuromod calm Hz | No circadian photodiode on l-LNv except CRY path | Low Hz on real `sLNv` `lLNv` `LNd` `DN1*` `DAN` `OA` `HT` `pep` |
@@ -87,15 +87,15 @@ Embodiment is the **male NeuroMechFly mesh** with MN→hinge pose and **planted 
 **Control law (connectome-only; no beacon-chase gain tweaks):**
 
 ```
-eye L/R salience (ripe fruit + garden landmarks)
-  → visionL/R + optic pools (Hz write-in, klinotaxis contrast)
+Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
+  → visionL/R + optic pools (Hz write-in)
     → LIF connectome
       → descending + leg MN EMAs
         → cmd.muscle[L1…R3] (empty pools stay 0)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns4`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns4sense`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -106,8 +106,8 @@ Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localSt
 **Control law (connectome-only; stim-map → drone axes — no beacon-chase gain tweaks):**
 
 ```
-eye L/R salience (beacon)
-  → visionL/R + optic pools (Hz write-in, klinotaxis contrast)
+eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
+  → visionL/R + optic pools (Hz write-in)
     → LIF connectome
       → descending + leg MN EMAs
         → cmd.walk / cmd.turn
@@ -132,7 +132,7 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns4`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns4sense`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -145,7 +145,7 @@ Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold 
 
 | World signal | Pool / channel keys | Notes |
 |---|---|---|
-| Compound eye | `R16*`, `R7*`, `R8*` sectors; `L1–L3`; `T4a–d`/`T5a–d`; `HS`/`VS` | From `eye.js` Hassenstein–Reichardt |
+| Compound eye | `R16*`, `R7*`, `R8*` sectors; `L1–L3`; `T4a–d`/`T5a–d`; `HS`/`VS` | Ommatidial lattice; L1/L2 ON/OFF; T4/T5 HR + 3D flow/loom; **not** RGB/salience. [`SENSORY.md`](SENSORY.md) |
 | Food / pher / CO₂ / aversive plumes | `foodORN`, `pherORN`, `co2ORN`, `aversiveORN` L/R | Antenna sampling + klinotaxis |
 | Wind | `JO` L/R | Body-frame wind at arista tips |
 | Taste | `sweet`, `bitter`, `taste` | Graded contact at food / bitter drops |
@@ -179,12 +179,12 @@ they are **not** sent as free-joint thrusters.
 
 ### Vision → walking (sensory write-in)
 
-Compound eye (`eye.js`, including ripe fruit + garden `landmarks`) →
-stronger Hz on `visionL/R` and optic channels (`R16*`, `L1–L3`, `T4*/T5*`,
-`HS`/`VS`) with L/R klinotaxis contrast → LIF (`sim.worker.js`) →
-descending/leg MN pools → MN hinge pose → stance-slip (fly) or portable
-`forward`/`yawRate` (cube/drone). No bypass that sets turn/walk from food bearing.
-Default spawn faces the ripe fruit so L/R vision has a target. Assay beacon only if `?assay=1`.
+Compound eye (`eye.js`: R1–R6 / R7 / R8, L1/L2, T4/T5, HS/VS, parallax + loom) →
+Hz on `visionL/R` and optic channels with natural L/R from the two eyes → LIF
+(`sim.worker.js`) → descending/leg MN pools → MN hinge pose → stance-slip (fly)
+or portable `forward`/`yawRate` (cube/drone). No bypass that sets turn/walk from
+food bearing. Default spawn faces the ripe fruit so the lattice has a near
+surface. Assay beacon only if `?assay=1`. Details: [`SENSORY.md`](SENSORY.md).
 
 ## Mapped vs unmapped (annotation limits)
 
@@ -219,7 +219,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (cns4 / utopia garden)
+### Embodiment status (cns4sense / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -228,7 +228,7 @@ Closed or kept honest on the homepage fly body:
 | Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
 | Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
 | Planted walk | Kinematic: T2/T3 + DNa gate slip; T1 feet down-weighted; y held at `standZ`. MuJoCo: vault/weak-plant settle in `physics.py` |
-| Vision → legs | Eye → `visionL/R` + optic Hz → LIF → annotated MNs → pose → stance-slip. Spawn faces ripe fruit. No bearing thruster |
+| Vision → legs | Compound eye → `visionL/R` + optic Hz (R16/R7/R8, L1/L2, T4/T5, HS/VS from flow/loom) → LIF → annotated MNs → pose → stance-slip. No RGB dump, no salFood→HS, no bearing thruster |
 | Proprio / touch | `readProprio` / `readProprioMj` write `cho*` `hp*` `csa*` `tact*` `prop*` including L/R soma-X splits of existing IDs |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
