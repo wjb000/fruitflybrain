@@ -6,19 +6,20 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=fullfly1";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=fullfly1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=fullfly1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=fullfly1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=fullfly1";
-import { spinRotors } from "./chassis.js?v=fullfly1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=dynw1";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=dynw1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=dynw1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=dynw1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=dynw1";
+import { spinRotors } from "./chassis.js?v=dynw1";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
   softDrive, muscleFromEma, embodyMuscle, neckFromEma, walkDriveFromEma,
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=fullfly1";
+} from "./poseMap.js?v=dynw1";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=dynw1";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -231,6 +232,8 @@ export class EmbodiedFly {
     this.lastSmellR = 0;
     this.life = { hunger: 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
     this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, headRoll: 0, abdomen: 0, abdSegs: [], antennaL: 0, antennaR: 0, swingN: 0, muscle: {} };
+    this.poseFilt = { walkTonic: 0, abdTonic: 0 };
+    this.syn = { meanU: 0, meanX: 1, meanEff: 1, meanW: 0, nDepressed: 0, nEdges: 0, nPre: 0, fastW: { meanAbs: 0, nEdges: 0 } };
     this.motEma = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
     this.opticEma = { HS_L: 0, HS_R: 0, VS_L: 0, VS_R: 0 };
     this.poolMap = mergePoolMaps(effectors, stim);
@@ -365,7 +368,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js");
+    this.worker = new Worker("sim.worker.js?v=dynw1");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -436,6 +439,15 @@ export class EmbodiedFly {
         for (const k of POOL_KEYS) pools[k] = [...this.poolSets[k]];
         // No walkL/walkR aggregate effectors — locomotion from annotated MN pools only.
         this.worker.postMessage({ type: "bindEffectors", pools });
+        // Tiny hΔ Δw on the 45 traced cells' outgoing chemical edges only —
+        // mid-run CX adaptation, not the hΔ lab / PFL3 tank-steer demo.
+        this.worker.postMessage({
+          type: "enableFastW",
+          ids: HDELTA_PLASTIC_IDS,
+          eta: 0.012,
+          decay: 0.9985,
+          plastic: true,
+        });
         this.worker.postMessage({ type: "run", on: true });
         if (this.onReady) this.onReady();
         return;
@@ -634,6 +646,7 @@ export class EmbodiedFly {
     this.body.rotation.set(0, this.heading, 0);
     this.life.hunger = 0.7;
     this.life.crop = 0.2; this.life.energy = 1; this.life.sleep = 0.1;
+    this.poseFilt = { walkTonic: 0, abdTonic: 0 };
     if (physics.ok && !isKinematicChassis(this.bodyMode)) {
       resetPhysics(this.physId, x, z, this.heading).then((pose) => {
         if (pose) this.mjPose = pose;
@@ -666,6 +679,7 @@ export class EmbodiedFly {
       this.life.hunger = this.life.hunger * 0.85 + Math.max(0, Math.min(1.5, m.hungerMod)) * 0.15;
     }
     if (m.lesion) this.lesionMeta = m.lesion;
+    if (m.syn) this.syn = m.syn;
     if (this.xray) {
       this.actAttr.set(this.activity);
       this.points.geometry.attributes.act.needsUpdate = true;
@@ -690,7 +704,7 @@ export class EmbodiedFly {
     const cmd = this.cmd;
     // Body commands are ONLY annotated MN / effector readout.
     // walk/turn are UI mode labels — never free-joint thrusters or class-aggregate cheats.
-    const walkDrive = walkDriveFromEma(e);
+    const walkDrive = walkDriveFromEma(e, this.poseFilt);
     cmd.walk = THREE.MathUtils.clamp(walkDrive, 0, 1);
     // Turn from bilateral walking-leg MN pools (T2/T3) plus a little T1.
     const walkL = ((e.T2L || 0) + (e.T3L || 0)) / 2;
@@ -716,7 +730,7 @@ export class EmbodiedFly {
     cmd.head = neck.head;
     cmd.headYaw = neck.headYaw;
     cmd.headRoll = neck.headRoll;
-    const abd = abdomenFromEma(e, cmd.court);
+    const abd = abdomenFromEma(e, cmd.court, this.poseFilt);
     cmd.abdomen = abd.curl;
     cmd.abdSegs = abd.segs;
     cmd.antennaL = antennaFromJo(this.lastJO?.L);
@@ -822,7 +836,8 @@ export class EmbodiedFly {
           this.lastSlipAbs = 0;
         } else {
           const asym = Math.min(1.25, Math.abs(walkR - walkL) * 2.0 + walkDrive);
-          const slipGain = (2.55 + 1.85 * asym) * Math.max(0.45, walkDrive);
+          // No constant-push floor: saturated T2/T3 must not cruise from a 0.45 gain.
+          const slipGain = (2.10 + 1.55 * asym) * walkDrive;
           let sx = (slip.x / slip.n) * slipGain;
           let sz = (slip.z / slip.n) * slipGain;
           const step = Math.hypot(sx, sz);
