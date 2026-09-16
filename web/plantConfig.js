@@ -1,12 +1,16 @@
 /** Remote MuJoCo plant origin.
  *
- * Pages serves UI + connectome data. Physics runs on the lab Mac via Cloudflare tunnel.
+ * Pages serves UI + connectome data. Local `serve.py` hosts `/physics`.
+ * Thrive default on GitHub Pages is kinematic NeuroMechFly (no remote plant)
+ * so a dead/vaulting tunnel cannot seize the fly. Opt in with `?plant=` or
+ * `localStorage.ffbPlant`.
  *
  * Resolution order:
  *   1. ?plant= query (absolute URL)
  *   2. localStorage.ffbPlant
- *   3. DEFAULT_PLANT (Mac tunnel)
- *   4. empty = same-origin /physics (local serve.py)
+ *   3. empty = same-origin /physics (local serve.py) or kinematic on Pages
+ *
+ * `DEFAULT_PLANT` is a documented lab example only — pass it via `?plant=` to opt in.
  */
 export const DEFAULT_PLANT = "https://candidate-however-bishop-promoted.trycloudflare.com";
 
@@ -23,7 +27,8 @@ export function plantBase() {
     const ls = localStorage.getItem("ffbPlant");
     if (ls != null && String(ls).trim() !== "") return String(ls).trim().replace(/\/$/, "");
   } catch (_) {}
-  if (DEFAULT_PLANT) return DEFAULT_PLANT.replace(/\/$/, "");
+  // Thrive default: same-origin /physics (local serve.py) or kinematic on Pages.
+  // Do not auto-dial DEFAULT_PLANT — a dead tunnel hangs/vaults. Opt in with ?plant=.
   return "";
 }
 

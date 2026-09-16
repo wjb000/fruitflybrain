@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=follow1";
-import { CompoundEye } from "./eye.js?v=follow1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=follow1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=follow1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
-import { spinRotors } from "./chassis.js?v=follow1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=thrive1";
+import { CompoundEye } from "./eye.js?v=thrive1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=thrive1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=thrive1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=thrive1";
+import { spinRotors } from "./chassis.js?v=thrive1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -174,14 +174,14 @@ export const FLIGHT_ENABLED = typeof location !== "undefined" && flightEnabledFr
 function bodyModeFromUrl() {
   try {
     const q = new URLSearchParams(location.search).get("body");
-    if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
+    if (q === "drone" || q === "quad" || q === "quadrotor") return "drone";
     if (q === "cube" || q === "box") return "cube";
-    return "drone";
+    return "fly";
   } catch (_) {
-    return "drone";
+    return "fly";
   }
 }
-export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "drone";
+export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "fly";
 function isKinematicChassis(mode) {
   return mode === "drone" || mode === "cube";
 }
@@ -211,8 +211,8 @@ export class EmbodiedFly {
   }) {
     this.sex = "male"; // public sim: male CNS only
     this.body = body;
-    // Default drone chassis; ?body=cube keeps box; ?body=fly restores NMF / MuJoCo.
-    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "drone";
+    // Default NeuroMechFly; ?body=cube box; ?body=drone quadrotor.
+    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "fly";
     this.plantLabel = plantLabelFor(this.bodyMode);
     this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0, pitch: 0, throttle: 1.45 };
     this.onReady = onReady;
@@ -756,17 +756,22 @@ export class EmbodiedFly {
     } else {
       // Kinematic fallback if the plant is down: MN → leg pose → stance slip.
       // No cmd.walk thruster — ground motion from foot slip only.
-      // Flight translation gated (default OFF); wing mesh still follows wing MNs in poseSoftParts.
+      // Thrive default: stay planted (no T1-extensor hop / vault). Flight translation
+      // stays gated off unless ?flight=1; wing mesh still follows wing MNs in poseSoftParts.
       const stand = this.body.userData.standZ || 1.3;
-      const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
-      if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
       const flying = FLIGHT_ENABLED && cmd.fly > 0.58;
-      if (flying) {
+      if (!FLIGHT_ENABLED) {
+        this.vy = 0;
+        this.y = stand;
+      } else if (flying) {
         this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
-      } else this.vy -= 18 * dt;
-      this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && !flying) this.vy = 0;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+      } else {
+        this.vy -= 18 * dt;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+        if (this.y === stand) this.vy = 0;
+      }
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
       if (flying) {
@@ -795,6 +800,9 @@ export class EmbodiedFly {
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? slipMag / 0.035
         : cmd.fly) * 0.7;
+      this.planted = !flying && this.y <= stand + 0.08;
+      this.plantNLeg = slip && slip.n ? slip.n : 0;
+      this.plantLabel = physics.ok ? "fly" : "kinematic NMF";
       // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
       if (OPEN_WORLD) {
         const rad = Math.hypot(this.body.position.x, this.body.position.z);

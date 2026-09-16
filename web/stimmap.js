@@ -1,23 +1,24 @@
 /**
- * Stim-map mode — causal pool activation → chassis forward/yaw (drone axes default).
+ * Stim-map mode — gentle causal pool exploration (Hz inject → LIF → MNs).
  *
- * Path stays honest: button → Hz inject (and optional lesion boost) on named
- * pools → LIF spikes → MN / descending effectors → portable steering → drone.
+ * Path stays honest: button → Hz inject (optional explore gain) on named
+ * pools → LIF spikes → MN / descending effectors → portable steering / fly pose.
  * Never calls chassis.setVelocity / thrusters from the UI.
  *
- * Enable: default on drone/cube, or ?stim=1 / ?map=1. Disable: ?stim=0.
+ * Enable: ?stim=1 / ?map=1 (also default on cube/drone). Disable: ?stim=0.
+ * Homepage fly-body default leaves this off — link from the HUD.
  */
-import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
-import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=follow1";
+import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=thrive1";
+import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=thrive1";
 
-export function stimMapWanted(bodyMode = "drone") {
+export function stimMapWanted(bodyMode = "fly") {
   try {
     const q = new URLSearchParams(location.search);
     if (q.get("stim") === "0" || q.get("map") === "0") return false;
     if (q.get("stim") === "1" || q.get("map") === "1") return true;
     return bodyMode === "drone" || bodyMode === "cube";
   } catch {
-    return bodyMode === "drone" || bodyMode === "cube";
+    return false;
   }
 }
 
@@ -29,7 +30,7 @@ export function stimMapUrl(on = true) {
   } else {
     u.searchParams.set("stim", "0");
   }
-  u.searchParams.set("v", "drone1");
+  u.searchParams.set("v", "thrive1");
   return u.pathname + u.search + u.hash;
 }
 
@@ -42,9 +43,9 @@ export function mountStimMapPanel({ getFly, root } = {}) {
   el.className = "panel stim-map-panel";
   el.innerHTML = `
     <button class="collapse" type="button" title="collapse">–</button>
-    <div class="kicker">stim map · causal</div>
+    <div class="kicker">stim map · explore</div>
     <div class="panel-body">
-      <div class="hint">Boost named pools (Hz inject through LIF). Watch chassis <b>pitch</b> / <b>yaw</b> / <b>throttle</b>. T1L vs T1R should yaw opposite. Path: stim → spikes → MNs → portable → drone axes.</div>
+      <div class="hint">Gently drive named pools (Hz through the LIF). Watch MN steering — T1L vs T1R should yaw opposite. Path: stim → spikes → MNs → body. Not surgery; not a chassis cheat.</div>
       <div class="stim-readouts" id="stimReadouts">
         <div><b id="stimFwd">—</b><span>forward</span></div>
         <div><b id="stimYaw">—</b><span>yawRate</span></div>
@@ -57,7 +58,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
         <input type="range" id="stimHz" min="20" max="160" step="5" value="${DEFAULT_STIM_HZ}" />
         <span id="stimHzVal">${DEFAULT_STIM_HZ}</span>
       </label>
-      <label class="hint stim-slider">lesion boost ×
+      <label class="hint stim-slider">explore gain ×
         <input type="range" id="stimBoost" min="1" max="4" step="0.25" value="1" />
         <span id="stimBoostVal">1</span>
       </label>
@@ -139,7 +140,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
     if (active) setBtnOn(active, false);
     active = null;
     holdPool = null;
-    log("cleared inject + lesion boost");
+    log("cleared inject + explore gain");
   }
   function activate(pool, { hold = false } = {}) {
     const f = fly();
@@ -160,7 +161,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
     active = pool;
     setBtnOn(pool, true);
     const g = boostG();
-    log(`inject ${pool} @ ${hz()} Hz${g > 1.01 ? ` · boost×${g}` : ""} → LIF → MNs → drone`);
+    log(`inject ${pool} @ ${hz()} Hz${g > 1.01 ? ` · gain×${g}` : ""} → LIF → MNs → body`);
   }
 
   for (const pool of STIM_MAP_POOLS) {
@@ -237,7 +238,7 @@ export function mountStimMapPanel({ getFly, root } = {}) {
 
   function sampleChassis(f) {
     const snap = portableControls(f);
-    const mode = f?.bodyMode || "drone";
+    const mode = f?.bodyMode || "fly";
     const set = mode === "drone"
       ? droneSetpoints(snap)
       : chassisSetpoints(snap, { vGain: 2.35, yawGain: 9.4 });

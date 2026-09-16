@@ -1,19 +1,19 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=follow1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=follow1";
-import { createOpenWorld } from "./world/procgen.js?v=follow1";
-import { EmbodiedFly } from "./agent.js?v=follow1";
-import { drawOmmatidia } from "./eye.js?v=follow1";
-import { OdorWorld } from "./plume.js?v=follow1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=follow1";
-import { parseLesionFlag } from "./lesion.js?v=follow1";
-import { mountAssayPanel } from "./assay/panel.js?v=follow1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=follow1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=follow1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=follow1";
+import { loadNmf, createMaleFly } from "./fly.js?v=thrive1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=thrive1";
+import { createOpenWorld } from "./world/procgen.js?v=thrive1";
+import { EmbodiedFly } from "./agent.js?v=thrive1";
+import { drawOmmatidia } from "./eye.js?v=thrive1";
+import { OdorWorld } from "./plume.js?v=thrive1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=thrive1";
+import { parseLesionFlag } from "./lesion.js?v=thrive1";
+import { mountAssayPanel } from "./assay/panel.js?v=thrive1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=thrive1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=thrive1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=thrive1";
 
-const BODY_MODE = bodyModeFromUrl(); // default "drone"; ?body=cube|fly fallbacks
+const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
 /** Local flight URL gate for HUD — do not import FLIGHT_ENABLED (stale module cache). Default OFF. */
 function flightEnabled() {
@@ -70,7 +70,13 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 120);
-camera.position.set(0, 6.2, 11.5);
+if (BODY_MODE === "fly") {
+  camera.position.set(2.4, 3.15, 6.6);
+} else if (BODY_MODE === "drone") {
+  camera.position.set(0, 6.2, 11.5);
+} else {
+  camera.position.set(0, 4.4, 8.5);
+}
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -80,7 +86,7 @@ controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
 controls.minDistance = 0.6;
 controls.maxDistance = 36;
-controls.target.set(0, 0.55, 0);
+controls.target.set(BODY_MODE === "fly" ? 1.35 : 0, BODY_MODE === "fly" ? 0.9 : 0.55, BODY_MODE === "fly" ? 0.85 : 0);
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN,
@@ -137,17 +143,29 @@ let nMale = 0;
 let readyN = 0;
 let expectedReady = 1;
 
+/** First male: planted near pad center, facing the food beacon (vision→leg has a target). */
+function thriveHome() {
+  const x = 1.35, z = 0.85;
+  const foodX = 6.5, foodZ = 4.2;
+  const yaw = Math.atan2(foodX - x, foodZ - z);
+  return { x, z, yaw };
+}
+
 function spawnSpot(occupied) {
   const pts = occupied || flies.map((f) => ({ x: f.body.position.x, z: f.body.position.z }));
-  const yaw = Math.random() * Math.PI * 2;
-  const gap = 5.5;
+  if (!pts.length) return thriveHome();
+  const gap = 4.2;
   for (let k = 0; k < 24; k++) {
     const a = Math.random() * Math.PI * 2;
-    const r = 3.5 + Math.random() * 10;
+    const r = 2.2 + Math.random() * 6;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (pts.every((p) => Math.hypot(p.x - x, p.z - z) >= gap)) return { x, z, yaw };
+    if (pts.every((p) => Math.hypot(p.x - x, p.z - z) >= gap)) {
+      const foodX = 6.5, foodZ = 4.2;
+      return { x, z, yaw: Math.atan2(foodX - x, foodZ - z) };
+    }
   }
-  return { x: (Math.random() - 0.5) * 12, z: (Math.random() - 0.5) * 12, yaw };
+  const h = thriveHome();
+  return { x: h.x + (Math.random() - 0.5) * 2, z: h.z + (Math.random() - 0.5) * 2, yaw: h.yaw };
 }
 
 function onFlyReady() {
@@ -254,7 +272,7 @@ fillJoints($("joints"));
 if (BODY_MODE === "fly") {
   setLoad(0.88, "NeuroMechFly body");
   await loadNmf();
-  setLoad(0.92, "MuJoCo flesh");
+  setLoad(0.92, "closing the loop");
   await connectPhysics();
   // Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
   if (physics.ok) {
@@ -262,8 +280,7 @@ if (BODY_MODE === "fly") {
   }
 } else {
   setLoad(0.88, BODY_MODE === "cube" ? "cube chassis" : "drone chassis");
-  setLoad(0.92, "brain → robot controller");
-  // Drone/cube: no MuJoCo plant, no nmf mesh load (avoids seize).
+  setLoad(0.92, "brain → chassis");
 }
 if ($("flesh")) {
   if (isKinematicChassis(BODY_MODE)) {
@@ -272,21 +289,21 @@ if ($("flesh")) {
     const origin = physics.plantOrigin || "";
     $("flesh").textContent = physics.ok
       ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
-      : "kinematic";
+      : "fly body";
   }
 }
 if ($("info")) {
   if (BODY_MODE === "drone") {
-    $("info").textContent = "Robot controller (drone default): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → quadrotor pitch/yaw/strafe/throttle (hover ~1.45). Stim-map → drone axes only. ?body=cube|fly fallbacks. See web/controller/portable.js.";
+    $("info").textContent = "Optional drone chassis: male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → quadrotor pitch/yaw/strafe/throttle. Homepage default is the fly body (?body=fly omitted). See web/controller/portable.js.";
   } else if (BODY_MODE === "cube") {
-    $("info").textContent = "Robot controller (cube): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → {v,ω} cube on small pad. No food-bearing thruster; no MuJoCo/nmf (?body=fly to restore). See web/controller/portable.js.";
+    $("info").textContent = "Optional cube chassis: male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable {v,ω}. Homepage default is the fly body. No food-bearing thruster.";
   } else {
     const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
       ? (" Plant @ " + physics.plantOrigin + ".")
       : "";
     $("info").textContent = physics.ok
-      ? ("Vision→walk: compound eye → optic/visionL/R pools → connectome → leg MNs → MuJoCo contact. Flight free-joint lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "OFF (add ?flight=1 to enable)") + ". No walk thrusters." + plantHint)
-      : ("Static host: kinematic MN→pose→stance-slip. Vision→walk via optic write-in (landmarks+salience→LIF→leg MNs). Flight translation " + (FLIGHT_ENABLED ? "ON" : "OFF") + ". Set ?plant=https://… for remote plant; ?flight=1 to allow wing-MN lift." + plantHint);
+      ? ("Thriving closed loop: compound eye → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Empty MN pools stay quiet." + plantHint)
+      : ("Thriving closed loop: kinematic NeuroMechFly. Vision → optic/visionL/R → LIF → leg MNs → pose → planted stance-slip. Flight translation " + (FLIGHT_ENABLED ? "ON" : "off") + ". Set ?plant=https://… for a live MuJoCo plant." + plantHint);
   }
 }
 
@@ -386,7 +403,7 @@ function onAny() {
     ? (kinMode === "cube" ? "cube chassis" : "drone chassis")
     : (physics.ok
       ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
-      : "kinematic MN");
+      : "fly body");
   if ($("flesh")) $("flesh").textContent = flesh;
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
@@ -422,13 +439,13 @@ function onAny() {
     if (kinMode === "drone") {
       plantBit = "plant=drone · MN→pitch/yaw/strafe/thr";
     } else if (kinMode === "cube") {
-      plantBit = "plant=cube · robot controller MN→v/ω";
+      plantBit = "plant=cube · MN→v/ω";
     } else {
       const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
       const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
       plantBit = physics.ok
-        ? ("legs↓" + nLeg + (focus.planted ? " planted" : ""))
-        : ("|slip|=" + Number(slip).toFixed(3));
+        ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling"))
+        : ("planted " + (focus.planted ? "yes" : "…") + " |slip|=" + Number(slip).toFixed(3));
     }
     $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs +
       (kinMode === "drone"
@@ -699,9 +716,9 @@ if (camHint) {
 const stimBtns = [
   ["loop", "live", ""],
   ["vision", "light", ""],
-  ["smell", "odor flood", ""],
+  ["smell", "scent", ""],
   ["taste", "taste", ""],
-  ["escape", "escape", "warn"],
+  ["touch", "touch", ""],
 ];
 const stimsEl = $("stims");
 for (const [id, label, cls] of stimBtns) {
@@ -718,7 +735,7 @@ function applyStim(id) {
   if (id === "vision") extra.vision = 90;
   if (id === "smell") extra.smellL = extra.smellR = 90;
   if (id === "taste") extra.taste = 90;
-  if (id === "escape") extra.escape = 180;
+  if (id === "touch") extra.touch = 90;
   for (const f of flies) {
     f.extra = { ...extra };
   }
@@ -851,9 +868,9 @@ let stimMapPanel = null;
     linkRow.style.marginTop = "8px";
     const a = document.createElement("a");
     a.href = stimMapUrl(true);
-    a.textContent = "open stim map";
+    a.textContent = "explore stim map";
     a.className = "stim-map-link";
-    a.title = "Causal stim → LIF → MNs → drone axes (not beacon-chase tuning)";
+    a.title = "Gentle pool exploration: Hz inject → LIF → MNs (not surgery)";
     linkRow.appendChild(a);
     if (panelL) panelL.appendChild(linkRow);
   }
