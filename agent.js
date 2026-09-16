@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=cns1";
-import { CompoundEye } from "./eye.js?v=cns1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns1";
-import { spinRotors } from "./chassis.js?v=cns1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=cns2";
+import { CompoundEye } from "./eye.js?v=cns2";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns2";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns2";
+import { spinRotors } from "./chassis.js?v=cns2";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -88,10 +88,10 @@ function antagPair(posEma, negEma, gain = 3.25) {
   if (mag < 1e-4) return { pos: 0, neg: 0 };
   const raw = (p - n) / (mag + 0.045);
   const d = Math.tanh(raw * 2.15);
-  const lose = 0.48; // suppress loser so flex/ext do not cancel
+  const lose = 0.62; // stronger winner-take-more — co-contraction was a twitch/seize
   return {
-    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.32)),
-    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.32)),
+    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.22)),
+    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.22)),
   };
 }
 
@@ -787,16 +787,29 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Stance-slip from MN foot motion (no thruster / CPG). Scale with leg MN
-        // asymmetry so quiet co-contraction does not thrash XY.
-        const asym = Math.min(1.4, Math.abs(legR - legL) * 2.2 + softDrive(legs, 2.4));
-        const slipGain = 2.2 + 1.6 * asym;
-        const sx = (slip.x / slip.n) * slipGain;
-        const sz = (slip.z / slip.n) * slipGain;
-        this.body.position.x += sx;
-        this.body.position.z += sz;
-        this.heading += (slip.yawR - slip.yawL) * (1.2 + 0.6 * asym);
-        this.lastSlipAbs = Math.hypot(sx, sz);
+        // Stance-slip from MN foot motion (no thruster / CPG). Dead-zone quiet
+        // co-contraction so idle MNs do not thrash XY / yaw (the seize look).
+        const walkDrive = softDrive(legs, 2.35);
+        const meanAbs = slip.meanAbs != null ? slip.meanAbs : Math.hypot(slip.x, slip.z) / slip.n;
+        if (walkDrive < 0.05 || meanAbs < 0.00055) {
+          this.lastSlipAbs = 0;
+        } else {
+          const asym = Math.min(1.15, Math.abs(legR - legL) * 2.0 + walkDrive);
+          const slipGain = (1.15 + 1.05 * asym) * walkDrive;
+          let sx = (slip.x / slip.n) * slipGain;
+          let sz = (slip.z / slip.n) * slipGain;
+          const step = Math.hypot(sx, sz);
+          const maxStep = 0.042;
+          if (step > maxStep) {
+            const k = maxStep / step;
+            sx *= k; sz *= k;
+          }
+          this.body.position.x += sx;
+          this.body.position.z += sz;
+          const dyaw = (slip.yawR - slip.yawL) * (0.7 + 0.45 * asym) * walkDrive;
+          this.heading += THREE.MathUtils.clamp(dyaw, -0.07, 0.07);
+          this.lastSlipAbs = Math.hypot(sx, sz);
+        }
       } else {
         this.lastSlipAbs = 0;
       }
@@ -819,20 +832,26 @@ export class EmbodiedFly {
           this.body.position.z *= s;
         }
       }
+      // Shade is visual/sensory only while flight is off. Auto-lift onto the
+      // old pole perch vaulted the thorax (y→~2.4) whenever he walked near it.
       const perch = this.world.perch;
       this.onPerch = false;
-      if (perch) {
+      if (FLIGHT_ENABLED && perch) {
         const px = this.body.position.x, pz = this.body.position.z;
         const dp = Math.hypot(px - perch.x, pz - perch.z);
-        const cap = 0.48, top = perch.h || 2.18;
-        if (dp < cap && this.y > top - 0.55 && this.y < top + stand + 0.2 && cmd.fly < 0.28) {
+        const cap = 0.42, top = perch.h || 2.18;
+        if (dp < cap && this.y > top - 0.2 && this.y < top + 0.45 && cmd.fly < 0.28) {
           this.onPerch = true;
           this.vy = 0;
-          this.y = top + stand - 0.05;
+          this.y = top + 0.12;
         }
       }
+      if (!FLIGHT_ENABLED) {
+        this.y = stand;
+        this.vy = 0;
+      }
       this.body.position.y = this.y;
-      this.body.rotation.y = this.heading;
+      this.body.rotation.set(0, this.heading, 0);
     }
 
     let lead = "rest", leadV = cmd.rest;

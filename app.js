@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=cns1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns1";
-import { EmbodiedFly } from "./agent.js?v=cns1";
-import { drawOmmatidia } from "./eye.js?v=cns1";
-import { OdorWorld } from "./plume.js?v=cns1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns1";
-import { parseLesionFlag } from "./lesion.js?v=cns1";
-import { mountAssayPanel } from "./assay/panel.js?v=cns1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns1";
+import { loadNmf, createMaleFly } from "./fly.js?v=cns2";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns2";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns2";
+import { EmbodiedFly } from "./agent.js?v=cns2";
+import { drawOmmatidia } from "./eye.js?v=cns2";
+import { OdorWorld } from "./plume.js?v=cns2";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns2";
+import { parseLesionFlag } from "./lesion.js?v=cns2";
+import { mountAssayPanel } from "./assay/panel.js?v=cns2";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns2";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns2";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -63,15 +63,15 @@ if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x5c4a36, 1);
+renderer.setClearColor(0xd8b888, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 120);
+const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 80);
 if (BODY_MODE === "fly") {
-  camera.position.set(2.05, 2.85, 5.35);
+  camera.position.set(UTOPIA_HOME.x + 1.15, 1.55, UTOPIA_HOME.z + 2.45);
 } else if (BODY_MODE === "drone") {
   camera.position.set(0, 5.4, 9.2);
 } else {
@@ -84,11 +84,11 @@ controls.rotateSpeed = 0.55;
 controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.6;
-controls.maxDistance = 28;
+controls.minDistance = 1.15;
+controls.maxDistance = 14;
 controls.target.set(
   BODY_MODE === "fly" ? UTOPIA_HOME.x : 0,
-  BODY_MODE === "fly" ? 0.85 : 0.55,
+  BODY_MODE === "fly" ? 0.52 : 0.55,
   BODY_MODE === "fly" ? UTOPIA_HOME.z : 0
 );
 controls.touches = {
@@ -108,13 +108,13 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const hemi = new THREE.HemisphereLight(0xffe8d0, 0x4a5a32, 1.32);
+const hemi = new THREE.HemisphereLight(0xfff2d8, 0x4a7a38, 1.38);
 scene.add(hemi);
-const fill = new THREE.DirectionalLight(0xffd4b0, 0.42);
-fill.position.set(-6, 5, -4);
+const fill = new THREE.DirectionalLight(0xffe0b8, 0.48);
+fill.position.set(-5, 6, -3);
 scene.add(fill);
-const key = new THREE.DirectionalLight(0xfff4e0, 1.22);
-key.position.set(7, 12, 8);
+const key = new THREE.DirectionalLight(0xfff6e6, 1.28);
+key.position.set(6, 11, 7);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.camera.near = 1;
@@ -122,7 +122,7 @@ key.shadow.camera.far = 48;
 key.shadow.camera.left = key.shadow.camera.bottom = -16;
 key.shadow.camera.right = key.shadow.camera.top = 16;
 scene.add(key);
-scene.fog = new THREE.FogExp2(0x5a4836, 0.014);
+scene.fog = new THREE.FogExp2(0xd4b48a, 0.012);
 
 const procWorld = createOpenWorld();
 const arena = procWorld.root;
@@ -397,12 +397,12 @@ function onAny() {
   if (focus.day != null) {
     const day = focus.day;
     // Stable garden sun — gentle, never night-black.
-    key.intensity = 1.05 + day * 0.28;
-    key.position.set(7 + Math.sin(day * Math.PI) * 1.4, 11.5, 8);
+    key.intensity = 1.12 + day * 0.22;
+    key.position.set(6.2 + Math.sin(day * Math.PI) * 1.1, 11, 7.2);
     key.target.position.set(focus.body.position.x, 0, focus.body.position.z);
     if (!key.target.parent) scene.add(key.target);
-    hemi.intensity = 1.18 + day * 0.18;
-    renderer.setClearColor(0x5c4a36, 1);
+    hemi.intensity = 1.28 + day * 0.14;
+    renderer.setClearColor(0xd8b888, 1);
   }
   const focusMode = focus.life?.mode || "…";
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;
@@ -629,8 +629,8 @@ function overviewCamera() {
   userDriving = false;
   followMode = "off";
   syncFollow();
-  controls.target.set(0, 0.55, 0);
-  camera.position.set(0, 6.2, 11.5);
+  controls.target.set(UTOPIA_HOME.x, 0.5, UTOPIA_HOME.z);
+  camera.position.set(UTOPIA_HOME.x + 2.4, 2.4, UTOPIA_HOME.z + 4.2);
   controls.update();
 }
 
@@ -818,7 +818,7 @@ function loop() {
   if (!userDriving && followMode === "selected" && selected) {
     const h = selected.heading;
     const px = selected.body.position.x, pz = selected.body.position.z, py = selected.y;
-    _tgt.set(px + Math.sin(h) * 1.4, 0.85 + py, pz + Math.cos(h) * 1.4);
+    _tgt.set(px + Math.sin(h) * 0.85, 0.48 + Math.min(0.35, py * 0.12), pz + Math.cos(h) * 0.85);
     const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.12);
     const delta = controls.target.clone().sub(prevT);
@@ -828,31 +828,31 @@ function loop() {
     const radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
     const desired = new THREE.Vector3(
       -Math.sin(h) * radius * 0.92,
-      Math.max(1.2, radius * 0.42 + py * 0.2),
+      Math.max(1.05, radius * 0.34 + 0.35),
       -Math.cos(h) * radius * 0.92
     );
     offset.lerp(desired, 0.045);
     offset.setLength(radius);
     camera.position.copy(controls.target).add(offset);
   } else if (!userDriving && followMode === "flock" && flies.length) {
-    let cx = 0, cz = 0, cy = 0, minx = 99, maxx = -99, minz = 99, maxz = -99;
+    let cx = 0, cz = 0, minx = 99, maxx = -99, minz = 99, maxz = -99;
     for (const f of flies) {
       const x = f.body.position.x, z = f.body.position.z;
-      cx += x; cz += z; cy += f.y;
+      cx += x; cz += z;
       if (x < minx) minx = x; if (x > maxx) maxx = x;
       if (z < minz) minz = z; if (z > maxz) maxz = z;
     }
     const n = flies.length;
-    cx /= n; cz /= n; cy /= n;
-    _tgt.set(cx, 0.55 + cy, cz);
+    cx /= n; cz /= n;
+    _tgt.set(cx, 0.48, cz);
     const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.09);
     const delta = controls.target.clone().sub(prevT);
     camera.position.add(delta);
     const offset = camera.position.clone().sub(controls.target);
     let radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
-    const span = Math.max(6, maxx - minx, maxz - minz);
-    const comfort = Math.min(controls.maxDistance, Math.max(8, 7.5 + span * 0.55));
+    const span = Math.max(3.2, maxx - minx, maxz - minz);
+    const comfort = Math.min(8.5, Math.max(3.15, 3.05 + span * 0.28));
     radius += (comfort - radius) * 0.02;
     offset.setLength(radius);
     camera.position.copy(controls.target).add(offset);

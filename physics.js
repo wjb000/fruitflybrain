@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase } from "./plantConfig.js?v=cns1";
+import { plantUrl, plantBase, isPagesHost } from "./plantConfig.js?v=cns2";
 
 export const physics = {
   ok: false,
@@ -62,9 +62,11 @@ export async function connectPhysics() {
   return false;
 }
 
-/** If plant dropped (tunnel blip), retry without reloading the page. */
+/** If plant dropped (tunnel blip), retry without reloading the page.
+ *  Pages kinematic default: never auto-reconnect a remote plant. */
 export function maybeReconnectPhysics() {
   if (physics.ok) return;
+  if (isPagesHost()) return;
   if (performance.now() < reconnectAt) return;
   reconnectAt = performance.now() + 8000;
   connectPhysics().catch(() => {});
