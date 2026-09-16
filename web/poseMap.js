@@ -5,9 +5,11 @@
  * pool EMAs into antagonist DoFs. Empty pools stay 0 — no invented MN IDs,
  * no CPG gait, no walk thruster.
  *
- * cns3: T1 (foreleg) and neck* pools are small and were saturating through
- * softDrive×span, which looked like head-twitch + arm-flail. Walk legs
- * (T2/T3) keep more authority so planted slip can still translate.
+ * fullfly1: idle MN noise was tarsus-tap + abdomen twitch while stance-slip
+ * stayed gated. Quiet T2/T3/DNa → planted rest (all six legs). Walk MNs →
+ * stance/swing from those flex/ext pools; empty T2/T3 Ta* / coxaProm are
+ * kinematically coupled in `embodyMuscle` (mesh/plant), not filled with fake
+ * cell IDs. Abdomen is dead-zoned and split by soma-Y into NMF segments.
  */
 
 export const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
@@ -39,8 +41,23 @@ export const MUSCLE_SPAN = {
   "trochanterfemur-pitch": ["trExt", "trFlex", 0.62],
   "trochanterfemur-roll": ["feRed", null, 0.26],
   "tibia-pitch": ["tiExt", "tiFlex", 0.60],
-  "tarsus1-pitch": ["taLev", "taDep", 0.32],
+  "tarsus1-pitch": ["taLev", "taDep", 0.16],
 };
+
+/** Male FlyEM muscle pools that are empty (do not invent IDs). */
+export const EMPTY_MALE_MUSCLE_POOLS = [
+  "L2_coxaProm", "R2_coxaProm", "L3_coxaProm", "R3_coxaProm",
+  "L2_taDep", "L2_taLev", "R2_taDep", "R2_taLev",
+  "L3_taDep", "L3_taLev", "R3_taDep", "R3_taLev",
+];
+
+/** Abdomen MN pool split by soma Y → NMF segments (real IDs, not new cells). */
+export const ABD_SEG_KEYS = ["abdomen12", "abdomen3", "abdomen4", "abdomen5", "abdomen6"];
+export const ABD_SEG_WEIGHTS = [0.28, 0.48, 0.68, 0.86, 1.00];
+export const ABD_POSE_GATE = 0.22;
+export const IDLE_WALK_GATE = 0.04;
+export const ANTENNA_JO_BASE = 8;
+export const ANTENNA_SPAN = 0.16;
 
 /** Visual neck spans (rad). Plant has no neck joint. */
 export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
@@ -228,5 +245,98 @@ export function follow(cur, target, dt, tau = MUSCLE_TAU) {
 
 /** Slip weight: T2/T3 planted feet drive walk; T1 is reach/groom. */
 export function slipWeight(legName) {
-  return isForeleg(legName) ? 0.32 : 1.0;
+  return isForeleg(legName) ? 0.28 : 1.0;
+}
+
+/**
+ * Abdomen posture from the 207-cell pool (and optional soma-Y segments).
+ * Large-pool Poisson was a constant butt twitch — dead-zone + gate.
+ */
+export function abdomenFromEma(e, court = 0) {
+  const dead = 0.16;
+  const segs = ABD_SEG_KEYS.map((k) => Math.max(0, (e[k] || 0) - dead));
+  const whole = Math.max(0, (e.abdomen || 0) - dead);
+  const courtV = court > 0.28 ? (court - 0.28) * 0.32 : 0;
+  const mag = Math.max(whole, segs.reduce((a, b) => Math.max(a, b), 0));
+  const drive = softDrive(mag, 1.30);
+  if (drive < ABD_POSE_GATE && courtV < 0.15) {
+    return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0 };
+  }
+  const curl = Math.min(1, drive * 0.50 + courtV);
+  const sum = segs.reduce((a, b) => a + b, 0);
+  const outSegs = segs.map((s, i) => {
+    const base = sum > 0.02 ? softDrive(s, 1.35) : curl * ABD_SEG_WEIGHTS[i];
+    return Math.min(1, base);
+  });
+  return { curl, segs: outSegs, court: courtV };
+}
+
+/**
+ * Antenna deflection from Johnston's organ Hz (sensory reflex, not fake MNs).
+ * Quiet wind → 0. Calm — never thrash.
+ */
+export function antennaFromJo(hz) {
+  const x = Math.max(0, (hz || 0) - ANTENNA_JO_BASE);
+  const v = Math.tanh(x / 95);
+  return v < 0.05 ? 0 : v;
+}
+
+/**
+ * Gap-fill body mechanics on top of honest `muscleFromEma`.
+ * - Idle (quiet T2/T3/DNa): all zeros → planted anatomical rest (no toe-tap).
+ * - Walk: empty Ta* / coxaProm couple from tibia/trochanter (kinematic, not IDs).
+ * - Stance vs swing from that leg's flex/ext contrast — no CPG clock.
+ */
+export function embodyMuscle(legName, muscle, { walkDrive = 0 } = {}) {
+  const src = muscle || {};
+  const out = {};
+  for (const k of MUSCLE_NAMES) out[k] = src[k] || 0;
+  const walking = (walkDrive || 0) >= IDLE_WALK_GATE;
+  if (!walking) {
+    for (const k of MUSCLE_NAMES) out[k] = 0;
+    out._lift = 0;
+    out._swing = false;
+    out._stance = true;
+    out._coupled = false;
+    return out;
+  }
+  const emptyTa = (src.taDep || 0) + (src.taLev || 0) < 1e-4;
+  const emptyProm = (src.coxaProm || 0) < 1e-4;
+  if (emptyTa) {
+    out.taDep = (src.tiExt || 0) * 0.40;
+    out.taLev = (src.tiFlex || 0) * 0.40;
+  }
+  if (emptyProm) {
+    out.coxaProm = (src.trFlex || 0) * 0.22;
+  }
+  const lift = (out.trFlex + out.tiFlex + out.taLev)
+    - (out.trExt + out.tiExt + out.taDep);
+  out._lift = lift;
+  out._swing = lift > 0.10;
+  out._stance = !out._swing;
+  out._coupled = emptyTa || emptyProm;
+  return out;
+}
+
+/** HUD: how many effector pools are mapped vs annotation-empty. */
+export function effectorMapStats(counts = {}) {
+  const entries = Object.entries(counts || {});
+  const mapped = entries.filter(([, n]) => n > 0);
+  const empty = entries.filter(([, n]) => n === 0).map(([k]) => k);
+  const muscleKeys = LEG_NAMES.flatMap((leg) => MUSCLE_NAMES.map((m) => `${leg}_${m}`));
+  const muscleMapped = muscleKeys.filter((k) => (counts[k] || 0) > 0).length;
+  const muscleEmpty = muscleKeys.filter((k) => !(counts[k] > 0));
+  return {
+    mappedN: mapped.length,
+    emptyN: empty.length,
+    empty,
+    muscleMapped,
+    muscleEmpty,
+    muscleTotal: muscleKeys.length,
+    abdomen: counts.abdomen || 0,
+    neck: counts.neck || 0,
+    wings: (counts.DLM || 0) + (counts.DVM || 0) + (counts.ADMN || 0),
+    mn9: counts.MN9 || 0,
+    proboscis: counts.proboscis || 0,
+  };
 }

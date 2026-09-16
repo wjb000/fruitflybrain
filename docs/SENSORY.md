@@ -49,10 +49,10 @@ Pool IDs: `web/data/stim.json` (`R16` 1394, `R7` 1384, `R8` 1329, `L1–L3` ~177
 
 No extra types. If a pool is empty in the Male CNS export, write-in is a no-op.
 
-## Motor quiet (cns4, kept)
+## Motor quiet (cns4 + fullfly1)
 
-Idle DLM/DVM/ADMN do not flap (`wingFromEma`, high gate). Idle MN9 does not mouth (`feedFromEma` dead-zone). T1/neck stay cns3-calm. Sensory upgrade does not reopen those gates.
+Idle DLM/DVM/ADMN do not flap (`wingFromEma`, high gate). Idle MN9 does not mouth (`feedFromEma` dead-zone). T1/neck stay cns3-calm. Idle T2/T3/DNa → planted rest (`embodyMuscle`); abdomen dead-zoned. Sensory upgrade does not reopen those gates.
 
 ## Cache
 
-Pages: [`?v=cns4sense`](https://wjb000.github.io/fruitflybrain/?v=cns4sense).
+Pages: [`?v=fullfly1`](https://wjb000.github.io/fruitflybrain/?v=fullfly1).

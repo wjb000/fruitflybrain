@@ -52,7 +52,7 @@ DOF_MAP = [
     ("trochanterfemur", "pitch", "trExt", "trFlex", 0.62, 0.0),
     ("trochanterfemur", "roll", "feRed", None, 0.26, 0.0),
     ("tibia", "pitch", "tiExt", "tiFlex", 0.60, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.32, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.16, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.

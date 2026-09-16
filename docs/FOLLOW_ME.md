@@ -29,7 +29,7 @@ Toggle **hΔ plastic ON / frozen** on `follow.html`. This is a **client teaching
 3. Move / drag the blob; drone yaws toward it and advances when centered via the brain path.
 4. Toggle fast weights ON to adapt while you move; freeze and **jump side** to see worse reacquisition.
 
-Main sim (fly utopia default): `index.html?v=cns4sense` (optional `?cam=1` thumbnail, same encoding). Follow-me stays on the drone chassis. Cube: `?body=cube`. Drone homepage: `index.html?body=drone&v=cns4sense`.
+Main sim (fly utopia default): `index.html?v=fullfly1` (optional `?cam=1` thumbnail, same encoding). Follow-me stays on the drone chassis. Cube: `?body=cube`. Drone homepage: `index.html?body=drone&v=fullfly1`.
 
 ## Files
 

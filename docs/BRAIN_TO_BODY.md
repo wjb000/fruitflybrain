@@ -47,6 +47,13 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Clock / neuromod calm Hz | No circadian photodiode on l-LNv except CRY path | Low Hz on real `sLNv` `lLNv` `LNd` `DN1*` `DAN` `OA` `HT` `pep` |
 | `poseMap.js` `antagPair` / `softDrive` | Co-contraction of real flex/ext would cancel DoF; small pools saturate | Contrast from **those** pool EMAs; unipolar empty partner stays a modest rest offset — no invented antagonists, no CPG |
 | T1 (foreleg) pose scale | T1 has coxaProm + Ta* (T2/T3 do not); sparse 2–8 cell pools were saturating | Scale T1 hinges down so reach/groom stays, arm-flail dies. Same real MN IDs |
+| Idle planted freeze (`embodyMuscle`) | T1 Ta* Poisson + all-feet twitch read as toe-tapping | Quiet T2/T3/DNa → all six legs at anatomical rest (planted). Not a CPG. |
+| Stance/swing from MN contrast | Connectome does not output a tripod clock | While walking, each leg’s flex vs ext (tr/ti/ta) unplants swing feet; stance feet make slip. Same EMAs, no oscillator. |
+| Empty Ta*/coxaProm kinematic couple | Male T2/T3 lack those muscle names | Hinges follow tibia/trochanter **only while walking**. `motEma` for those pools stays 0 — no invented IDs. |
+| Abdomen segments (`abdomenFromEma`) | 207-cell pool + one mesh joint was a butt twitch | Dead-zone + gate; soma-Y split of **those** abdomen MN IDs → NMF abdomen12–6 posture chain |
+| Antenna JO reflex | NMF antennae were static (tips for odor only) | Calm pedicel deflection from real `JO` L/R Hz after head FK. No antennal MN IDs invented. |
+| Head/abdomen FK | Flat NMF segments did not follow neck/abdomen joints | Pose `c_head` children (eyes, antennae, mouth) and abdomen3–6 from the driven joints |
+| Halteres | Mesh existed, never posed | Rest when wings folded; beat only above `WING_FLAP_GATE` (same DLM/DVM/ADMN) |
 | Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
 | Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` |
 | Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate |
@@ -65,6 +72,7 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 - Walk/turn/climb thrusters that set `{v,ω}` from food bearing
 - Invented MN IDs to fill empty T2/T3 `coxaProm` / `taDep` / `taLev`
 - Cosmetic wing idle when `DLM`/`DVM`/`ADMN` are quiet
+- Always-on tarsus or abdomen fidget when walk/abdomen MNs are quiet
 
 ## Pipeline
 
@@ -95,7 +103,7 @@ Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=cns4sense`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=fullfly1`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -132,7 +140,7 @@ eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=cns4sense`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=fullfly1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -162,13 +170,15 @@ Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold 
 | `L*|R*_{coxaProm,Rem,RotA,RotP,Add}` | Coxa pitch / yaw / roll (NMF 3 DoF) |
 | `*_trFlex` / `*_trExt` (+ `feRed` assist) | Trochanter–femur pitch (+ roll from feRed) |
 | `*_tiFlex` / `*_tiExt` | Tibia pitch |
-| `*_taDep` / `*_taLev` | Tarsus pitch (empty on male T2/T3 — see gaps) |
-| Neuromere aggregates `T1L`…`T3R` | UI walk label + adhesion lift bias via muscle |
-| `DNa` | Contributes to walk mode label only |
-| `DLM`, `DVM`, `ADMN` | Wing mesh flap **only above a high gate**; plant flight force still `?flight=1` |
+| `*_taDep` / `*_taLev` | Tarsus pitch. Empty on male T2/T3 — kinematic couple from tibia **while walking only** |
+| Neuromere aggregates `T1L`…`T3R` | UI walk label + walk-gate for planted gait |
+| `DNa` | Walk-gate with T2/T3 (not a thruster) |
+| `DLM`, `DVM`, `ADMN` | Wing mesh flap **only above a high gate**; halteres beat on the same gate. Flight still `?flight=1` |
 | `MN9`, `proboscis` | Proboscis / haustellum — dead-zoned; idle MN9 does not mouth |
-| `neck`, `neckL`, `neckR` | Head **pitch** from pooled CvN; **yaw/roll** from L/R (smoothed, dead-zoned) |
-| `abdomen`, courtship (`aIPg`/`pIP1`/`DNg02`/`fru`) | Abdomen curl |
+| `neck`, `neckL`, `neckR` | Head **pitch** from pooled CvN; **yaw/roll** from L/R (smoothed) + FK onto eyes/antennae/mouth |
+| `JO` L/R | Calm antenna pedicel reflex (sensory, not fake MNs) |
+| `abdomen` (soma-Y → `abdomen12`…`abdomen6`) | Multi-segment posture; quiet unless driven |
+| Courtship (`aIPg`/`pIP1`/`DNg02`/`fru`) | Can add abdomen curl when sustained |
 | `DNp01` | Mode label only (arousal path; not a default stim) |
 
 Ground translation: **stance slip from MN-posed feet** (kinematic) or
@@ -219,7 +229,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (cns4sense / utopia garden)
+### Embodiment status (fullfly1 / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -227,26 +237,25 @@ Closed or kept honest on the homepage fly body:
 |---|---|
 | Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
 | Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
-| Planted walk | Kinematic: T2/T3 + DNa gate slip; T1 feet down-weighted; y held at `standZ`. MuJoCo: vault/weak-plant settle in `physics.py` |
+| Six-leg gait | Idle: all planted at rest (no toe-tap). Walk: T2/T3+DNa gate; per-leg flex/ext → stance vs swing; T2/T3 slip coupled; T1 reach/groom |
+| Soft parts | Head+eyes+antennae+mouth FK from neck; abdomen12–6 from abdomen MNs; wings folded below gate; halteres rest/beat with wings; JO antenna reflex |
 | Vision → legs | Compound eye → `visionL/R` + optic Hz (R16/R7/R8, L1/L2, T4/T5, HS/VS from flow/loom) → LIF → annotated MNs → pose → stance-slip. No RGB dump, no salFood→HS, no bearing thruster |
-| Proprio / touch | `readProprio` / `readProprioMj` write `cho*` `hp*` `csa*` `tact*` `prop*` including L/R soma-X splits of existing IDs |
+| Other senses | ORN plumes; JO + self-motion/yaw airflow; hygro L/R; taste; ppk/IR52b; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R splits of existing IDs; calm clock |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
-| Soft home | Clearing radius 12.5, hedge bounce/redirect (never punish), `WORLD_SOFT_LIMIT` ~10.8 |
-| Aversives | Bitter / assay pole / scent bomb **off** unless `?bitter=1` / `?assay=1` / HUD toggle |
-| Flight | Off unless `?flight=1` |
-| Plant / mesh sync | `applyMujoco` copies thorax XYZ + bones when a plant is live; Pages skips auto-tunnel |
-| Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev). Unipolar remotor is a modest rest offset, not a slam |
+| Abdomen | Dead-zoned 207-cell pool; soma-Y segments; quiet unless driven |
+| Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev). Unipolar remotor is a modest rest offset. Walking may kinematically couple those **hinges** |
 | Connectome vs gap-fill | LIF + real synapses primary; helpers listed above. No CPG / thruster / invented MNs |
+| HUD | Mapped vs empty pool counts; live MN; per-leg S/W; ant/halt/abd bars |
 
 Still open (not invented around):
 
-- Male T2/T3 coxa promotor and tarsus MNs are unlabeled — mid/hind coxa/ta stay under-actuated.
-- Connectome may not produce a strong tripod gait from vision write-in; walk amplitude follows real MN rates.
-- Head / abdomen / wings are visual (or wing-MN–gated flight only with `?flight=1`), not plant joints.
+- Male T2/T3 coxa promotor and tarsus MNs are unlabeled — mid/hind coxa/ta have **no cell IDs**; walking uses kinematic couple only.
+- Connectome may not produce a strong tripod from vision write-in; swing/stance follows real MN flex/ext, not a clock.
 - Pages kinematic path is not full MuJoCo contact; attach `?plant=` for the 42-DoF plant.
-- Headless lesion/hΔ packs are not the browser eye + NMF loop.
+- No annotated antennal motor pool — antenna motion is JO reflex + head FK only.
 - Courtship song posture is not a closed 3D kinematic.
+- Headless lesion/hΔ packs are not the browser eye + NMF loop.
 
 ## Regenerating maps
 
