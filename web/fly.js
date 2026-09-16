@@ -1,18 +1,12 @@
 import * as THREE from "three";
+import {
+  MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
+  WING_FLAP_GATE, WING_FLAP_AMP,
+  antagonist, follow, isForeleg, slipWeight,
+} from "./poseMap.js?v=cns4sense";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
-const MUSCLE_SPAN = {
-  // Walkable spans: clear stance-slip XY on kinematic path (no thruster/CPG).
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.92],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.62],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.55],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 1.05],
-  "trochanterfemur-roll": ["feRed", null, 0.42],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.95],
-  "tarsus1-pitch": ["taLev", "taDep", 0.55],
-};
 const GROUND_Y = 0.05;
-const MUSCLE_TAU = 0.05;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();
@@ -215,6 +209,7 @@ function buildFly({ female = false } = {}) {
 
   fly.userData = {
     female,
+    plantMode: "fly",
     body: visual,
     head: nodes.c_head?.body,
     thorax: nodes.c_thorax?.body,
@@ -276,38 +271,31 @@ function applyMuscleFk(leg, nodes) {
   }
 }
 
-function antagonist(pos, neg) {
-  const p = pos || 0, n = neg || 0;
-  const mag = p + n;
-  // Quiet pools stay limp. Stronger flex/ext contrast so feet push, not twitch.
-  if (mag < 0.01) return 0;
-  const raw = (p - n) / (mag + 0.04);
-  return Math.tanh(raw * 1.85);
-}
-
-function follow(cur, target, dt) {
-  const a = 1 - Math.exp(-dt / MUSCLE_TAU);
-  return cur + (target - cur) * a;
-}
-
 function poseLegFromMuscle(leg, muscle, dt) {
   const m = muscle || {};
+  // Forelegs already scaled in poseMap; still cap T1 hinge travel so "arms"
+  // cannot throw up even if a small MN pool saturates.
+  const t1k = isForeleg(leg.name) ? 0.72 : 1;
   for (const [key, spec] of Object.entries(MUSCLE_SPAN)) {
     const h = leg.hinges[key];
     if (!h) continue;
     let pos = m[spec[0]] || 0;
     const neg = spec[1] ? (m[spec[1]] || 0) : 0;
-    if (key === "trochanterfemur-pitch") pos = pos + 0.6 * (m.feRed || 0);
-    const tgt = h.userData.rest + spec[2] * antagonist(pos, neg);
+    const feAssist = isForeleg(leg.name) ? 0.22 : 0.45;
+    if (key === "trochanterfemur-pitch") pos = pos + feAssist * (m.feRed || 0);
+    const span = spec[2] * t1k;
+    const raw = span * antagonist(pos, neg);
+    const lim = span * 0.88;
+    const tgt = h.userData.rest + Math.max(-lim, Math.min(lim, raw));
     const cur = h.userData.angle ?? h.userData.rest;
-    setHinge(h, follow(cur, tgt, dt));
+    setHinge(h, follow(cur, tgt, dt, MUSCLE_TAU));
   }
 }
 
 /**
  * Pose the NeuroMechFly skeleton from connectome motor neurons.
- * cmd: {walk, turn, fly, feed, court, groom, escape, rest, head, abdomen, muscle}
- * Body translation comes from stance slip (MN foot motion), not cmd.walk.
+ * Gap-fill: kinematic hinges + stance-slip so Pages can walk without MuJoCo.
+ * Body translation comes from MN foot motion, not cmd.walk, not a CPG.
  */
 export function stepLife(fly, dt, t, cmd) {
   const d = fly.userData;
@@ -333,16 +321,9 @@ export function stepLife(fly, dt, t, cmd) {
   const hy = fly.rotation.y;
   const cy = Math.cos(hy), sy = Math.sin(hy);
   const idt = 1 / Math.max(dt, 1e-4);
-  // Stance vs world floor, not absolute mesh Y — body at standZ ≈ 1.3 puts tips near 0.
-  const floorY = GROUND_Y + 0.22;
-  // Prefer lowest feet as planted when several hover slightly above floor.
-  let minFy = Infinity;
-  for (let i = 0; i < d.legs.length; i++) {
-    if (d.legs[i].tarsusTip) d.legs[i].tarsusTip.getWorldPosition(_foot);
-    else _foot.set(prev[i].x, prev[i].y, prev[i].z);
-    if (_foot.y < minFy) minFy = _foot.y;
-  }
-  const stanceCut = Math.min(floorY, minFy + 0.12);
+  // Stance vs world floor only — do not mark a swinging cluster as planted
+  // (that turned idle MN twitch into XY/yaw seizure).
+  const floorY = GROUND_Y + 0.18;
   d.legs.forEach((leg, i) => {
     if (leg.tarsusTip) leg.tarsusTip.getWorldPosition(_foot);
     else _foot.set(prev[i].x, prev[i].y, prev[i].z);
@@ -352,16 +333,18 @@ export function stepLife(fly, dt, t, cmd) {
     leg.foot.x = _foot.x;
     leg.foot.y = _foot.y;
     leg.foot.z = _foot.z;
-    leg.foot.stance = flyA < 0.40 && _foot.y <= stanceCut;
+    leg.foot.stance = flyA < 0.40 && _foot.y <= floorY;
     leg.foot.vx = dx * idt;
     leg.foot.vy = dy * idt;
     leg.foot.vz = dz * idt;
     if (leg.foot.stance) {
       // Planted foot: body slips opposite the world foot displacement.
-      slipX -= dx;
-      slipZ -= dz;
-      n += 1;
-      const back = -(dx * sy + dz * cy);
+      // T2/T3 carry walk; T1 (foreleg) is reach/groom so it must not thrash XY.
+      const w = slipWeight(leg.name);
+      slipX -= dx * w;
+      slipZ -= dz * w;
+      n += w;
+      const back = -(dx * sy + dz * cy) * w;
       if (leg.side < 0) yawL += back * 0.85;
       else yawR += back * 0.85;
     }
@@ -370,10 +353,10 @@ export function stepLife(fly, dt, t, cmd) {
   d.slip = { x: slipX, z: slipZ, n, yawL, yawR, meanAbs };
   // EMA for HUD / diagnostics (kinematic Pages path).
   d.slipMeanAbs = (d.slipMeanAbs || 0) * 0.85 + meanAbs * 0.15;
-  poseSoftParts(d, t, cmd, flyA, feed);
+  poseSoftParts(d, dt, t, cmd, flyA, feed);
 }
 
-function poseSoftParts(d, t, cmd, flyA, feed) {
+function poseSoftParts(d, dt, t, cmd, flyA, feed) {
   // Wings move ONLY from wing-MN drive (cmd.fly ← DLM/DVM/ADMN). Quiet MNs → rest pose.
   // No always-on idle flap / cosmetic CPG. Mesh pose only — body translation/lift
   // is gated separately in agent.js / physics.py (flight default OFF).
@@ -381,23 +364,27 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   const dlm = wing.dlm != null ? wing.dlm : flyA;
   const dvm = wing.dvm != null ? wing.dvm : flyA;
   const admn = wing.admn != null ? wing.admn : flyA * 0.7;
-  const power = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
-  // Gate noise flaps — only clear wing-MN drive moves wings.
-  const flapHz = power > 0.08 ? 10 + power * 140 : 0;
-  const flapAmp = power * 0.85; // zero when MNs quiet
+  const powerRaw = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
+  const power = powerRaw >= WING_FLAP_GATE ? powerRaw : 0;
+  const over = power > 0 ? (power - WING_FLAP_GATE) / Math.max(1e-3, 1 - WING_FLAP_GATE) : 0;
+  const flapHz = power > 0 ? 4 + over * 36 : 0;
+  const flapAmp = over * WING_FLAP_AMP;
   const flap = flapHz > 0 ? Math.sin(t * flapHz) * flapAmp : 0;
+  const tau = dt != null ? dt : 0.032;
+  const wingSoft = d.wingSoft || (d.wingSoft = { amp: 0 });
+  wingSoft.amp = follow(wingSoft.amp, flapAmp, tau, WING_TAU);
   for (let i = 0; i < d.wings.length; i++) {
     const w = d.wings[i];
     const rest = w.userData.restQuat;
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
     w.quaternion.copy(rest);
-    if (power > 0.08) {
-      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.28 + power * 0.45));
+    // Below gate: exact rest. No residual rotateZ that read as tapping.
+    if (power > 0 && wingSoft.amp > 0.01) {
+      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.20 + over * 0.25));
       w.quaternion.multiply(_flapQ);
-      w.rotateZ(s * (0.015 + power * 0.22 + admn * 0.1));
-      // Slight stroke asymmetry from DLM vs DVM (still MN-derived).
-      w.rotateX((dlm - dvm) * 0.1 * s);
+      w.rotateZ(s * (over * 0.12 + admn * 0.04));
+      w.rotateX((dlm - dvm) * 0.06 * s * over);
     }
   }
   if (d.abdomen) {
@@ -411,26 +398,37 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   if (d.head) {
     const rest = d.head.userData.restQuat;
     if (rest) {
-      // Magnitude from neck MN pool; yaw from annotated neckL/neckR asymmetry.
-      const hy = THREE.MathUtils.clamp(
-        (cmd.headYaw != null ? cmd.headYaw : 0) * 0.85 + (cmd.head || 0) * 0.12,
-        -0.85, 0.85
+      // Pitch from neck pool magnitude; yaw/roll from neckL vs neckR.
+      // Smoothed — raw EMA on 25 CvN cells was a head-thrash.
+      const pose = d.headPose || (d.headPose = { yaw: 0, pitch: 0, roll: 0 });
+      const yawT = THREE.MathUtils.clamp((cmd.headYaw || 0) * NECK_SPAN.yaw, -NECK_SPAN.yaw, NECK_SPAN.yaw);
+      const mouthPitch = feed > 0.35 ? (feed - 0.35) * 0.08 : 0;
+      const pitchT = THREE.MathUtils.clamp(
+        (cmd.head || 0) * NECK_SPAN.pitch + mouthPitch,
+        -NECK_SPAN.pitch, NECK_SPAN.pitch + 0.06
       );
+      const rollT = THREE.MathUtils.clamp((cmd.headRoll || 0) * NECK_SPAN.roll, -NECK_SPAN.roll, NECK_SPAN.roll);
+      pose.yaw = follow(pose.yaw, yawT, tau, NECK_TAU);
+      pose.pitch = follow(pose.pitch, pitchT, tau, NECK_TAU);
+      pose.roll = follow(pose.roll, rollT, tau, NECK_TAU);
       d.head.quaternion.copy(rest);
-      d.head.rotateY(hy);
-      d.head.rotateX(feed * 0.55 - power * 0.2);
+      d.head.rotateY(pose.yaw);
+      d.head.rotateX(pose.pitch);
+      d.head.rotateZ(pose.roll);
     }
   }
+  const mouth = d.mouthSoft || (d.mouthSoft = { feed: 0 });
+  const feedT = feed > 0.28 ? (feed - 0.28) / 0.72 : 0;
+  mouth.feed = follow(mouth.feed, feedT, tau, FEED_TAU);
   if (d.proboscis) {
-    const pe = 1 + feed * 0.85;
-    d.proboscis.scale.set(1, pe, 1);
-    d.proboscis.rotation.x = feed * 0.55;
+    d.proboscis.scale.set(1, 1 + mouth.feed * 0.32, 1);
+    d.proboscis.rotation.x = mouth.feed * 0.18;
   }
   if (d.haustellum) {
-    d.haustellum.rotation.x = feed * 0.35;
+    d.haustellum.rotation.x = mouth.feed * 0.12;
   }
   // Eye glow tracks MN/behavior cmds only (no fake activity).
-  const glow = 0.08 + power * 0.45 + (cmd.walk || 0) * 0.2 + feed * 0.15 + (cmd.court || 0) * 0.18;
+  const glow = 0.08 + power * 0.25 + (cmd.walk || 0) * 0.2 + mouth.feed * 0.08 + (cmd.court || 0) * 0.18;
   for (const e of d.eyes) if (e.material) e.material.emissiveIntensity = glow;
 }
 
@@ -461,7 +459,7 @@ export function applyPhysicsPose(fly, pose, dt, t, cmd) {
     leg.foot.vy = 0;
   }
   d.slip = { x: 0, z: 0, n: 0, yawL: 0, yawR: 0 };
-  poseSoftParts(d, t, cmd, flyA, feed);
+  poseSoftParts(d, dt, t, cmd, flyA, feed);
 }
 
 export function wanderFemale(female, dt, t) {
