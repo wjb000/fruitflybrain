@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=thrive1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=thrive1";
-import { createOpenWorld } from "./world/procgen.js?v=thrive1";
-import { EmbodiedFly } from "./agent.js?v=thrive1";
-import { drawOmmatidia } from "./eye.js?v=thrive1";
-import { OdorWorld } from "./plume.js?v=thrive1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=thrive1";
-import { parseLesionFlag } from "./lesion.js?v=thrive1";
-import { mountAssayPanel } from "./assay/panel.js?v=thrive1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=thrive1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=thrive1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=thrive1";
+import { loadNmf, createMaleFly } from "./fly.js?v=utopia1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=utopia1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=utopia1";
+import { EmbodiedFly } from "./agent.js?v=utopia1";
+import { drawOmmatidia } from "./eye.js?v=utopia1";
+import { OdorWorld } from "./plume.js?v=utopia1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=utopia1";
+import { parseLesionFlag } from "./lesion.js?v=utopia1";
+import { mountAssayPanel } from "./assay/panel.js?v=utopia1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=utopia1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=utopia1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=utopia1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -63,7 +63,7 @@ if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x0b0d12, 1);
+renderer.setClearColor(0x5c4a36, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -71,11 +71,11 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 120);
 if (BODY_MODE === "fly") {
-  camera.position.set(2.4, 3.15, 6.6);
+  camera.position.set(2.05, 2.85, 5.35);
 } else if (BODY_MODE === "drone") {
-  camera.position.set(0, 6.2, 11.5);
+  camera.position.set(0, 5.4, 9.2);
 } else {
-  camera.position.set(0, 4.4, 8.5);
+  camera.position.set(0, 3.8, 7.2);
 }
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -85,8 +85,12 @@ controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
 controls.minDistance = 0.6;
-controls.maxDistance = 36;
-controls.target.set(BODY_MODE === "fly" ? 1.35 : 0, BODY_MODE === "fly" ? 0.9 : 0.55, BODY_MODE === "fly" ? 0.85 : 0);
+controls.maxDistance = 28;
+controls.target.set(
+  BODY_MODE === "fly" ? UTOPIA_HOME.x : 0,
+  BODY_MODE === "fly" ? 0.85 : 0.55,
+  BODY_MODE === "fly" ? UTOPIA_HOME.z : 0
+);
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN,
@@ -104,17 +108,21 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const hemi = new THREE.HemisphereLight(0xb8c4d8, 0x1a120c, 1.05);
+const hemi = new THREE.HemisphereLight(0xffe8d0, 0x4a5a32, 1.32);
 scene.add(hemi);
-const key = new THREE.DirectionalLight(0xfff2dc, 1.35);
-key.position.set(8, 16, 10);
+const fill = new THREE.DirectionalLight(0xffd4b0, 0.42);
+fill.position.set(-6, 5, -4);
+scene.add(fill);
+const key = new THREE.DirectionalLight(0xfff4e0, 1.22);
+key.position.set(7, 12, 8);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.camera.near = 1;
-key.shadow.camera.far = 60;
-key.shadow.camera.left = key.shadow.camera.bottom = -22;
-key.shadow.camera.right = key.shadow.camera.top = 22;
+key.shadow.camera.far = 48;
+key.shadow.camera.left = key.shadow.camera.bottom = -16;
+key.shadow.camera.right = key.shadow.camera.top = 16;
 scene.add(key);
+scene.fog = new THREE.FogExp2(0x5a4836, 0.014);
 
 const procWorld = createOpenWorld();
 const arena = procWorld.root;
@@ -128,9 +136,12 @@ const worldShared = {
   water: arena.userData.water.position,
   bitter: arena.userData.bitter.position,
   perch: arena.userData.perch.userData,
+  foods: arena.userData.foods || [],
+  assayBeacon: !!arena.userData.assayBeacon,
   odors,
   landmarks: [],
   procedural: true,
+  utopia: true,
 };
 
 const flies = [];
@@ -143,29 +154,27 @@ let nMale = 0;
 let readyN = 0;
 let expectedReady = 1;
 
-/** First male: planted near pad center, facing the food beacon (vision→leg has a target). */
+/** First male: planted in the garden clearing, facing ripe fruit. */
 function thriveHome() {
-  const x = 1.35, z = 0.85;
-  const foodX = 6.5, foodZ = 4.2;
-  const yaw = Math.atan2(foodX - x, foodZ - z);
+  const x = UTOPIA_HOME.x, z = UTOPIA_HOME.z;
+  const yaw = Math.atan2(UTOPIA_FOOD.x - x, UTOPIA_FOOD.z - z);
   return { x, z, yaw };
 }
 
 function spawnSpot(occupied) {
   const pts = occupied || flies.map((f) => ({ x: f.body.position.x, z: f.body.position.z }));
   if (!pts.length) return thriveHome();
-  const gap = 4.2;
+  const gap = 3.2;
   for (let k = 0; k < 24; k++) {
     const a = Math.random() * Math.PI * 2;
-    const r = 2.2 + Math.random() * 6;
+    const r = 1.6 + Math.random() * 4.2;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     if (pts.every((p) => Math.hypot(p.x - x, p.z - z) >= gap)) {
-      const foodX = 6.5, foodZ = 4.2;
-      return { x, z, yaw: Math.atan2(foodX - x, foodZ - z) };
+      return { x, z, yaw: Math.atan2(UTOPIA_FOOD.x - x, UTOPIA_FOOD.z - z) };
     }
   }
   const h = thriveHome();
-  return { x: h.x + (Math.random() - 0.5) * 2, z: h.z + (Math.random() - 0.5) * 2, yaw: h.yaw };
+  return { x: h.x + (Math.random() - 0.5) * 1.6, z: h.z + (Math.random() - 0.5) * 1.6, yaw: h.yaw };
 }
 
 function onFlyReady() {
@@ -302,8 +311,8 @@ if ($("info")) {
       ? (" Plant @ " + physics.plantOrigin + ".")
       : "";
     $("info").textContent = physics.ok
-      ? ("Thriving closed loop: compound eye → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Empty MN pools stay quiet." + plantHint)
-      : ("Thriving closed loop: kinematic NeuroMechFly. Vision → optic/visionL/R → LIF → leg MNs → pose → planted stance-slip. Flight translation " + (FLIGHT_ENABLED ? "ON" : "off") + ". Set ?plant=https://… for a live MuJoCo plant." + plantHint);
+      ? ("Home: a fly utopia. Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
+      : ("Home: a fly utopia. Eyes → optic/visionL/R → LIF → leg MNs → pose → planted stance-slip. Fruit, dew, shade, blossoms. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
   }
 }
 
@@ -387,12 +396,13 @@ function onAny() {
   }
   if (focus.day != null) {
     const day = focus.day;
-    const fx = focus.body.position.x, fz = focus.body.position.z;
-    key.intensity = 0.12 + day * 1.35;
-    key.position.set(fx + Math.sin(day * Math.PI) * 14, 3 + day * 14, fz + Math.cos(day * Math.PI) * 8);
-    key.target.position.set(fx, 0, fz);
+    // Stable garden sun — gentle, never night-black.
+    key.intensity = 1.05 + day * 0.28;
+    key.position.set(7 + Math.sin(day * Math.PI) * 1.4, 11.5, 8);
+    key.target.position.set(focus.body.position.x, 0, focus.body.position.z);
     if (!key.target.parent) scene.add(key.target);
-    renderer.setClearColor(0x0b0d12, 1);
+    hemi.intensity = 1.18 + day * 0.18;
+    renderer.setClearColor(0x5c4a36, 1);
   }
   const focusMode = focus.life?.mode || "…";
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;
@@ -434,7 +444,6 @@ function onAny() {
     }
   }
   if ($("lifeHint")) {
-    const ps = procWorld.stats();
     let plantBit;
     if (kinMode === "drone") {
       plantBit = "plant=drone · MN→pitch/yaw/strafe/thr";
@@ -447,7 +456,7 @@ function onAny() {
         ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling"))
         : ("planted " + (focus.planted ? "yes" : "…") + " |slip|=" + Number(slip).toFixed(3));
     }
-    $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs +
+    $("lifeHint").textContent = flesh + " · " + plantBit + " · home · MN DLM " + dlm + " legs " + legs +
       (kinMode === "drone"
         ? (" · steer thr=" + (steer.throttle ?? 1.45).toFixed(2) + " yaw=" + (steer.yawRate ?? 0).toFixed(2) + " pitch=" + (steer.pitch ?? 0).toFixed(2))
         : (" · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2))) +
@@ -527,7 +536,7 @@ $("showOdor").onchange = (e) => {
 };
 
 function placeBombNearView() {
-  // Prefer dish food / center; fall back near camera look target
+  // Prefer garden fruit / clearing center; fall back near camera look target
   const food = arena.userData.food?.position;
   let x = food ? food.x + 1.8 : controls.target.x;
   let z = food ? food.z + 1.2 : controls.target.z;
@@ -783,7 +792,9 @@ function loop() {
     worldShared.water = arena.userData.water.position;
     worldShared.bitter = arena.userData.bitter.position;
     worldShared.perch = arena.userData.perch.userData;
-    worldShared.landmarks = procWorld.landmarksNear(wx, wz, 24);
+    worldShared.landmarks = procWorld.landmarksNear(wx, wz, 18);
+    worldShared.foods = arena.userData.foods || [];
+    worldShared.assayBeacon = !!arena.userData.assayBeacon;
     for (const f of flies) {
       if (f.world) {
         f.world.food = worldShared.food;
@@ -791,12 +802,15 @@ function loop() {
         f.world.bitter = worldShared.bitter;
         f.world.perch = worldShared.perch;
         f.world.landmarks = worldShared.landmarks;
+        f.world.foods = worldShared.foods;
+        f.world.assayBeacon = worldShared.assayBeacon;
       }
     }
     odors.step(dt, now * 0.001, {
       food: arena.userData.food.position,
       water: arena.userData.water.position,
       bitter: arena.userData.bitter.position,
+      foods: arena.userData.foods || [],
       flies,
     });
     if (assayPanel) assayPanel.tick(dt);

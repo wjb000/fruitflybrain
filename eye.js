@@ -2,14 +2,14 @@
  * Drosophila compound eye: hexagonal ommatidia, R1–R6 luminance, R7 UV,
  * L1 ON / L2 OFF, T4/T5 Hassenstein–Reichardt motion (A/B/C/D).
  *
- * Each ommatidium is a Gaussian-acceptance ray into the real dish
- * (sky, checker floor, food, water, the other fly, arena wall).
+ * Each ommatidium is a Gaussian-acceptance ray into the garden
+ * (warm sky, moss floor, fruit, dew, perch, blossoms).
  */
 
 const DA = 3.8 * Math.PI / 180;
 const FOV = 1.42;
 const RINGS = 19;
-const ARENA_R = 17.4;
+const ARENA_R = 12.5;
 const ARENA_R2 = ARENA_R * ARENA_R;
 
 function hexLattice(rings, da, fov) {
@@ -181,14 +181,16 @@ export class CompoundEye {
         const tw = rayWall(ox, oz, dx, dz);
         if (tw < best) {
           const wy = oy + dy * tw;
-          if (wy > 0 && wy < 2.4) { best = tw; hit = "wall"; }
+          if (wy > 0 && wy < 0.42) { best = tw; hit = "wall"; }
         }
-        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.35, food.z, 0.95);
+        const tFood = raySphere(ox, oy, oz, dx, dy, dz, food.x, 0.28, food.z, 0.72);
         if (tFood < best) { best = tFood; hit = "food"; }
-        // Tall beacon ball — slightly larger so L/R eyes get clear salience asymmetry.
-        const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 2.15, food.z, 0.55);
-        if (tBeacon < best) { best = tBeacon; hit = "food"; }
-        // Procedural extras (other chunk landmarks within eye range).
+        // Assay pole only when the garden opted into it.
+        if (world.assayBeacon) {
+          const tBeacon = raySphere(ox, oy, oz, dx, dy, dz, food.x, 1.7, food.z, 0.4);
+          if (tBeacon < best) { best = tBeacon; hit = "food"; }
+        }
+        // Garden extras (fruit, dew, blossoms, shade).
         const extras = world.landmarks || [];
         for (let li = 0; li < extras.length && li < 12; li++) {
           const L = extras[li];
@@ -197,11 +199,11 @@ export class CompoundEye {
           if (tL < best) {
             best = tL;
             hit = L.kind === "water" ? "water" : L.kind === "bitter" ? "bitter"
-              : L.kind === "perch" ? "perch" : "food";
+              : L.kind === "perch" ? "perch" : L.kind === "flower" ? "flower" : "food";
           }
         }
         const bitter = world.bitter;
-        if (bitter) {
+        if (bitter && (bitter.x * bitter.x + bitter.z * bitter.z) < 400) {
           const tB = raySphere(ox, oy, oz, dx, dy, dz, bitter.x, 0.22, bitter.z, 0.42);
           if (tB < best) { best = tB; hit = "bitter"; }
         }
@@ -222,44 +224,45 @@ export class CompoundEye {
           if (t < best) { best = t; hit = "fly"; hitCol = fb.col || hitCol; }
         }
 
-        // Distance falloff keeps near objects punchier than far arena clutter.
+        // Distance falloff keeps near objects punchier than far garden clutter.
         const near = Math.max(0.14, Math.min(1, 3.4 / (0.45 + best)));
         let r, g, b, uv, sal = 0;
         if (hit === "sky") {
           const el = Math.max(0, dy);
-          const sky = (0.22 + 0.78 * day) * (0.35 + 0.65 * el);
-          r = sky * 0.40; g = sky * 0.52; b = sky * 0.95;
-          uv = sky * (0.55 + 0.7 * el);
+          const sky = (0.38 + 0.62 * day) * (0.40 + 0.60 * el);
+          r = sky * 0.92; g = sky * 0.68; b = sky * 0.42;
+          uv = sky * 0.22;
         } else if (hit === "floor") {
           const px = ox + dx * best, pz = oz + dz * best;
-          const chk = ((Math.floor(px * 0.55) + Math.floor(pz * 0.55)) & 1);
-          const fl = (chk ? 0.18 : 0.06) * (0.35 + 0.65 * day);
-          // Checker contrast → stronger spatial structure for R1–R6.
-          r = fl; g = fl * 0.95; b = fl * 0.85;
-          uv = fl * 0.15;
+          const moss = 0.5 + 0.5 * Math.sin(px * 0.65) * Math.cos(pz * 0.5);
+          const fl = (0.10 + 0.08 * moss) * (0.50 + 0.50 * day);
+          r = fl * 0.62; g = fl * 0.72; b = fl * 0.32;
+          uv = fl * 0.12;
         } else if (hit === "wall") {
-          const w = 0.20 * day;
-          r = w * 0.9; g = w; b = w * 1.1;
-          uv = w * 0.2;
-          sal = 0.08 * near;
+          const w = 0.22 * day;
+          r = w * 0.55; g = w * 0.85; b = w * 0.40;
+          uv = w * 0.12;
+          sal = 0.04 * near;
         } else if (hit === "food") {
-          // Warm sugar drop + beacon — high luminance + chromatic pop for robot/assay.
-          r = 1.85 * day * near; g = 1.15 * day * near; b = 0.10 * day * near;
+          r = 1.45 * day * near; g = 0.95 * day * near; b = 0.18 * day * near;
           uv = 0.10 * day;
-          sal = 2.15 * near;
+          sal = 1.65 * near;
+        } else if (hit === "flower") {
+          r = 1.05 * day * near; g = 0.48 * day * near; b = 0.92 * day * near;
+          uv = 0.18 * day * near;
+          sal = 0.72 * near;
         } else if (hit === "bitter") {
           r = 0.18 * day * near; g = 0.48 * day * near; b = 0.10 * day * near;
           uv = 0.22 * day * near;
           sal = 0.85 * near;
         } else if (hit === "perch") {
-          r = 0.48 * day * near; g = 0.30 * day * near; b = 0.12 * day * near;
-          uv = 0.05 * day;
-          sal = 0.35 * near;
+          r = 0.32 * day * near; g = 0.52 * day * near; b = 0.18 * day * near;
+          uv = 0.08 * day;
+          sal = 0.32 * near;
         } else if (hit === "water") {
-          // Blue-UV bright water for R7 / hygrosensory visual cue.
-          r = 0.14 * day * near; g = 0.58 * day * near; b = 1.15 * day * near;
-          uv = 0.55 * day * near;
-          sal = 1.05 * near;
+          r = 0.18 * day * near; g = 0.62 * day * near; b = 1.05 * day * near;
+          uv = 0.50 * day * near;
+          sal = 0.95 * near;
         } else if (hit === "bomb") {
           // Scent orb: intense warm flicker target (visual only — odor is plume).
           const pulse = 0.85 + 0.15 * Math.sin((world.t || 0) * 9.5 + i * 0.07);
@@ -301,6 +304,7 @@ export class CompoundEye {
         secUV[sec] += uv;
         secN[sec]++;
         if (hit === "food" || hit === "bomb") { secFood[sec] += sal; sumFood += sal; }
+        else if (hit === "flower") { secFood[sec] += sal * 0.45; sumFood += sal * 0.45; }
         else if (hit === "water") { secWater[sec] += sal; sumWater += sal; }
         else if (hit === "fly") { secFly[sec] += sal; sumFly += sal; }
         else if (hit === "bitter") { secBitter[sec] += sal; sumBitter += sal; }
