@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """MuJoCo flesh for the connectome.
 
-The brain only fires motor neurons. This module is the body: NeuroMechFly
-position actuators on 42 leg DoFs, contact, adhesion, gravity. Thorax pose
-is whatever physics does — no slip kinematics, no scripted gait.
+The brain only fires motor neurons. This module is gap-fill plant: NeuroMechFly
+position actuators on 42 leg DoFs, contact, adhesion, gravity, vault-settle.
+Thorax pose is whatever physics does — no slip kinematics, no scripted gait,
+no walk thruster.
 """
 
 from __future__ import annotations
@@ -23,34 +24,35 @@ from flygym.utils.mjcf import GEOM_TYPES
 from flygym_demo.complex_terrain.common import make_locomotion_fly
 import mujoco as mj
 
-# Three.js dish: x right, y up, z forward. MuJoCo NeuroMechFly: x forward, y left, z up.
+# Three.js garden: x right, y up, z forward. MuJoCo NeuroMechFly: x forward, y left, z up.
 # three (x, y, z) <-> mujoco (z, -x, y)
-ARENA_R = 18.0  # small pad (matches web/world/procgen.js)
-OPEN_WORLD = True  # no hard ring walls; soft XY clamp at WORLD_SOFT_LIMIT
-WORLD_SOFT_LIMIT = 15.8  # soft pad rim (~ARENA_R - 2.2)
+ARENA_R = 12.5  # garden clearing (matches web/world/procgen.js)
+OPEN_WORLD = True  # hedge bounce in JS; no hard ring walls
+WORLD_SOFT_LIMIT = 10.8  # ~ARENA_R - 1.7
 FLY_CEILING = 5.8
 SPAWN_Z = 0.55  # free-joint seed; stand_z remeasured after warmup (~1.15)
 VISUAL_THORAX_Y = 1.18  # nmf visual thorax height; client standZ syncs to plant pose.y
-PERCH = dict(three_x=4.8, three_z=-7.4, r_pole=0.20, r_cap=0.42, h=2.18)
+PERCH = dict(three_x=-1.6, three_z=-2.2, r_pole=0.08, r_cap=0.55, h=1.35)
 
 OUR_LEGS = ["L1", "L2", "L3", "R1", "R2", "R3"]  # maps 1:1 onto NMF lf,lm,lh,rf,rm,rh
 NMF_TO_OUR = dict(zip(NMF_LEGS, OUR_LEGS))
 OUR_TO_NMF = dict(zip(OUR_LEGS, NMF_LEGS))
 
-# Antagonist → DoF. Same pairing as the connectome muscle pools / fly.js.
+# Antagonist → DoF. Same pairing as the connectome muscle pools / poseMap.js.
 # (nmf child-link, axis) → (flex/positive MN, ext/negative MN, range rad, extra)
 # MANC muscle → NeuroMechFly DoF (Azevedo et al.; Soler et al.).
 # Promotor/remotor swing the coxa (pitch). Adductor vs remotor/abductor
 # sets stance width (yaw). Rotators roll the coxa. TTMn is trExt.
+# cns3: calmer spans — T1 already scaled in JS muscle cmds; plant must not
+# re-amplify neck-less T1 arm-flail via large coxa/tr pitch.
 DOF_MAP = [
-    # Walkable spans: MN-only contact locomotion (restore after calm2 twitch).
-    ("coxa", "pitch", "coxaProm", "coxaRem", 0.78, 0.0),
-    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.58, 0.0),
-    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.55, 0.0),
-    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.98, 0.0),
-    ("trochanterfemur", "roll", "feRed", None, 0.36, 0.0),
-    ("tibia", "pitch", "tiExt", "tiFlex", 0.78, 0.0),
-    ("tarsus1", "pitch", "taLev", "taDep", 0.50, 0.0),
+    ("coxa", "pitch", "coxaProm", "coxaRem", 0.58, 0.0),
+    ("coxa", "yaw", "coxaAdd", "coxaRem", 0.40, 0.0),
+    ("coxa", "roll", "coxaRotA", "coxaRotP", 0.34, 0.0),
+    ("trochanterfemur", "pitch", "trExt", "trFlex", 0.62, 0.0),
+    ("trochanterfemur", "roll", "feRed", None, 0.26, 0.0),
+    ("tibia", "pitch", "tiExt", "tiFlex", 0.60, 0.0),
+    ("tarsus1", "pitch", "taLev", "taDep", 0.16, 0.0),
 ]
 
 # Cartoon rest (fly.js REST) so visual deltas stay on the Three.js skeleton.
@@ -80,11 +82,13 @@ def antagonist(pos: float, neg: float) -> float:
     p = float(pos or 0.0)
     n = float(neg or 0.0)
     mag = p + n
-    # Quiet pools stay limp. Stronger flex/ext so contact can push the body.
-    if mag < 0.01:
+    # Quiet pools stay limp. Unipolar (empty coxaProm) is a modest offset.
+    if mag < 0.02:
         return 0.0
-    raw = (p - n) / (mag + 0.045)
-    return float(math.tanh(raw * 1.75))
+    unipolar = (p < 0.045) != (n < 0.045)
+    raw = (p - n) / (mag + 0.05)
+    d = math.tanh(raw * 1.55)
+    return d * (0.52 if unipolar else 1.0)
 
 
 def three_to_mj(x: float, z: float, y: float = SPAWN_Z) -> tuple[float, float, float]:
@@ -214,7 +218,7 @@ class Body:
     born: float = field(default_factory=time.time)
 
 
-# Soft dish limit (legacy). Open world uses WORLD_SOFT_LIMIT sanity only.
+# Soft garden rim (legacy). Open world uses WORLD_SOFT_LIMIT bounce/redirect only.
 ARENA_SOFT = ARENA_R - 1.8
 ARENA_EPS = 0.08
 MAX_BODIES = 8
@@ -415,7 +419,7 @@ class Plant:
             pos = float(m.get(pos_name, 0.0) or 0.0)
             neg = float(m.get(neg_name, 0.0) or 0.0) if neg_name else 0.0
             if link == "trochanterfemur" and axis == "pitch":
-                pos = pos + 0.6 * float(m.get("feRed", 0.0) or 0.0)
+                pos = pos + 0.35 * float(m.get("feRed", 0.0) or 0.0)
             tgt[i] = body.rest[i] + span * antagonist(pos, neg)
         return tgt
 
@@ -530,7 +534,7 @@ class Plant:
         return snap
 
     def _contain(self, body: Body) -> None:
-        """Open world: no XY cage. Sanity soft-limit far out; still clamp Z ceiling/floor."""
+        """Garden hedge: bounce/redirect at WORLD_SOFT_LIMIT, never punish; still clamp Z."""
         d = body.sim.mj_data
         th = d.xpos[body.thorax_bodyid]
         mx, my, mz = float(th[0]), float(th[1]), float(th[2])

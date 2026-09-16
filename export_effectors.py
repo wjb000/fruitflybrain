@@ -88,6 +88,9 @@ def proprio_stim(pools: dict) -> dict:
         "propT1", "propT2", "propT3",
         "choT1L", "choT1R", "choT2L", "choT2R", "choT3L", "choT3R",
         "tactT1L", "tactT1R", "tactT2L", "tactT2R", "tactT3L", "tactT3R",
+        "hpT1L", "hpT1R", "hpT2L", "hpT2R", "hpT3L", "hpT3R",
+        "csaT1L", "csaT1R", "csaT2L", "csaT2R", "csaT3L", "csaT3R",
+        "propT1L", "propT1R", "propT2L", "propT2R", "propT3L", "propT3R",
         # Contact / pheromone receptors (annotated pools → stim channels).
         "ppk23", "ppk25", "IR52b",
         "neckL", "neckR",
@@ -244,6 +247,9 @@ def export_male() -> None:
         for lr, smask in side_of.items():
             pools[f"cho{seg}{lr}"] = take(cho & nmask & smask)
             pools[f"tact{seg}{lr}"] = take(tact & nmask & smask)
+            pools[f"hp{seg}{lr}"] = take(hp & nmask & smask)
+            pools[f"csa{seg}{lr}"] = take(csa & nmask & smask)
+            pools[f"prop{seg}{lr}"] = take(prop & nmask & smask)
 
     dump(os.path.join(ROOT, "web", "data", "effectors.json"), len(df), pools)
     merge_stim(os.path.join(ROOT, "web", "data", "stim.json"), proprio_stim(pools))
@@ -377,6 +383,9 @@ def export_female() -> None:
             sm = side == side_name
             pools[f"cho{seg}{lr}"] = take(cho & on_leg & sm)
             pools[f"tact{seg}{lr}"] = take(tact & on_leg & sm)
+            pools[f"hp{seg}{lr}"] = take(hp & on_leg & sm)
+            pools[f"csa{seg}{lr}"] = take((csa | pt.str.contains("campaniform")) & on_leg & sm)
+            pools[f"prop{seg}{lr}"] = take(prop & on_leg & sm)
 
     dump(os.path.join(ROOT, "web", "data", "female", "effectors.json"), len(df), pools)
     merge_stim(os.path.join(ROOT, "web", "data", "female", "stim.json"), proprio_stim(pools))

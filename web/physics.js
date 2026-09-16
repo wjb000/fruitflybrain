@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase, DEFAULT_PLANT } from "./plantConfig.js?v=drone1";
+import { plantUrl, plantBase, isPagesHost } from "./plantConfig.js?v=fullfly1";
 
 export const physics = {
   ok: false,
@@ -13,13 +13,16 @@ export const physics = {
 
 let busy = false;
 let reconnectAt = 0;
+const PLANT_HEALTH_MS = 2200;
 
-async function probe(url) {
-  const r = await fetch(url + "/physics/health", { mode: "cors" });
-  if (!r.ok) throw new Error("health " + r.status);
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || "plant not ok");
-  return j;
+async function fetchTimed(url, ms = PLANT_HEALTH_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { mode: "cors", signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 export async function connectPhysics() {
@@ -27,11 +30,7 @@ export async function connectPhysics() {
   const candidates = [];
   const base = plantBase();
   if (base) candidates.push(base);
-  if (DEFAULT_PLANT) {
-    const d = DEFAULT_PLANT.replace(/\/$/, "");
-    if (!candidates.includes(d)) candidates.push(d);
-  }
-  // same-origin last (Pages has no /physics)
+  // same-origin last (Pages has no /physics; local serve.py does)
   candidates.push("");
 
   for (const c of candidates) {
@@ -39,7 +38,8 @@ export async function connectPhysics() {
     tried.push(origin);
     try {
       const healthUrl = c ? (c + "/physics/health") : "/physics/health";
-      const r = await fetch(healthUrl, { mode: "cors" });
+      const r = await fetchTimed(healthUrl);
+      if (!r.ok) continue;
       const j = await r.json();
       if (!j.ok) continue;
       physics.ok = true;
@@ -62,9 +62,11 @@ export async function connectPhysics() {
   return false;
 }
 
-/** If plant dropped (tunnel blip), retry without reloading the page. */
+/** If plant dropped (tunnel blip), retry without reloading the page.
+ *  Pages kinematic default: never auto-reconnect a remote plant. */
 export function maybeReconnectPhysics() {
   if (physics.ok) return;
+  if (isPagesHost()) return;
   if (performance.now() < reconnectAt) return;
   reconnectAt = performance.now() + 8000;
   connectPhysics().catch(() => {});

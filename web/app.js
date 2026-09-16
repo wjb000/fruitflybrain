@@ -1,19 +1,19 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=follow1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=follow1";
-import { createOpenWorld } from "./world/procgen.js?v=follow1";
-import { EmbodiedFly } from "./agent.js?v=follow1";
-import { drawOmmatidia } from "./eye.js?v=follow1";
-import { OdorWorld } from "./plume.js?v=follow1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=follow1";
-import { parseLesionFlag } from "./lesion.js?v=follow1";
-import { mountAssayPanel } from "./assay/panel.js?v=follow1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=follow1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=follow1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=follow1";
+import { loadNmf, createMaleFly } from "./fly.js?v=fullfly1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=fullfly1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=fullfly1";
+import { EmbodiedFly } from "./agent.js?v=fullfly1";
+import { drawOmmatidia } from "./eye.js?v=fullfly1";
+import { OdorWorld } from "./plume.js?v=fullfly1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=fullfly1";
+import { parseLesionFlag } from "./lesion.js?v=fullfly1";
+import { mountAssayPanel } from "./assay/panel.js?v=fullfly1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=fullfly1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=fullfly1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=fullfly1";
 
-const BODY_MODE = bodyModeFromUrl(); // default "drone"; ?body=cube|fly fallbacks
+const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
 /** Local flight URL gate for HUD — do not import FLIGHT_ENABLED (stale module cache). Default OFF. */
 function flightEnabled() {
@@ -63,14 +63,20 @@ if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x0b0d12, 1);
+renderer.setClearColor(0xd8b888, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 120);
-camera.position.set(0, 6.2, 11.5);
+const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 80);
+if (BODY_MODE === "fly") {
+  camera.position.set(UTOPIA_HOME.x + 1.15, 1.55, UTOPIA_HOME.z + 2.45);
+} else if (BODY_MODE === "drone") {
+  camera.position.set(0, 5.4, 9.2);
+} else {
+  camera.position.set(0, 3.8, 7.2);
+}
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -78,9 +84,13 @@ controls.rotateSpeed = 0.55;
 controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.6;
-controls.maxDistance = 36;
-controls.target.set(0, 0.55, 0);
+controls.minDistance = 1.15;
+controls.maxDistance = 14;
+controls.target.set(
+  BODY_MODE === "fly" ? UTOPIA_HOME.x : 0,
+  BODY_MODE === "fly" ? 0.52 : 0.55,
+  BODY_MODE === "fly" ? UTOPIA_HOME.z : 0
+);
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN,
@@ -98,17 +108,21 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const hemi = new THREE.HemisphereLight(0xb8c4d8, 0x1a120c, 1.05);
+const hemi = new THREE.HemisphereLight(0xfff2d8, 0x4a7a38, 1.38);
 scene.add(hemi);
-const key = new THREE.DirectionalLight(0xfff2dc, 1.35);
-key.position.set(8, 16, 10);
+const fill = new THREE.DirectionalLight(0xffe0b8, 0.48);
+fill.position.set(-5, 6, -3);
+scene.add(fill);
+const key = new THREE.DirectionalLight(0xfff6e6, 1.28);
+key.position.set(6, 11, 7);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.camera.near = 1;
-key.shadow.camera.far = 60;
-key.shadow.camera.left = key.shadow.camera.bottom = -22;
-key.shadow.camera.right = key.shadow.camera.top = 22;
+key.shadow.camera.far = 48;
+key.shadow.camera.left = key.shadow.camera.bottom = -16;
+key.shadow.camera.right = key.shadow.camera.top = 16;
 scene.add(key);
+scene.fog = new THREE.FogExp2(0xd4b48a, 0.012);
 
 const procWorld = createOpenWorld();
 const arena = procWorld.root;
@@ -122,9 +136,12 @@ const worldShared = {
   water: arena.userData.water.position,
   bitter: arena.userData.bitter.position,
   perch: arena.userData.perch.userData,
+  foods: arena.userData.foods || [],
+  assayBeacon: !!arena.userData.assayBeacon,
   odors,
   landmarks: [],
   procedural: true,
+  utopia: true,
 };
 
 const flies = [];
@@ -137,17 +154,27 @@ let nMale = 0;
 let readyN = 0;
 let expectedReady = 1;
 
+/** First male: planted in the garden clearing, facing ripe fruit. */
+function thriveHome() {
+  const x = UTOPIA_HOME.x, z = UTOPIA_HOME.z;
+  const yaw = Math.atan2(UTOPIA_FOOD.x - x, UTOPIA_FOOD.z - z);
+  return { x, z, yaw };
+}
+
 function spawnSpot(occupied) {
   const pts = occupied || flies.map((f) => ({ x: f.body.position.x, z: f.body.position.z }));
-  const yaw = Math.random() * Math.PI * 2;
-  const gap = 5.5;
+  if (!pts.length) return thriveHome();
+  const gap = 3.2;
   for (let k = 0; k < 24; k++) {
     const a = Math.random() * Math.PI * 2;
-    const r = 3.5 + Math.random() * 10;
+    const r = 1.6 + Math.random() * 4.2;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (pts.every((p) => Math.hypot(p.x - x, p.z - z) >= gap)) return { x, z, yaw };
+    if (pts.every((p) => Math.hypot(p.x - x, p.z - z) >= gap)) {
+      return { x, z, yaw: Math.atan2(UTOPIA_FOOD.x - x, UTOPIA_FOOD.z - z) };
+    }
   }
-  return { x: (Math.random() - 0.5) * 12, z: (Math.random() - 0.5) * 12, yaw };
+  const h = thriveHome();
+  return { x: h.x + (Math.random() - 0.5) * 1.6, z: h.z + (Math.random() - 0.5) * 1.6, yaw: h.yaw };
 }
 
 function onFlyReady() {
@@ -245,7 +272,7 @@ function fillJoints(el) {
   for (const name of JOINT_LEGS) {
     const row = document.createElement("div");
     row.className = "barline";
-    row.innerHTML = `<div class="name">${name}</div><div class="track"><i id="j-${name}" style="background:#7ecbff"></i></div>`;
+    row.innerHTML = `<div class="name" id="jn-${name}">${name}</div><div class="track"><i id="j-${name}" style="background:#7ecbff"></i></div>`;
     el.appendChild(row);
   }
 }
@@ -254,7 +281,7 @@ fillJoints($("joints"));
 if (BODY_MODE === "fly") {
   setLoad(0.88, "NeuroMechFly body");
   await loadNmf();
-  setLoad(0.92, "MuJoCo flesh");
+  setLoad(0.92, "closing the loop");
   await connectPhysics();
   // Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
   if (physics.ok) {
@@ -262,8 +289,7 @@ if (BODY_MODE === "fly") {
   }
 } else {
   setLoad(0.88, BODY_MODE === "cube" ? "cube chassis" : "drone chassis");
-  setLoad(0.92, "brain → robot controller");
-  // Drone/cube: no MuJoCo plant, no nmf mesh load (avoids seize).
+  setLoad(0.92, "brain → chassis");
 }
 if ($("flesh")) {
   if (isKinematicChassis(BODY_MODE)) {
@@ -272,21 +298,21 @@ if ($("flesh")) {
     const origin = physics.plantOrigin || "";
     $("flesh").textContent = physics.ok
       ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
-      : "kinematic";
+      : "fly body";
   }
 }
 if ($("info")) {
   if (BODY_MODE === "drone") {
-    $("info").textContent = "Robot controller (drone default): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → quadrotor pitch/yaw/strafe/throttle (hover ~1.45). Stim-map → drone axes only. ?body=cube|fly fallbacks. See web/controller/portable.js.";
+    $("info").textContent = "Optional drone chassis: male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → quadrotor pitch/yaw/strafe/throttle. Homepage default is the fly body (?body=fly omitted). See web/controller/portable.js.";
   } else if (BODY_MODE === "cube") {
-    $("info").textContent = "Robot controller (cube): male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable forward/yawRate → {v,ω} cube on small pad. No food-bearing thruster; no MuJoCo/nmf (?body=fly to restore). See web/controller/portable.js.";
+    $("info").textContent = "Optional cube chassis: male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable {v,ω}. Homepage default is the fly body. No food-bearing thruster.";
   } else {
     const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
       ? (" Plant @ " + physics.plantOrigin + ".")
       : "";
     $("info").textContent = physics.ok
-      ? ("Vision→walk: compound eye → optic/visionL/R pools → connectome → leg MNs → MuJoCo contact. Flight free-joint lift " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "OFF (add ?flight=1 to enable)") + ". No walk thrusters." + plantHint)
-      : ("Static host: kinematic MN→pose→stance-slip. Vision→walk via optic write-in (landmarks+salience→LIF→leg MNs). Flight translation " + (FLIGHT_ENABLED ? "ON" : "OFF") + ". Set ?plant=https://… for remote plant; ?flight=1 to allow wing-MN lift." + plantHint);
+      ? ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
+      : ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → LIF → annotated MNs → pose → planted stance-slip. Fruit, dew, shade, blossoms. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
   }
 }
 
@@ -313,6 +339,11 @@ function paintJoints(fly) {
       + Math.abs((u.trFlex || 0) - (u.trExt || 0))
       + Math.abs((u.coxaProm || 0) - (u.coxaRem || 0));
     el.style.width = (Math.min(1, net / 2) * 100).toFixed(1) + "%";
+    const lab = document.getElementById("jn-" + name);
+    if (lab) {
+      const gait = fly.cmd.walk > 0.04 ? (u._swing ? " W" : " S") : " ·";
+      lab.textContent = name + gait;
+    }
   }
 }
 
@@ -370,12 +401,13 @@ function onAny() {
   }
   if (focus.day != null) {
     const day = focus.day;
-    const fx = focus.body.position.x, fz = focus.body.position.z;
-    key.intensity = 0.12 + day * 1.35;
-    key.position.set(fx + Math.sin(day * Math.PI) * 14, 3 + day * 14, fz + Math.cos(day * Math.PI) * 8);
-    key.target.position.set(fx, 0, fz);
+    // Stable garden sun — gentle, never night-black.
+    key.intensity = 1.12 + day * 0.22;
+    key.position.set(6.2 + Math.sin(day * Math.PI) * 1.1, 11, 7.2);
+    key.target.position.set(focus.body.position.x, 0, focus.body.position.z);
     if (!key.target.parent) scene.add(key.target);
-    renderer.setClearColor(0x0b0d12, 1);
+    hemi.intensity = 1.28 + day * 0.14;
+    renderer.setClearColor(0xd8b888, 1);
   }
   const focusMode = focus.life?.mode || "…";
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;
@@ -386,7 +418,7 @@ function onAny() {
     ? (kinMode === "cube" ? "cube chassis" : "drone chassis")
     : (physics.ok
       ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
-      : "kinematic MN");
+      : "fly body");
   if ($("flesh")) $("flesh").textContent = flesh;
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
@@ -395,8 +427,9 @@ function onAny() {
     ? droneSetpoints(portableControls(focus))
     : chassisSetpoints(portableControls(focus)));
   if ($("steerHint")) {
-    const salT = steer.salTarget ?? focus.lastVisionSal?.salTarget ?? focus.eye?.lastSummary?.salTarget ?? 0;
-    const asym = steer.asymFood ?? focus.lastVisionSal?.asymFood ?? focus.eye?.lastSummary?.asymFood ?? 0;
+    const loom = 0.5 * ((focus.lastVisionSal?.loomL || 0) + (focus.lastVisionSal?.loomR || 0));
+    const hsL = focus.lastVisionSal?.hsL ?? focus.opticEma?.HS_L ?? 0;
+    const hsR = focus.lastVisionSal?.hsR ?? focus.opticEma?.HS_R ?? 0;
     if (kinMode === "drone") {
       $("steerHint").textContent =
         "thr " + (steer.throttle ?? 1.45).toFixed(2) +
@@ -404,33 +437,32 @@ function onAny() {
         "  pitch " + (steer.pitch ?? 0).toFixed(2) +
         "  | v=" + (steer.v ?? 0).toFixed(2) +
         " ω=" + (steer.omega ?? 0).toFixed(2) +
-        "  sal " + Number(salT).toFixed(2) +
-        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+        "  loom " + Number(loom).toFixed(2) +
+        " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     } else {
       $("steerHint").textContent =
         "fwd " + (steer.forward ?? 0).toFixed(2) +
         "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
         "  | v=" + (steer.v ?? 0).toFixed(2) +
         " ω=" + (steer.omega ?? 0).toFixed(2) +
-        "  sal " + Number(salT).toFixed(2) +
-        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+        "  loom " + Number(loom).toFixed(2) +
+        " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     }
   }
   if ($("lifeHint")) {
-    const ps = procWorld.stats();
     let plantBit;
     if (kinMode === "drone") {
       plantBit = "plant=drone · MN→pitch/yaw/strafe/thr";
     } else if (kinMode === "cube") {
-      plantBit = "plant=cube · robot controller MN→v/ω";
+      plantBit = "plant=cube · MN→v/ω";
     } else {
       const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
       const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
       plantBit = physics.ok
-        ? ("legs↓" + nLeg + (focus.planted ? " planted" : ""))
-        : ("|slip|=" + Number(slip).toFixed(3));
+        ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling"))
+        : ("planted " + (focus.planted ? "yes" : "…") + " S/W " + (focus.cmd?.stanceN ?? 6) + "/" + (focus.cmd?.swingN ?? 0) + " |slip|=" + Number(slip).toFixed(3));
     }
-    $("lifeHint").textContent = flesh + " · " + plantBit + " · pad @" + ps.chunk.join(",") + " · MN DLM " + dlm + " legs " + legs +
+    $("lifeHint").textContent = flesh + " · " + plantBit + " · home · MN DLM " + dlm + " legs " + legs +
       (kinMode === "drone"
         ? (" · steer thr=" + (steer.throttle ?? 1.45).toFixed(2) + " yaw=" + (steer.yawRate ?? 0).toFixed(2) + " pitch=" + (steer.pitch ?? 0).toFixed(2))
         : (" · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2))) +
@@ -448,8 +480,18 @@ function onAny() {
   setW("mn-admn", e.ADMN || 0);
   setW("mn-legs", ((e.T1L || 0) + (e.T1R || 0) + (e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 6);
   setW("mn-neck", e.neck || 0);
-  setW("mn-abd", e.abdomen || 0);
+  setW("mn-abd", focus.cmd?.abdomen || e.abdomen || 0);
   setW("mn-mn9", Math.max(e.MN9 || 0, e.proboscis || 0));
+  setW("mn-ant", Math.max(focus.cmd?.antennaL || 0, focus.cmd?.antennaR || 0));
+  setW("mn-halt", focus.cmd?.fly || 0);
+  if ($("mapHint")) {
+    const st = focus.effectorStats || {};
+    const live = focus.liveMapped != null ? focus.liveMapped : 0;
+    const bound = focus.boundMapped != null ? focus.boundMapped : (st.mappedN || 0);
+    $("mapHint").textContent = "mapped " + (st.mappedN || bound) + " pools · empty " + (st.emptyN || 12)
+      + " (T2/T3 coxaProm+Ta*) · live MN " + live + "/" + bound
+      + " · soft: head+ant+abd×5+wings+halt+mouth";
+  }
   const o = focus.lastOdor;
   if (o && $("odorFL")) {
     $("odorFL").style.width = Math.min(100, o.foodL).toFixed(1) + "%";
@@ -510,7 +552,7 @@ $("showOdor").onchange = (e) => {
 };
 
 function placeBombNearView() {
-  // Prefer dish food / center; fall back near camera look target
+  // Prefer garden fruit / clearing center; fall back near camera look target
   const food = arena.userData.food?.position;
   let x = food ? food.x + 1.8 : controls.target.x;
   let z = food ? food.z + 1.2 : controls.target.z;
@@ -603,8 +645,8 @@ function overviewCamera() {
   userDriving = false;
   followMode = "off";
   syncFollow();
-  controls.target.set(0, 0.55, 0);
-  camera.position.set(0, 6.2, 11.5);
+  controls.target.set(UTOPIA_HOME.x, 0.5, UTOPIA_HOME.z);
+  camera.position.set(UTOPIA_HOME.x + 2.4, 2.4, UTOPIA_HOME.z + 4.2);
   controls.update();
 }
 
@@ -699,9 +741,9 @@ if (camHint) {
 const stimBtns = [
   ["loop", "live", ""],
   ["vision", "light", ""],
-  ["smell", "odor flood", ""],
+  ["smell", "scent", ""],
   ["taste", "taste", ""],
-  ["escape", "escape", "warn"],
+  ["touch", "touch", ""],
 ];
 const stimsEl = $("stims");
 for (const [id, label, cls] of stimBtns) {
@@ -718,7 +760,7 @@ function applyStim(id) {
   if (id === "vision") extra.vision = 90;
   if (id === "smell") extra.smellL = extra.smellR = 90;
   if (id === "taste") extra.taste = 90;
-  if (id === "escape") extra.escape = 180;
+  if (id === "touch") extra.touch = 90;
   for (const f of flies) {
     f.extra = { ...extra };
   }
@@ -766,7 +808,9 @@ function loop() {
     worldShared.water = arena.userData.water.position;
     worldShared.bitter = arena.userData.bitter.position;
     worldShared.perch = arena.userData.perch.userData;
-    worldShared.landmarks = procWorld.landmarksNear(wx, wz, 24);
+    worldShared.landmarks = procWorld.landmarksNear(wx, wz, 18);
+    worldShared.foods = arena.userData.foods || [];
+    worldShared.assayBeacon = !!arena.userData.assayBeacon;
     for (const f of flies) {
       if (f.world) {
         f.world.food = worldShared.food;
@@ -774,12 +818,15 @@ function loop() {
         f.world.bitter = worldShared.bitter;
         f.world.perch = worldShared.perch;
         f.world.landmarks = worldShared.landmarks;
+        f.world.foods = worldShared.foods;
+        f.world.assayBeacon = worldShared.assayBeacon;
       }
     }
     odors.step(dt, now * 0.001, {
       food: arena.userData.food.position,
       water: arena.userData.water.position,
       bitter: arena.userData.bitter.position,
+      foods: arena.userData.foods || [],
       flies,
     });
     if (assayPanel) assayPanel.tick(dt);
@@ -787,7 +834,7 @@ function loop() {
   if (!userDriving && followMode === "selected" && selected) {
     const h = selected.heading;
     const px = selected.body.position.x, pz = selected.body.position.z, py = selected.y;
-    _tgt.set(px + Math.sin(h) * 1.4, 0.85 + py, pz + Math.cos(h) * 1.4);
+    _tgt.set(px + Math.sin(h) * 0.85, 0.48 + Math.min(0.35, py * 0.12), pz + Math.cos(h) * 0.85);
     const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.12);
     const delta = controls.target.clone().sub(prevT);
@@ -797,31 +844,31 @@ function loop() {
     const radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
     const desired = new THREE.Vector3(
       -Math.sin(h) * radius * 0.92,
-      Math.max(1.2, radius * 0.42 + py * 0.2),
+      Math.max(1.05, radius * 0.34 + 0.35),
       -Math.cos(h) * radius * 0.92
     );
     offset.lerp(desired, 0.045);
     offset.setLength(radius);
     camera.position.copy(controls.target).add(offset);
   } else if (!userDriving && followMode === "flock" && flies.length) {
-    let cx = 0, cz = 0, cy = 0, minx = 99, maxx = -99, minz = 99, maxz = -99;
+    let cx = 0, cz = 0, minx = 99, maxx = -99, minz = 99, maxz = -99;
     for (const f of flies) {
       const x = f.body.position.x, z = f.body.position.z;
-      cx += x; cz += z; cy += f.y;
+      cx += x; cz += z;
       if (x < minx) minx = x; if (x > maxx) maxx = x;
       if (z < minz) minz = z; if (z > maxz) maxz = z;
     }
     const n = flies.length;
-    cx /= n; cz /= n; cy /= n;
-    _tgt.set(cx, 0.55 + cy, cz);
+    cx /= n; cz /= n;
+    _tgt.set(cx, 0.48, cz);
     const prevT = controls.target.clone();
     controls.target.lerp(_tgt, 0.09);
     const delta = controls.target.clone().sub(prevT);
     camera.position.add(delta);
     const offset = camera.position.clone().sub(controls.target);
     let radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
-    const span = Math.max(6, maxx - minx, maxz - minz);
-    const comfort = Math.min(controls.maxDistance, Math.max(8, 7.5 + span * 0.55));
+    const span = Math.max(3.2, maxx - minx, maxz - minz);
+    const comfort = Math.min(8.5, Math.max(3.15, 3.05 + span * 0.28));
     radius += (comfort - radius) * 0.02;
     offset.setLength(radius);
     camera.position.copy(controls.target).add(offset);
@@ -851,9 +898,9 @@ let stimMapPanel = null;
     linkRow.style.marginTop = "8px";
     const a = document.createElement("a");
     a.href = stimMapUrl(true);
-    a.textContent = "open stim map";
+    a.textContent = "explore stim map";
     a.className = "stim-map-link";
-    a.title = "Causal stim → LIF → MNs → drone axes (not beacon-chase tuning)";
+    a.title = "Gentle pool exploration: Hz inject → LIF → MNs (not surgery)";
     linkRow.appendChild(a);
     if (panelL) panelL.appendChild(linkRow);
   }

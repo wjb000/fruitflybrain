@@ -1,4 +1,9 @@
-/* LIF engine for the Male CNS connectome. Runs in a Web Worker. */
+/* LIF engine for the Male CNS connectome. Runs in a Web Worker.
+ *
+ * This is the primary brain: ~166k Traced cells, real chemical synapses,
+ * Poisson stim, STD, slow neuromod. Gap-fill lives outside (eye/ORN/proprio
+ * Hz write-in, plant adhesion). Do not add a behavior tree or CPG here.
+ */
 
 let n = 0;
 let indptr, indices, weight, group, nt;
@@ -286,16 +291,18 @@ function effectorFractions(steps) {
   const hzOut = {};
   const s = Math.max(1, steps);
   const sec = (s * params.dt) / 1000;
-  const HZ_SCALE = 40; // ~40 Hz mean → full drive (less saturated effectors)
+  const HZ_SCALE = 52; // ~52 Hz mean → full drive (small pools were saturating at 40)
   for (const name in effectorIds) {
     const sz = effectorSize[name] || 0;
     const hits = effectorHits[name] || 0;
     const hz = sz > 0 && sec > 0 ? hits / (sz * sec) : 0;
-    // Soft map: 1 - exp(-hz/18) ≈ linear near 0, saturates ~50–60 Hz
-    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / 18));
-    // Linear 0–HZ_SCALE floor so mid rates stay visible without pegging
-    const lin = Math.min(1, hz / HZ_SCALE);
-    out[name] = Math.max(norm, lin * 0.85);
+    // Tiny pools (neck=25, coxaProm=4) have high Poisson variance — do not
+    // treat a handful of spikes as tetanus. Larger pools keep the old map.
+    const tau = sz > 0 && sz < 8 ? 30 : sz < 22 ? 24 : 20;
+    const hzFull = sz > 0 && sz < 8 ? 80 : sz < 22 ? 62 : HZ_SCALE;
+    const norm = hz <= 0 ? 0 : Math.min(1, 1 - Math.exp(-hz / tau));
+    const lin = Math.min(1, hz / hzFull);
+    out[name] = Math.max(norm, lin * 0.80);
     hzOut[name] = hz;
     effectorHits[name] = 0;
   }
