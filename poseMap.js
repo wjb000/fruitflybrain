@@ -48,6 +48,14 @@ export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
 export const POSE_EMA_ALPHA = 0.38; // slower muscle/neck EMA (was 0.85)
 export const MUSCLE_TAU = 0.14;     // hinge follow (was 0.05 — twitchy)
 export const NECK_TAU = 0.18;
+export const WING_TAU = 0.16;
+export const FEED_TAU = 0.18;
+
+/** Visual wing flap. cns3 0.12 + 10 Hz sine read as tapping from idle MN noise. */
+export const WING_FLAP_GATE = 0.48;
+export const WING_FLAP_AMP = 0.22;
+/** Mouth/proboscis. MN9 is 2 cells — a single spike was constant mouthing. */
+export const FEED_POSE_GATE = 0.26;
 
 const DEAD = 0.045;
 
@@ -154,6 +162,34 @@ export function neckFromEma(e) {
     headYaw: Math.max(-1, Math.min(1, yaw)),
     headRoll: Math.max(-1, Math.min(1, yaw * 0.35)),
   };
+}
+
+/**
+ * Wing power from DLM/DVM/ADMN. Idle Poisson on these small pools must not
+ * flap or tap the mesh. Flight translation is gated separately (?flight=1).
+ * No cosmetic idle CPG — below WING_FLAP_GATE the mesh stays at rest.
+ */
+export function wingFromEma(e) {
+  const dead = 0.12;
+  const dlm = softDrive(Math.max(0, (e.DLM || 0) - dead), 1.45);
+  const dvm = softDrive(Math.max(0, (e.DVM || 0) - dead), 1.45);
+  const admn = softDrive(Math.max(0, (e.ADMN || 0) - dead), 1.30);
+  const power = 0.42 * dlm + 0.38 * dvm + 0.22 * admn;
+  if (power < WING_FLAP_GATE) {
+    return { dlm: 0, dvm: 0, admn: 0, power: 0, fly: 0 };
+  }
+  return { dlm, dvm, admn, power, fly: power };
+}
+
+/**
+ * Proboscis / MN9. MN9 n=2 saturates from one spike (cns3 softDrive×2.4).
+ * Dead-zone + low gain; quiet pools → 0 mouth pose.
+ */
+export function feedFromEma(e) {
+  const mn9 = Math.max(0, (e.MN9 || 0) - 0.28);
+  const pr = Math.max(0, (e.proboscis || 0) - 0.16);
+  const v = softDrive(mn9 * 0.65 + pr * 0.75, 1.20);
+  return v < FEED_POSE_GATE ? 0 : v;
 }
 
 /**

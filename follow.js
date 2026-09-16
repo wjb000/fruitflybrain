@@ -4,11 +4,11 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createDroneChassis } from "./chassis.js?v=cns3";
-import { createOpenWorld } from "./world/procgen.js?v=cns3";
-import { EmbodiedFly } from "./agent.js?v=cns3";
-import { portableControls, droneSetpoints } from "./controller/portable.js?v=cns3";
-import { createHandCam, applyCamToFly } from "./handcam.js?v=cns3";
+import { createDroneChassis } from "./chassis.js?v=cns4";
+import { createOpenWorld } from "./world/procgen.js?v=cns4";
+import { EmbodiedFly } from "./agent.js?v=cns4";
+import { portableControls, droneSetpoints } from "./controller/portable.js?v=cns4";
+import { createHandCam, applyCamToFly } from "./handcam.js?v=cns4";
 
 const $ = (id) => document.getElementById(id);
 const loaderEl = $("loader");

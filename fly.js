@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import {
-  MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU,
+  MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
+  WING_FLAP_GATE, WING_FLAP_AMP,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=cns3";
+} from "./poseMap.js?v=cns4";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const GROUND_Y = 0.05;
@@ -363,23 +364,27 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
   const dlm = wing.dlm != null ? wing.dlm : flyA;
   const dvm = wing.dvm != null ? wing.dvm : flyA;
   const admn = wing.admn != null ? wing.admn : flyA * 0.7;
-  const power = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
-  // Gate noise flaps — only clear wing-MN drive moves wings.
-  const flapHz = power > 0.12 ? 10 + power * 140 : 0;
-  const flapAmp = power * 0.85; // zero when MNs quiet
+  const powerRaw = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
+  const power = powerRaw >= WING_FLAP_GATE ? powerRaw : 0;
+  const over = power > 0 ? (power - WING_FLAP_GATE) / Math.max(1e-3, 1 - WING_FLAP_GATE) : 0;
+  const flapHz = power > 0 ? 4 + over * 36 : 0;
+  const flapAmp = over * WING_FLAP_AMP;
   const flap = flapHz > 0 ? Math.sin(t * flapHz) * flapAmp : 0;
+  const tau = dt != null ? dt : 0.032;
+  const wingSoft = d.wingSoft || (d.wingSoft = { amp: 0 });
+  wingSoft.amp = follow(wingSoft.amp, flapAmp, tau, WING_TAU);
   for (let i = 0; i < d.wings.length; i++) {
     const w = d.wings[i];
     const rest = w.userData.restQuat;
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
     w.quaternion.copy(rest);
-    if (power > 0.12) {
-      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.28 + power * 0.45));
+    // Below gate: exact rest. No residual rotateZ that read as tapping.
+    if (power > 0 && wingSoft.amp > 0.01) {
+      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.20 + over * 0.25));
       w.quaternion.multiply(_flapQ);
-      w.rotateZ(s * (0.015 + power * 0.22 + admn * 0.1));
-      // Slight stroke asymmetry from DLM vs DVM (still MN-derived).
-      w.rotateX((dlm - dvm) * 0.1 * s);
+      w.rotateZ(s * (over * 0.12 + admn * 0.04));
+      w.rotateX((dlm - dvm) * 0.06 * s * over);
     }
   }
   if (d.abdomen) {
@@ -397,12 +402,12 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
       // Smoothed — raw EMA on 25 CvN cells was a head-thrash.
       const pose = d.headPose || (d.headPose = { yaw: 0, pitch: 0, roll: 0 });
       const yawT = THREE.MathUtils.clamp((cmd.headYaw || 0) * NECK_SPAN.yaw, -NECK_SPAN.yaw, NECK_SPAN.yaw);
+      const mouthPitch = feed > 0.35 ? (feed - 0.35) * 0.08 : 0;
       const pitchT = THREE.MathUtils.clamp(
-        (cmd.head || 0) * NECK_SPAN.pitch + (feed > 0.18 ? feed * 0.10 : 0),
+        (cmd.head || 0) * NECK_SPAN.pitch + mouthPitch,
         -NECK_SPAN.pitch, NECK_SPAN.pitch + 0.06
       );
       const rollT = THREE.MathUtils.clamp((cmd.headRoll || 0) * NECK_SPAN.roll, -NECK_SPAN.roll, NECK_SPAN.roll);
-      const tau = dt != null ? dt : 0.032;
       pose.yaw = follow(pose.yaw, yawT, tau, NECK_TAU);
       pose.pitch = follow(pose.pitch, pitchT, tau, NECK_TAU);
       pose.roll = follow(pose.roll, rollT, tau, NECK_TAU);
@@ -412,16 +417,18 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
       d.head.rotateZ(pose.roll);
     }
   }
+  const mouth = d.mouthSoft || (d.mouthSoft = { feed: 0 });
+  const feedT = feed > 0.28 ? (feed - 0.28) / 0.72 : 0;
+  mouth.feed = follow(mouth.feed, feedT, tau, FEED_TAU);
   if (d.proboscis) {
-    const pe = 1 + feed * 0.85;
-    d.proboscis.scale.set(1, pe, 1);
-    d.proboscis.rotation.x = feed * 0.55;
+    d.proboscis.scale.set(1, 1 + mouth.feed * 0.32, 1);
+    d.proboscis.rotation.x = mouth.feed * 0.18;
   }
   if (d.haustellum) {
-    d.haustellum.rotation.x = feed * 0.35;
+    d.haustellum.rotation.x = mouth.feed * 0.12;
   }
   // Eye glow tracks MN/behavior cmds only (no fake activity).
-  const glow = 0.08 + power * 0.45 + (cmd.walk || 0) * 0.2 + feed * 0.15 + (cmd.court || 0) * 0.18;
+  const glow = 0.08 + power * 0.25 + (cmd.walk || 0) * 0.2 + mouth.feed * 0.08 + (cmd.court || 0) * 0.18;
   for (const e of d.eyes) if (e.material) e.material.emissiveIntensity = glow;
 }
 

@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=cns3";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns3";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns3";
-import { EmbodiedFly } from "./agent.js?v=cns3";
-import { drawOmmatidia } from "./eye.js?v=cns3";
-import { OdorWorld } from "./plume.js?v=cns3";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns3";
-import { parseLesionFlag } from "./lesion.js?v=cns3";
-import { mountAssayPanel } from "./assay/panel.js?v=cns3";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns3";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns3";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns3";
+import { loadNmf, createMaleFly } from "./fly.js?v=cns4";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns4";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns4";
+import { EmbodiedFly } from "./agent.js?v=cns4";
+import { drawOmmatidia } from "./eye.js?v=cns4";
+import { OdorWorld } from "./plume.js?v=cns4";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns4";
+import { parseLesionFlag } from "./lesion.js?v=cns4";
+import { mountAssayPanel } from "./assay/panel.js?v=cns4";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns4";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns4";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns4";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
