@@ -63,7 +63,7 @@ if ($("nEdges")) $("nEdges").textContent = mMeta.nEdges.toLocaleString();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x2a221c, 1);
+renderer.setClearColor(0x5c4a36, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -108,12 +108,12 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const hemi = new THREE.HemisphereLight(0xffe2c4, 0x3d4a2a, 1.18);
+const hemi = new THREE.HemisphereLight(0xffe8d0, 0x4a5a32, 1.32);
 scene.add(hemi);
-const fill = new THREE.DirectionalLight(0xffc9a0, 0.32);
+const fill = new THREE.DirectionalLight(0xffd4b0, 0.42);
 fill.position.set(-6, 5, -4);
 scene.add(fill);
-const key = new THREE.DirectionalLight(0xfff0d4, 1.12);
+const key = new THREE.DirectionalLight(0xfff4e0, 1.22);
 key.position.set(7, 12, 8);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
@@ -122,7 +122,7 @@ key.shadow.camera.far = 48;
 key.shadow.camera.left = key.shadow.camera.bottom = -16;
 key.shadow.camera.right = key.shadow.camera.top = 16;
 scene.add(key);
-scene.fog = new THREE.FogExp2(0x2a241c, 0.028);
+scene.fog = new THREE.FogExp2(0x5a4836, 0.014);
 
 const procWorld = createOpenWorld();
 const arena = procWorld.root;
@@ -397,12 +397,12 @@ function onAny() {
   if (focus.day != null) {
     const day = focus.day;
     // Stable garden sun — gentle, never night-black.
-    key.intensity = 0.95 + day * 0.28;
+    key.intensity = 1.05 + day * 0.28;
     key.position.set(7 + Math.sin(day * Math.PI) * 1.4, 11.5, 8);
     key.target.position.set(focus.body.position.x, 0, focus.body.position.z);
     if (!key.target.parent) scene.add(key.target);
-    hemi.intensity = 1.05 + day * 0.18;
-    renderer.setClearColor(0x2a221c, 1);
+    hemi.intensity = 1.18 + day * 0.18;
+    renderer.setClearColor(0x5c4a36, 1);
   }
   const focusMode = focus.life?.mode || "…";
   if ($("gait")) $("gait").textContent = "♂ " + focusMode;

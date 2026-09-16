@@ -35,7 +35,7 @@ function makeFloorTexture() {
   chk.height = 512;
   const cx = chk.getContext("2d");
   // Warm earth base
-  cx.fillStyle = "#3a3324";
+  cx.fillStyle = "#6a5c40";
   cx.fillRect(0, 0, 512, 512);
   // Moss dapples
   for (let k = 0; k < 220; k++) {
@@ -43,7 +43,7 @@ function makeFloorTexture() {
     const y = (k * 53 + 18) % 512;
     const r = 12 + (k % 17);
     const g = cx.createRadialGradient(x, y, 1, x, y, r);
-    const moss = k % 3 === 0 ? "rgba(74, 110, 52, 0.45)" : "rgba(90, 92, 42, 0.32)";
+    const moss = k % 3 === 0 ? "rgba(92, 132, 62, 0.50)" : "rgba(110, 112, 52, 0.38)";
     g.addColorStop(0, moss);
     g.addColorStop(1, "rgba(58, 51, 36, 0)");
     cx.fillStyle = g;
@@ -273,7 +273,7 @@ export class ProceduralWorld {
       new THREE.CircleGeometry(R, 80),
       new THREE.MeshStandardMaterial({
         map: makeFloorTexture(),
-        color: 0xc4b48a,
+        color: 0xd4c49a,
         roughness: 0.94,
         metalness: 0.02,
       })
