@@ -222,7 +222,7 @@ Robot controller (connectome-only)
 ==================================
 Pipeline: eye → optic/visionL/R Hz → LIF → leg/descending MNs → cmd.walk/turn
           → steering.forward/yawRate → { v, omega }           (cube / robot)
-          → droneSetpoints { pitch, v, omega, vx, vy, throttle }  (default drone)
+          → droneSetpoints { pitch, v, omega, vx, vy, throttle }  (optional ?body=drone)
 
 Browser:
   const snap = ffbPortable.snapshot();
@@ -236,8 +236,8 @@ Hardware:
   bypasses the brain.
 
 Sanity: silence:HS or silence optic pools should weaken beacon-directed yaw.
-Default embodiment: drone chassis (?body=drone). Fallbacks ?body=cube|fly.
-Cache-bust ?v=follow1. Follow-me: follow.html?v=follow1 (cam blob → vision pools → LIF → drone).
+Default embodiment: fly body (NeuroMechFly mesh + MN drive). Optional ?body=cube|drone.
+Cache-bust ?v=thrive1. Follow-me (optional): follow.html?v=follow1. hΔ lab: hdelta.html?v=lab1.
 `.trim();
 
 function num(a, b) {

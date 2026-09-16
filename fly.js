@@ -215,6 +215,7 @@ function buildFly({ female = false } = {}) {
 
   fly.userData = {
     female,
+    plantMode: "fly",
     body: visual,
     head: nodes.c_head?.body,
     thorax: nodes.c_thorax?.body,
@@ -334,7 +335,8 @@ export function stepLife(fly, dt, t, cmd) {
   const cy = Math.cos(hy), sy = Math.sin(hy);
   const idt = 1 / Math.max(dt, 1e-4);
   // Stance vs world floor, not absolute mesh Y — body at standZ ≈ 1.3 puts tips near 0.
-  const floorY = GROUND_Y + 0.22;
+  // Generous plant band so calm MN pose stays grounded (no air-cycle / vault).
+  const floorY = GROUND_Y + 0.28;
   // Prefer lowest feet as planted when several hover slightly above floor.
   let minFy = Infinity;
   for (let i = 0; i < d.legs.length; i++) {
@@ -342,7 +344,7 @@ export function stepLife(fly, dt, t, cmd) {
     else _foot.set(prev[i].x, prev[i].y, prev[i].z);
     if (_foot.y < minFy) minFy = _foot.y;
   }
-  const stanceCut = Math.min(floorY, minFy + 0.12);
+  const stanceCut = Math.min(floorY, minFy + 0.16);
   d.legs.forEach((leg, i) => {
     if (leg.tarsusTip) leg.tarsusTip.getWorldPosition(_foot);
     else _foot.set(prev[i].x, prev[i].y, prev[i].z);
