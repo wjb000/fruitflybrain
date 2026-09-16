@@ -3,7 +3,7 @@ import {
   MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
   WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ANTENNA_SPAN,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=fullfly1";
+} from "./poseMap.js?v=dynw1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const GROUND_Y = 0.05;

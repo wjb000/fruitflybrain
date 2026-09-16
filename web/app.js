@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=fullfly1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=fullfly1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=fullfly1";
-import { EmbodiedFly } from "./agent.js?v=fullfly1";
-import { drawOmmatidia } from "./eye.js?v=fullfly1";
-import { OdorWorld } from "./plume.js?v=fullfly1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=fullfly1";
-import { parseLesionFlag } from "./lesion.js?v=fullfly1";
-import { mountAssayPanel } from "./assay/panel.js?v=fullfly1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=fullfly1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=fullfly1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=fullfly1";
+import { loadNmf, createMaleFly } from "./fly.js?v=dynw1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=dynw1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=dynw1";
+import { EmbodiedFly } from "./agent.js?v=dynw1";
+import { drawOmmatidia } from "./eye.js?v=dynw1";
+import { OdorWorld } from "./plume.js?v=dynw1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=dynw1";
+import { parseLesionFlag } from "./lesion.js?v=dynw1";
+import { mountAssayPanel } from "./assay/panel.js?v=dynw1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=dynw1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=dynw1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=dynw1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -311,8 +311,8 @@ if ($("info")) {
       ? (" Plant @ " + physics.plantOrigin + ".")
       : "";
     $("info").textContent = physics.ok
-      ? ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
-      : ("Home: a fly utopia. Full Male CNS LIF is primary; gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → LIF → annotated MNs → pose → planted stance-slip. Fruit, dew, shade, blossoms. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
+      ? ("Home: a fly utopia. Full Male CNS LIF is primary; chemical synapses use connectome weights × NT-aware short-term depression/facilitation (efficacy varies over time). Gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
+      : ("Home: a fly utopia. Full Male CNS LIF is primary; chemical synapses use connectome weights × NT-aware short-term depression/facilitation (efficacy varies over time). Gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → LIF → annotated MNs → pose → planted stance-slip. Abdomen quiet unless phasic. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
   }
 }
 
@@ -463,6 +463,7 @@ function onAny() {
         : ("planted " + (focus.planted ? "yes" : "…") + " S/W " + (focus.cmd?.stanceN ?? 6) + "/" + (focus.cmd?.swingN ?? 0) + " |slip|=" + Number(slip).toFixed(3));
     }
     $("lifeHint").textContent = flesh + " · " + plantBit + " · home · MN DLM " + dlm + " legs " + legs +
+      " · syn eff=" + Number((focus.syn && focus.syn.meanEff) != null ? focus.syn.meanEff : 1).toFixed(2) +
       (kinMode === "drone"
         ? (" · steer thr=" + (steer.throttle ?? 1.45).toFixed(2) + " yaw=" + (steer.yawRate ?? 0).toFixed(2) + " pitch=" + (steer.pitch ?? 0).toFixed(2))
         : (" · steer f=" + (steer.forward ?? 0).toFixed(2) + " y=" + (steer.yawRate ?? 0).toFixed(2))) +
@@ -484,6 +485,20 @@ function onAny() {
   setW("mn-mn9", Math.max(e.MN9 || 0, e.proboscis || 0));
   setW("mn-ant", Math.max(focus.cmd?.antennaL || 0, focus.cmd?.antennaR || 0));
   setW("mn-halt", focus.cmd?.fly || 0);
+  const syn = focus.syn || {};
+  setW("syn-u", syn.meanU || 0);
+  setW("syn-x", syn.meanX != null ? syn.meanX : 1);
+  setW("syn-eff", syn.meanEff != null ? syn.meanEff : 1);
+  if ($("synHint")) {
+    const fw = syn.fastW || {};
+    $("synHint").textContent =
+      "syn u=" + Number(syn.meanU || 0).toFixed(2)
+      + " x=" + Number(syn.meanX != null ? syn.meanX : 1).toFixed(2)
+      + " eff=" + Number(syn.meanEff != null ? syn.meanEff : 1).toFixed(2)
+      + " ⟨w⟩=" + Number(syn.meanW || 0).toFixed(1)
+      + " dep " + (syn.nDepressed || 0) + "/" + (syn.nEdges || 0)
+      + (fw.nEdges ? (" · hΔ |Δw|=" + Number(fw.meanAbs || 0).toFixed(4)) : "");
+  }
   if ($("mapHint")) {
     const st = focus.effectorStats || {};
     const live = focus.liveMapped != null ? focus.liveMapped : 0;

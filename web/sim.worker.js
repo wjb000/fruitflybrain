@@ -1,16 +1,28 @@
 /* LIF engine for the Male CNS connectome. Runs in a Web Worker.
  *
- * This is the primary brain: ~166k Traced cells, real chemical synapses,
- * Poisson stim, STD, slow neuromod. Gap-fill lives outside (eye/ORN/proprio
- * Hz write-in, plant adhesion). Do not add a behavior tree or CPG here.
+ * This is the primary brain: ~166k Traced cells, real chemical synapses
+ * (connectome edge weights, NT-aware sign), Poisson stim, Tsodyks–Markram
+ * short-term depression/facilitation on chemical edges, slow neuromod.
+ * Optional tiny hΔ Δw on the 45 traced hDelta cells — not the hΔ demo.
+ * Gap-fill lives outside (eye/ORN/proprio Hz write-in, plant adhesion).
+ * Do not add a behavior tree or CPG here.
  */
 
 let n = 0;
 let indptr, indices, weight, group, nt;
 let V, I, refrac, spikes, drive, sign;
 let adapt, mDA, mOA, m5;
-let uStd; // per-neuron short-term synaptic resource (depression/facilitation)
+let uFac;            // per-neuron TM utilization (facilitation)
+let xStd;            // per-edge TM resource (depression) — time-varying efficacy
+let tLastStd;        // last spike time of pre (ms) for lazy x/u recovery
 let rngs;
+// NT → Tsodyks–Markram (must match web/stp.js NT_STP).
+const NT_U = new Float32Array([0.22, 0.40, 0.30, 0.34, 0.10, 0.16, 0.14, 0.10]);
+const NT_TAUD = new Float32Array([260, 420, 320, 360, 90, 400, 480, 200]);
+const NT_TAUF = new Float32Array([90, 48, 70, 60, 40, 180, 220, 520]);
+function chemWeight(w) {
+  return 0.68 * Math.sqrt(w) + 0.040 * w;
+}
 let params = {
   dt: 0.5,
   tau: 20,
@@ -18,21 +30,30 @@ let params = {
   tauSynInhib: 7.0,  // GABA / GluCl / histamine
   tauAdapt: 90,
   tauMod: 1400,      // slow neuromod (DA/OA/5HT)
-  tauStd: 220,       // STD recovery (ms)
+  tauStd: 420,       // legacy alias (ACh tau_d); TM uses NT_TAUD
   vRest: 0,
   vReset: 0,
   vThresh: 1,
   refractory: 2,
-  // Sqrt-compressed synapse weights (see step): mid edges matter more vs hubs.
-  // Calm regime: enough network drive for MN readout, not seizure/spastic.
-  wScale: 0.012,
+  // Connectome weights via chemWeight (√w + linear), not unit hits.
+  // Scaled so a first ACh spike (U≈0.40) matches the old sqrt·wScale regime.
+  wScale: 0.028,
   inhibGain: 2.15,
   stimAmp: 0.11,
-  // Keep STD; quiet resting tone without silencing the network.
-  stdUse: 0.12,
-  // Mild facilitation for OA-ergic (arousal) — applied via mOA gain, not uStd.
+  // Legacy stdUse kept for params messages; TM uses NT_U.
+  stdUse: 0.40,
   facOA: 0.08,
 };
+// Optional hΔ fast weights (additive Δw on traced hDelta outgoing edges only).
+let fastW = null;
+let fastWPre = null;
+let fastWEdges = null;
+let fastWIds = null;
+let fastWPlastic = false;
+let fastWEta = 0.012;
+let fastWDecay = 0.9985;
+let fastWClip = 2.5;
+let synAcc = { sumU: 0, sumX: 0, sumEff: 0, sumW: 0, nEdge: 0, nDep: 0, nPre: 0 };
 // Keep legacy tauSyn alias for params messages
 params.tauSyn = params.tauSynFast;
 let t = 0;
@@ -240,8 +261,11 @@ function init(bufNeurons, bufCsr) {
   mDA = new Float32Array(n);
   mOA = new Float32Array(n);
   m5 = new Float32Array(n);
-  uStd = new Float32Array(n);
-  uStd.fill(1);
+  uFac = new Float32Array(n); // TM utilization; 0 at rest (first spike → U)
+  xStd = new Float32Array(nnz);
+  xStd.fill(1);
+  tLastStd = new Float32Array(n);
+  tLastStd.fill(-1e6);
   rngs = mulberry32(0xC0FFEE);
   rebuildSign();
   // Neuron xyz lives in neurons.bin; keep a view for swapLR lesions.
@@ -270,12 +294,17 @@ function bindEffectors(pools) {
 }
 
 function tallyEffectors() {
+  // Weight each MN spike by incoming |I| so weakly driven Poisson is not a
+  // unit hit. Strong connectome current (weighted, time-varying) counts more.
   for (const name in effectorIds) {
     const ids = effectorIds[name];
     let h = 0;
     for (let k = 0; k < ids.length; k++) {
       const i = ids[k];
-      if (i < n && spikes[i]) h++;
+      if (i < n && spikes[i]) {
+        const wHit = Math.min(2.2, 0.22 + Math.abs(I[i]) * 7);
+        h += wHit;
+      }
     }
     effectorHits[name] += h;
   }
@@ -331,6 +360,52 @@ function setStim(ids, rateHz) {
   applyDrive();
 }
 
+function enableFastW(opts) {
+  const ids = Array.from(opts.ids || []).filter((i) => i >= 0 && i < n);
+  fastWIds = Uint32Array.from(ids);
+  fastWPre = new Uint8Array(n);
+  const edges = [];
+  for (const i of ids) {
+    fastWPre[i] = 1;
+    for (let k = indptr[i]; k < indptr[i + 1]; k++) edges.push(k);
+  }
+  fastWEdges = Uint32Array.from(edges);
+  if (!fastW || fastW.length !== weight.length) fastW = new Float32Array(weight.length);
+  else fastW.fill(0);
+  fastWEta = opts.eta != null ? opts.eta : 0.012;
+  fastWDecay = opts.decay != null ? opts.decay : 0.9985;
+  fastWClip = opts.clip != null ? opts.clip : 2.5;
+  fastWPlastic = opts.plastic !== false;
+  return { nPre: ids.length, nEdges: edges.length };
+}
+
+function fastWStats() {
+  if (!fastW || !fastWEdges) return { nEdges: 0, nNonzero: 0, meanAbs: 0 };
+  const nEdges = fastWEdges.length;
+  let sumAbs = 0, nNonzero = 0;
+  for (let e = 0; e < nEdges; e++) {
+    const v = Math.abs(fastW[fastWEdges[e]]);
+    sumAbs += v;
+    if (v > 1e-6) nNonzero++;
+  }
+  return { nEdges, nNonzero, meanAbs: nEdges ? sumAbs / nEdges : 0 };
+}
+
+function synStats() {
+  const nE = synAcc.nEdge || 0;
+  const nP = synAcc.nPre || 0;
+  return {
+    meanU: nP ? synAcc.sumU / nP : 0,
+    meanX: nE ? synAcc.sumX / nE : 1,
+    meanEff: nE ? synAcc.sumEff / nE : 1,
+    meanW: nE ? synAcc.sumW / nE : 0,
+    nDepressed: synAcc.nDep,
+    nEdges: nE,
+    nPre: nP,
+    fastW: fastWStats(),
+  };
+}
+
 function step() {
   const dt = params.dt;
   const leak = dt / params.tau;
@@ -341,12 +416,8 @@ function step() {
   const rest = params.vRest;
   const ref0 = params.refractory;
   const gAro = arousalGain;
-  const stdUse = params.stdUse;
   const facOA = params.facOA;
 
-  // Dual synaptic current decay: fast EPSP vs slower inhibition, plus STD recover.
-  // I holds net current; we decay with a blend favoring fast (majority ACh edges).
-  // Lightweight: single I buffer, decay = weighted average of fast/inhib.
   const synDecay = 0.72 * synDecayFast + 0.28 * synDecayInhib;
   for (let i = 0; i < n; i++) {
     I[i] *= synDecay;
@@ -354,75 +425,114 @@ function step() {
     mDA[i] *= modDecay;
     mOA[i] *= modDecay;
     m5[i] *= modDecay;
-    // Recover release probability toward 1
-    uStd[i] += (1 - uStd[i]) * (1 - stdDecay);
   }
+  if (fastW && fastWPlastic && fastWEdges && fastWDecay < 1) {
+    const dcy = fastWDecay;
+    for (let e = 0; e < fastWEdges.length; e++) fastW[fastWEdges[e]] *= dcy;
+  }
+
+  synAcc.sumU = 0; synAcc.sumX = 0; synAcc.sumEff = 0; synAcc.sumW = 0;
+  synAcc.nEdge = 0; synAcc.nDep = 0; synAcc.nPre = 0;
 
   for (let i = 0; i < n; i++) {
     if (!spikes[i]) continue;
-    const knt = nt[i];
-    const a = indptr[i], b = indptr[i + 1];
-    const u = uStd[i];
-    // Consume resources on spike (depression); OA gets mild facilitation bias via mOA.
-    uStd[i] = Math.max(0.05, u * (1 - stdUse));
+    const knt = nt[i] || 0;
+    const U = NT_U[knt] || 0.22;
+    const tauD = NT_TAUD[knt] || 260;
+    const tauF = NT_TAUF[knt] || 90;
+    const isi = t - tLastStd[i];
+    tLastStd[i] = t;
+    // Recover u toward 0, then TM jump on this spike.
+    let u = uFac[i] * Math.exp(-Math.max(0, isi) / tauF);
+    const uOn = u + U * (1 - u);
+    uFac[i] = uOn;
+    const recX = Math.exp(-Math.max(0, isi) / tauD);
+    const beta = 1 - uOn;
+    synAcc.sumU += uOn;
+    synAcc.nPre++;
     const gOut = gainOut ? gainOut[i] : 1;
-    if (gOut <= 0) continue; // silenced — no outgoing transmission
+    if (gOut <= 0) continue;
     const src = (swapLR && swapLR[i] >= 0) ? swapLR[i] : i;
     const a2 = indptr[src], b2 = indptr[src + 1];
     const dly = delaySteps ? delaySteps[i] : 0;
+    const useFW = fastW && fastWPre && fastWPre[i];
+    const hebb = useFW && fastWPlastic;
+
     if (knt === 5) {
-      // Dopamine: slow gain / threshold modulate — hunger dial scales deposit.
       const h = 0.55 + 0.9 * hungerMod;
+      const s = 0.012 * uOn * gOut * h;
       for (let k = a2; k < b2; k++) {
         const esc = edgeScale ? edgeScale[k] : 1;
         if (esc <= 0) continue;
-        const j = indices[k];
-        const v = mDA[j] + 0.012 * Math.sqrt(weight[k]) * u * gOut * esc * h;
-        mDA[j] = v > 1.5 ? 1.5 : v;
+        let x = 1 - (1 - xStd[k]) * recX;
+        const v = mDA[indices[k]] + s * chemWeight(weight[k]) * x * esc;
+        mDA[indices[k]] = v > 1.5 ? 1.5 : v;
+        xStd[k] = Math.max(0.06, x * beta);
       }
     } else if (knt === 6) {
+      const s = 0.010 * uOn * gOut;
       for (let k = a2; k < b2; k++) {
         const esc = edgeScale ? edgeScale[k] : 1;
         if (esc <= 0) continue;
-        const j = indices[k];
-        const v = m5[j] + 0.010 * Math.sqrt(weight[k]) * u * gOut * esc;
-        m5[j] = v > 1.5 ? 1.5 : v;
+        let x = 1 - (1 - xStd[k]) * recX;
+        const v = m5[indices[k]] + s * chemWeight(weight[k]) * x * esc;
+        m5[indices[k]] = v > 1.5 ? 1.5 : v;
+        xStd[k] = Math.max(0.06, x * beta);
       }
     } else if (knt === 7) {
       const h = 0.65 + 0.7 * hungerMod;
+      const s = 0.014 * uOn * gOut * h;
       for (let k = a2; k < b2; k++) {
         const esc = edgeScale ? edgeScale[k] : 1;
         if (esc <= 0) continue;
-        const j = indices[k];
-        const v = mOA[j] + 0.014 * Math.sqrt(weight[k]) * u * gOut * esc * h;
-        mOA[j] = v > 1.5 ? 1.5 : v;
+        let x = 1 - (1 - xStd[k]) * recX;
+        const v = mOA[indices[k]] + s * chemWeight(weight[k]) * x * esc;
+        mOA[indices[k]] = v > 1.5 ? 1.5 : v;
+        xStd[k] = Math.max(0.06, x * beta);
       }
     } else if (dly > 0) {
-      // Queue fast chemical delivery for later steps (synaptic delay lesion).
       const slot = (delayRingPos + dly) % delayRingLen;
-      const s = sign[i] * wScale * u * gOut;
-      const payload = { s, a: a2, b: b2 };
-      delayRing[slot].push(payload);
+      delayRing[slot].push({ s: sign[i] * wScale * uOn * gOut, a: a2, b: b2, recX, beta, uOn });
     } else {
-      // Fast chemical: sqrt-compress; STD + lesion scales.
-      const s = sign[i] * wScale * u * gOut;
+      const s = sign[i] * wScale * gOut;
       for (let k = a2; k < b2; k++) {
         const esc = edgeScale ? edgeScale[k] : 1;
         if (esc <= 0) continue;
-        I[indices[k]] += s * Math.sqrt(weight[k]) * esc;
+        let x = 1 - (1 - xStd[k]) * recX;
+        const wc = chemWeight(weight[k]);
+        const fw = useFW ? fastW[k] : 0;
+        const eff = uOn * x;
+        I[indices[k]] += s * (wc + fw) * eff * esc;
+        xStd[k] = Math.max(0.06, x * beta);
+        synAcc.sumX += x;
+        synAcc.sumEff += eff;
+        synAcc.sumW += wc;
+        synAcc.nEdge++;
+        if (eff < 0.18) synAcc.nDep++;
+        if (hebb && spikes[indices[k]]) {
+          let v = fastW[k] + fastWEta;
+          if (v > fastWClip) v = fastWClip;
+          else if (v < -fastWClip) v = -fastWClip;
+          fastW[k] = v;
+        }
       }
     }
   }
 
-  // Deliver delayed synaptic events due this step.
   if (delayRing) {
     const due = delayRing[delayRingPos];
     for (let p = 0; p < due.length; p++) {
-      const { s, a: aa, b: bb } = due[p];
+      const { s, a: aa, b: bb, recX, beta, uOn } = due[p];
+      const rX = recX != null ? recX : 1;
+      const bt = beta != null ? beta : 0.6;
+      const u = uOn != null ? uOn : 0.4;
       for (let k = aa; k < bb; k++) {
         const esc = edgeScale ? edgeScale[k] : 1;
         if (esc <= 0) continue;
-        I[indices[k]] += s * Math.sqrt(weight[k]) * esc;
+        let x = 1 - (1 - xStd[k]) * rX;
+        const wc = chemWeight(weight[k]);
+        I[indices[k]] += s * wc * u * x * esc;
+        xStd[k] = Math.max(0.06, x * bt);
       }
     }
     delayRing[delayRingPos] = [];
@@ -556,14 +666,27 @@ onmessage = (ev) => {
     postMessage({ type: "lesionApplied", meta: lesionMeta, hungerMod });
     return;
   }
+  if (m.type === "enableFastW") {
+    const info = enableFastW(m);
+    postMessage({ type: "fastWReady", ...info, eta: fastWEta, decay: fastWDecay });
+    return;
+  }
+  if (m.type === "fastW") {
+    if (m.plastic != null) fastWPlastic = !!m.plastic;
+    if (m.eta != null) fastWEta = Number(m.eta);
+    if (m.decay != null) fastWDecay = Number(m.decay);
+    if (m.clear && fastW) fastW.fill(0);
+    return;
+  }
   if (m.type === "reset") {
     V.fill(0); I.fill(0); refrac.fill(0); spikes.fill(0); t = 0;
     if (adapt) { adapt.fill(0); mDA.fill(0); mOA.fill(0); m5.fill(0); }
-    if (uStd) uStd.fill(1);
+    if (uFac) uFac.fill(0);
+    if (xStd) xStd.fill(1);
+    if (tLastStd) tLastStd.fill(-1e6);
     sleepBias = 0; arousalGain = 1;
     recent.length = 0;
     if (delayRing) for (let i = 0; i < delayRing.length; i++) delayRing[i] = [];
-    // Lesions persist across reset unless m.clearLesion
     if (m.clearLesion) clearLesion();
     return;
   }
@@ -594,7 +717,10 @@ function frame() {
     delete eff._hz;
     const spikeArr = new Uint32Array(last);
     postMessage(
-      { type: "frame", t, nSpikes, spikes: spikeArr, rates, eff, effHz, hungerMod, lesion: lesionMeta },
+      {
+        type: "frame", t, nSpikes, spikes: spikeArr, rates, eff, effHz,
+        hungerMod, lesion: lesionMeta, syn: synStats(),
+      },
       [spikeArr.buffer]
     );
   }

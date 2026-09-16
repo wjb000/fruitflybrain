@@ -49,10 +49,18 @@ Pool IDs: `web/data/stim.json` (`R16` 1394, `R7` 1384, `R8` 1329, `L1–L3` ~177
 
 No extra types. If a pool is empty in the Male CNS export, write-in is a no-op.
 
-## Motor quiet (cns4 + fullfly1)
+## Motor quiet (cns4 + fullfly1 + dynw1)
 
-Idle DLM/DVM/ADMN do not flap (`wingFromEma`, high gate). Idle MN9 does not mouth (`feedFromEma` dead-zone). T1/neck stay cns3-calm. Idle T2/T3/DNa → planted rest (`embodyMuscle`); abdomen dead-zoned. Sensory upgrade does not reopen those gates.
+Idle DLM/DVM/ADMN do not flap (`wingFromEma`, high gate). Idle MN9 does not mouth (`feedFromEma` dead-zone). T1/neck stay cns3-calm. Idle T2/T3/DNa → planted rest (`embodyMuscle`); abdomen dead-zoned **and high-passed** so tonic pool hits are not a butt-lift loop. Walk slip is gated on **phasic** T2/T3+DNa, not a constant push from saturated neuromeres.
+
+## Synapses over time (dynw1)
+
+Chemical edges in `sim.worker.js` are **not unit hits**. Each spike transmits
+
+`I_j += sign(NT_i) · wScale · chemWeight(w_ij) · u_i · x_ij`
+
+with Tsodyks–Markram `u` (facilitation, per pre cell) and `x` (depression, per connectome edge). ACh/GABA/Glu depress under repeats; OA facilitates; histamine stays near-tonic. HUD shows live `syn u / x / eff`. Optional tiny hΔ Δw on the 45 traced hDelta cells only — the fly is not the hΔ lab.
 
 ## Cache
 
-Pages: [`?v=fullfly1`](https://wjb000.github.io/fruitflybrain/?v=fullfly1).
+Pages: [`?v=dynw1`](https://wjb000.github.io/fruitflybrain/?v=dynw1).

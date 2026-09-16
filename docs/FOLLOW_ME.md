@@ -20,7 +20,7 @@ Steering is **not** a PID go-to-pixel on the chassis. A thin pixel→sensory enc
 
 ## Fast weights (labeled)
 
-Toggle **hΔ plastic ON / frozen** on `follow.html`. This is a **client teaching overlay** on real **hDeltaH / A / I / G** column prefs (same 45-cell compact set as `hdelta.html`). It biases `visionL/R` stimInject. `sim.worker.js` does **not** run `enableFastW` on the 2832 outgoing chemical edges — that pack stays in `tools/hdelta/` + the lab page. Frozen keeps the last mapping, so a **jump side** reacquires worse; plastic adapts while you move. Does not reopen CVA-SST Exp0/Exp1.
+Toggle **hΔ plastic ON / frozen** on `follow.html`. This is a **client teaching overlay** on real **hDeltaH / A / I / G** column prefs (same 45-cell compact set as `hdelta.html`). It biases `visionL/R` stimInject. The live worker now runs a **tiny** `enableFastW` on those 45 cells’ outgoing chemical edges (not the hΔ lab / PFL3 tank-steer). Follow-me’s overlay stays client-side. Frozen overlay keeps the last mapping, so a **jump side** reacquires worse; plastic adapts while you move. Does not reopen CVA-SST Exp0/Exp1.
 
 ## How to use
 
@@ -29,7 +29,7 @@ Toggle **hΔ plastic ON / frozen** on `follow.html`. This is a **client teaching
 3. Move / drag the blob; drone yaws toward it and advances when centered via the brain path.
 4. Toggle fast weights ON to adapt while you move; freeze and **jump side** to see worse reacquisition.
 
-Main sim (fly utopia default): `index.html?v=fullfly1` (optional `?cam=1` thumbnail, same encoding). Follow-me stays on the drone chassis. Cube: `?body=cube`. Drone homepage: `index.html?body=drone&v=fullfly1`.
+Main sim (fly utopia default): `index.html?v=dynw1` (optional `?cam=1` thumbnail, same encoding). Follow-me stays on the drone chassis. Cube: `?body=cube`. Drone homepage: `index.html?body=drone&v=dynw1`.
 
 ## Files
 

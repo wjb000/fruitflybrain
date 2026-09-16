@@ -5,6 +5,8 @@
  * pool EMAs into antagonist DoFs. Empty pools stay 0 — no invented MN IDs,
  * no CPG gait, no walk thruster.
  *
+ * dynw1: synapses are time-varying (connectome weights × TM STD). Tonic
+ * T2/T3 is not a constant slip push; abdomen is phasic (no butt-lift loop).
  * fullfly1: idle MN noise was tarsus-tap + abdomen twitch while stance-slip
  * stayed gated. Quiet T2/T3/DNa → planted rest (all six legs). Walk MNs →
  * stance/swing from those flex/ext pools; empty T2/T3 Ta* / coxaProm are
@@ -54,8 +56,8 @@ export const EMPTY_MALE_MUSCLE_POOLS = [
 /** Abdomen MN pool split by soma Y → NMF segments (real IDs, not new cells). */
 export const ABD_SEG_KEYS = ["abdomen12", "abdomen3", "abdomen4", "abdomen5", "abdomen6"];
 export const ABD_SEG_WEIGHTS = [0.28, 0.48, 0.68, 0.86, 1.00];
-export const ABD_POSE_GATE = 0.22;
-export const IDLE_WALK_GATE = 0.04;
+export const ABD_POSE_GATE = 0.30;
+export const IDLE_WALK_GATE = 0.05;
 export const ANTENNA_JO_BASE = 8;
 export const ANTENNA_SPAN = 0.16;
 
@@ -212,15 +214,28 @@ export function feedFromEma(e) {
 /**
  * Walk drive from walking-leg neuromeres (T2/T3) + DNa.
  * T1 twitch alone must not gate stance-slip (that froze or thrashed XY).
+ *
+ * Saturated tonic T2/T3 (constant push) is not a gait: optional `state`
+ * high-passes against a slow tonic so repeated identical drive fades.
+ * Bursting / changing MN rates still walk.
  */
-export function walkDriveFromEma(e) {
+export function walkDriveFromEma(e, state = null, dt = 0.032) {
   const t23 = ((e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 4;
   const t1 = ((e.T1L || 0) + (e.T1R || 0)) / 2;
   const dna = e.DNa || 0;
-  // T1 (foreleg) cannot gate locomotion by itself — that was the arm-flail
-  // "walk" that thrashed XY. Quiet T2/T3/DNa → idle.
-  if (t23 + dna * 0.6 < 0.10) return 0;
-  return softDrive(t23 * 0.92 + dna * 0.55 + t1 * 0.08, 2.15);
+  if (t23 + dna * 0.6 < 0.10) {
+    if (state) state.walkTonic = (state.walkTonic || 0) * 0.92;
+    return 0;
+  }
+  const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
+  if (!state) return softDrive(raw, 2.15);
+  const a = 1 - Math.exp(-dt / 0.70);
+  state.walkTonic = (state.walkTonic || 0) + (raw - (state.walkTonic || 0)) * a;
+  const tonic = state.walkTonic;
+  const phasic = Math.max(0, raw - 0.98 * tonic);
+  // Pegged T2/T3 (same circuit every frame) → no constant slip push.
+  if (phasic < 0.05 && tonic > 0.16) return 0;
+  return softDrive(phasic * 0.90 + raw * 0.10, 2.15);
 }
 
 export function legsMean(e) {
@@ -251,21 +266,33 @@ export function slipWeight(legName) {
 /**
  * Abdomen posture from the 207-cell pool (and optional soma-Y segments).
  * Large-pool Poisson was a constant butt twitch — dead-zone + gate.
+ * Optional `state` high-passes tonic drive so the same circuit hit every
+ * frame does not curl the abdomen over and over.
  */
-export function abdomenFromEma(e, court = 0) {
-  const dead = 0.16;
+export function abdomenFromEma(e, court = 0, state = null, dt = 0.032) {
+  const dead = 0.22;
   const segs = ABD_SEG_KEYS.map((k) => Math.max(0, (e[k] || 0) - dead));
   const whole = Math.max(0, (e.abdomen || 0) - dead);
-  const courtV = court > 0.28 ? (court - 0.28) * 0.32 : 0;
+  const courtV = court > 0.30 ? (court - 0.30) * 0.36 : 0;
   const mag = Math.max(whole, segs.reduce((a, b) => Math.max(a, b), 0));
-  const drive = softDrive(mag, 1.30);
-  if (drive < ABD_POSE_GATE && courtV < 0.15) {
+  let driveMag = mag;
+  if (state) {
+    const a = 1 - Math.exp(-dt / 0.85);
+    state.abdTonic = (state.abdTonic || 0) + (mag - (state.abdTonic || 0)) * a;
+    const phasic = Math.max(0, mag - 0.92 * state.abdTonic);
+    if (phasic < 0.06 && courtV < 0.10) {
+      return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0 };
+    }
+    driveMag = phasic;
+  }
+  const drive = softDrive(driveMag, 1.22);
+  if (drive < ABD_POSE_GATE && courtV < 0.10) {
     return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0 };
   }
-  const curl = Math.min(1, drive * 0.50 + courtV);
+  const curl = Math.min(1, drive * 0.42 + courtV);
   const sum = segs.reduce((a, b) => a + b, 0);
   const outSegs = segs.map((s, i) => {
-    const base = sum > 0.02 ? softDrive(s, 1.35) : curl * ABD_SEG_WEIGHTS[i];
+    const base = sum > 0.02 ? softDrive(s, 1.25) : curl * ABD_SEG_WEIGHTS[i];
     return Math.min(1, base);
   });
   return { curl, segs: outSegs, court: courtV };

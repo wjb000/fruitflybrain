@@ -7,7 +7,7 @@ The **complete adult male *Drosophila* central nervous system** (brain + ventral
 ```
 world (light, odor, contact, proprio)
   → sensory pools
-    → LIF connectome (sim.worker.js)
+    → LIF connectome (sim.worker.js) — connectome weights × TM STD/STF
       → annotated motor neurons
         → NeuroMechFly pose (fly.js)
           → planted stance-slip  (Pages kinematic default)
@@ -16,7 +16,7 @@ world (light, odor, contact, proprio)
 
 Quiet annotated pools → quiet actuators. Empty annotation pools stay empty (no invented MNs, no cosmetic gait, no free-joint walk thrusters). Flight translation is **off** unless `?flight=1`.
 
-Hard-refresh: [`?v=fullfly1`](https://wjb000.github.io/fruitflybrain/?v=fullfly1). Optional labs stay as links: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=fullfly1).
+Hard-refresh: [`?v=dynw1`](https://wjb000.github.io/fruitflybrain/?v=dynw1). Chemical synapse strength varies over time (connectome edge weights × NT-aware short-term depression/facilitation). Optional labs: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=dynw1).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -31,7 +31,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python prepare.py          # first time: builds web/data from the public Male CNS files
 python export_effectors.py # MN→muscle + proprio pools → web/data/effectors.json
-python serve.py            # opens http://127.0.0.1:8787/?v=fullfly1
+python serve.py            # opens http://127.0.0.1:8787/?v=dynw1
 ```
 
 `prepare.py` expects the public tables already under `data/` (annotations, neurotransmitters, connectome-weights, brain/VNC meshes). Those are CC-BY from [male-cns.janelia.org](https://male-cns.janelia.org/).
