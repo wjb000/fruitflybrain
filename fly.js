@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import {
   MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
-  WING_FLAP_GATE, WING_FLAP_AMP,
+  WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ANTENNA_SPAN,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=cns4sense";
+} from "./poseMap.js?v=fullfly1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const GROUND_Y = 0.05;
@@ -206,6 +206,21 @@ function buildFly({ female = false } = {}) {
 
   const eyes = [nodes.l_eye?.mesh, nodes.r_eye?.mesh].filter(Boolean);
   const wings = [nodes.l_wing?.body, nodes.r_wing?.body].filter(Boolean);
+  const bodyOf = (n) => nodes[n]?.body;
+  const abdomenChain = [
+    "c_abdomen12", "c_abdomen3", "c_abdomen4", "c_abdomen5", "c_abdomen6",
+  ].map(bodyOf).filter(Boolean);
+  const headChain = [
+    "c_head", "l_eye", "r_eye",
+    "l_pedicel", "l_funiculus", "l_arista",
+    "r_pedicel", "r_funiculus", "r_arista",
+    "c_rostrum", "c_haustellum",
+  ].map(bodyOf).filter(Boolean);
+  const antennaChains = {
+    L: ["l_pedicel", "l_funiculus", "l_arista"].map(bodyOf).filter(Boolean),
+    R: ["r_pedicel", "r_funiculus", "r_arista"].map(bodyOf).filter(Boolean),
+  };
+  const halteres = [bodyOf("l_haltere"), bodyOf("r_haltere")].filter(Boolean);
 
   fly.userData = {
     female,
@@ -214,6 +229,10 @@ function buildFly({ female = false } = {}) {
     head: nodes.c_head?.body,
     thorax: nodes.c_thorax?.body,
     abdomen: nodes.c_abdomen12?.body,
+    abdomenChain,
+    headChain,
+    antennaChains,
+    halteres,
     wings,
     legs,
     eyes,
@@ -260,15 +279,40 @@ function applyMuscleFk(leg, nodes) {
     if (Math.abs(delta) < 1e-5) continue;
     const pivotBody = nodes[names[j.pivot]]?.body;
     if (!pivotBody) continue;
-    _fkPivot.copy(pivotBody.position);
-    _fkQ.setFromAxisAngle(h.userData.axis, delta);
-    for (let i = j.pivot; i < names.length; i++) {
-      const body = nodes[names[i]].body;
-      _fkP.copy(body.position).sub(_fkPivot).applyQuaternion(_fkQ).add(_fkPivot);
-      body.position.copy(_fkP);
-      body.quaternion.premultiply(_fkQ);
+    rotateDistal(nodes, names, j.pivot, h.userData.axis, delta);
+  }
+  // Soft tarsus chain: tarsus2–5 follow tarsus1 with decaying pitch (mesh
+  // kinematics from the one MN-driven tarsus hinge — not extra cell IDs).
+  const ta = leg.hinges["tarsus1-pitch"];
+  const taDelta = ta ? ((ta.userData.angle ?? 0) - (ta.userData.rest ?? 0)) : 0;
+  if (Math.abs(taDelta) > 1e-4) {
+    for (let k = 1; k <= 4; k++) {
+      const pivot = 3 + k;
+      if (pivot >= names.length) break;
+      rotateDistal(nodes, names, pivot, ta.userData.axis, taDelta * (0.16 * k));
     }
   }
+}
+
+function rotateDistal(nodes, names, pivot, axis, delta) {
+  const pivotBody = nodes[names[pivot]]?.body;
+  if (!pivotBody || Math.abs(delta) < 1e-5) return;
+  _fkPivot.copy(pivotBody.position);
+  _fkQ.setFromAxisAngle(axis, delta);
+  for (let i = pivot; i < names.length; i++) {
+    const body = nodes[names[i]].body;
+    _fkP.copy(body.position).sub(_fkPivot).applyQuaternion(_fkQ).add(_fkPivot);
+    body.position.copy(_fkP);
+    body.quaternion.premultiply(_fkQ);
+  }
+}
+
+function resetAnatomical(body) {
+  if (!body) return;
+  const rp = body.userData.anatomicalRestPos || body.userData.restPos;
+  const rq = body.userData.anatomicalRestQuat || body.userData.restQuat;
+  if (rp) body.position.copy(rp);
+  if (rq) body.quaternion.copy(rq);
 }
 
 function poseLegFromMuscle(leg, muscle, dt) {
@@ -333,7 +377,10 @@ export function stepLife(fly, dt, t, cmd) {
     leg.foot.x = _foot.x;
     leg.foot.y = _foot.y;
     leg.foot.z = _foot.z;
-    leg.foot.stance = flyA < 0.40 && _foot.y <= floorY;
+    const mus = muscle[leg.name] || {};
+    const swinging = !!mus._swing && flyA < 0.40;
+    // Idle: all planted. Walk: unplant only legs whose flex/ext contrast is swing.
+    leg.foot.stance = flyA < 0.40 && !swinging && _foot.y <= floorY + 0.04;
     leg.foot.vx = dx * idt;
     leg.foot.vy = dy * idt;
     leg.foot.vz = dz * idt;
@@ -354,6 +401,21 @@ export function stepLife(fly, dt, t, cmd) {
   // EMA for HUD / diagnostics (kinematic Pages path).
   d.slipMeanAbs = (d.slipMeanAbs || 0) * 0.85 + meanAbs * 0.15;
   poseSoftParts(d, dt, t, cmd, flyA, feed);
+}
+
+function applyPivotDelta(bodies, pivot, axis, delta) {
+  if (!pivot || Math.abs(delta) < 1e-5) return;
+  _fkPivot.copy(pivot.position);
+  _fkQ.setFromAxisAngle(axis, delta);
+  const start = bodies.indexOf(pivot);
+  const from = start >= 0 ? start : 0;
+  for (let i = from; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (!body) continue;
+    _fkP.copy(body.position).sub(_fkPivot).applyQuaternion(_fkQ).add(_fkPivot);
+    body.position.copy(_fkP);
+    body.quaternion.premultiply(_fkQ);
+  }
 }
 
 function poseSoftParts(d, dt, t, cmd, flyA, feed) {
@@ -379,7 +441,7 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
     w.quaternion.copy(rest);
-    // Below gate: exact rest. No residual rotateZ that read as tapping.
+    // Below gate: exact rest (folded). No residual rotateZ that read as tapping.
     if (power > 0 && wingSoft.amp > 0.01) {
       _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.20 + over * 0.25));
       w.quaternion.multiply(_flapQ);
@@ -387,45 +449,74 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
       w.rotateX((dlm - dvm) * 0.06 * s * over);
     }
   }
-  if (d.abdomen) {
-    const rest = d.abdomen.userData.restQuat;
-    if (rest) {
-      const curl = (cmd.abdomen || 0) * 0.72 + (cmd.court || 0) * 0.28;
-      _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), -0.02 + curl);
-      d.abdomen.quaternion.copy(rest).multiply(_flapQ);
+  // Halteres: rest when wings folded; beat with wing MNs only (same gate).
+  const halt = d.halteres || [];
+  for (let i = 0; i < halt.length; i++) {
+    const h = halt[i];
+    resetAnatomical(h);
+    if (power > 0 && wingSoft.amp > 0.01) {
+      const s = i === 0 ? -1 : 1;
+      h.rotateX(flap * 0.55 * s);
     }
   }
+
+  // Abdomen: multi-segment posture from abdomen MN pool (quiet unless driven).
+  const abdChain = d.abdomenChain || (d.abdomen ? [d.abdomen] : []);
+  for (const body of abdChain) resetAnatomical(body);
+  const segs = cmd.abdSegs || [];
+  const curlCmd = cmd.abdomen || 0;
+  if (curlCmd > 0.01 || segs.some((v) => v > 0.01)) {
+    for (let i = 0; i < abdChain.length; i++) {
+      const w = segs[i] != null ? segs[i] : curlCmd * (ABD_SEG_WEIGHTS[i] ?? 1);
+      const ang = -0.012 + w * 0.38;
+      applyPivotDelta(abdChain, abdChain[i], _axis.set(1, 0, 0), ang);
+    }
+  }
+
+  // Head + attached cuticle (eyes, antennae, mouth) follow neck MNs via FK.
+  const headChain = d.headChain || [];
+  for (const body of headChain) resetAnatomical(body);
   if (d.head) {
-    const rest = d.head.userData.restQuat;
-    if (rest) {
-      // Pitch from neck pool magnitude; yaw/roll from neckL vs neckR.
-      // Smoothed — raw EMA on 25 CvN cells was a head-thrash.
-      const pose = d.headPose || (d.headPose = { yaw: 0, pitch: 0, roll: 0 });
-      const yawT = THREE.MathUtils.clamp((cmd.headYaw || 0) * NECK_SPAN.yaw, -NECK_SPAN.yaw, NECK_SPAN.yaw);
-      const mouthPitch = feed > 0.35 ? (feed - 0.35) * 0.08 : 0;
-      const pitchT = THREE.MathUtils.clamp(
-        (cmd.head || 0) * NECK_SPAN.pitch + mouthPitch,
-        -NECK_SPAN.pitch, NECK_SPAN.pitch + 0.06
-      );
-      const rollT = THREE.MathUtils.clamp((cmd.headRoll || 0) * NECK_SPAN.roll, -NECK_SPAN.roll, NECK_SPAN.roll);
-      pose.yaw = follow(pose.yaw, yawT, tau, NECK_TAU);
-      pose.pitch = follow(pose.pitch, pitchT, tau, NECK_TAU);
-      pose.roll = follow(pose.roll, rollT, tau, NECK_TAU);
-      d.head.quaternion.copy(rest);
-      d.head.rotateY(pose.yaw);
-      d.head.rotateX(pose.pitch);
-      d.head.rotateZ(pose.roll);
-    }
+    const pose = d.headPose || (d.headPose = { yaw: 0, pitch: 0, roll: 0 });
+    const yawT = THREE.MathUtils.clamp((cmd.headYaw || 0) * NECK_SPAN.yaw, -NECK_SPAN.yaw, NECK_SPAN.yaw);
+    const mouthPitch = feed > 0.35 ? (feed - 0.35) * 0.08 : 0;
+    const pitchT = THREE.MathUtils.clamp(
+      (cmd.head || 0) * NECK_SPAN.pitch + mouthPitch,
+      -NECK_SPAN.pitch, NECK_SPAN.pitch + 0.06
+    );
+    const rollT = THREE.MathUtils.clamp((cmd.headRoll || 0) * NECK_SPAN.roll, -NECK_SPAN.roll, NECK_SPAN.roll);
+    pose.yaw = follow(pose.yaw, yawT, tau, NECK_TAU);
+    pose.pitch = follow(pose.pitch, pitchT, tau, NECK_TAU);
+    pose.roll = follow(pose.roll, rollT, tau, NECK_TAU);
+    applyPivotDelta(headChain, d.head, _axis.set(0, 1, 0), pose.yaw);
+    applyPivotDelta(headChain, d.head, _axis.set(1, 0, 0), pose.pitch);
+    applyPivotDelta(headChain, d.head, _axis.set(0, 0, 1), pose.roll);
   }
+
+  // Antennae: calm JO reflex on pedicel after head FK (no thrash).
+  const antSoft = d.antSoft || (d.antSoft = { L: 0, R: 0 });
+  antSoft.L = follow(antSoft.L, cmd.antennaL || 0, tau, NECK_TAU);
+  antSoft.R = follow(antSoft.R, cmd.antennaR || 0, tau, NECK_TAU);
+  const chains = d.antennaChains || {};
+  for (const side of ["L", "R"]) {
+    const chain = chains[side] || [];
+    const ped = chain[0];
+    if (!ped) continue;
+    const a = (side === "L" ? antSoft.L : antSoft.R) * ANTENNA_SPAN;
+    const sgn = side === "L" ? -1 : 1;
+    applyPivotDelta(chain, ped, _axis.set(0, 1, 0), a * 0.55 * sgn);
+    applyPivotDelta(chain, ped, _axis.set(1, 0, 0), a * 0.35);
+  }
+
   const mouth = d.mouthSoft || (d.mouthSoft = { feed: 0 });
   const feedT = feed > 0.28 ? (feed - 0.28) / 0.72 : 0;
   mouth.feed = follow(mouth.feed, feedT, tau, FEED_TAU);
   if (d.proboscis) {
     d.proboscis.scale.set(1, 1 + mouth.feed * 0.32, 1);
-    d.proboscis.rotation.x = mouth.feed * 0.18;
+    if (mouth.feed > 0.01) d.proboscis.rotateX(mouth.feed * 0.18);
   }
-  if (d.haustellum) {
-    d.haustellum.rotation.x = mouth.feed * 0.12;
+  if (d.haustellum && mouth.feed > 0.01) {
+    d.haustellum.rotateX(mouth.feed * 0.12);
   }
   // Eye glow tracks MN/behavior cmds only (no fake activity).
   const glow = 0.08 + power * 0.25 + (cmd.walk || 0) * 0.2 + mouth.feed * 0.08 + (cmd.court || 0) * 0.18;

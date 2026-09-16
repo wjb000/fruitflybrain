@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=cns4sense";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns4sense";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns4sense";
-import { EmbodiedFly } from "./agent.js?v=cns4sense";
-import { drawOmmatidia } from "./eye.js?v=cns4sense";
-import { OdorWorld } from "./plume.js?v=cns4sense";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns4sense";
-import { parseLesionFlag } from "./lesion.js?v=cns4sense";
-import { mountAssayPanel } from "./assay/panel.js?v=cns4sense";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns4sense";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns4sense";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns4sense";
+import { loadNmf, createMaleFly } from "./fly.js?v=fullfly1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=fullfly1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=fullfly1";
+import { EmbodiedFly } from "./agent.js?v=fullfly1";
+import { drawOmmatidia } from "./eye.js?v=fullfly1";
+import { OdorWorld } from "./plume.js?v=fullfly1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=fullfly1";
+import { parseLesionFlag } from "./lesion.js?v=fullfly1";
+import { mountAssayPanel } from "./assay/panel.js?v=fullfly1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=fullfly1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=fullfly1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=fullfly1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -272,7 +272,7 @@ function fillJoints(el) {
   for (const name of JOINT_LEGS) {
     const row = document.createElement("div");
     row.className = "barline";
-    row.innerHTML = `<div class="name">${name}</div><div class="track"><i id="j-${name}" style="background:#7ecbff"></i></div>`;
+    row.innerHTML = `<div class="name" id="jn-${name}">${name}</div><div class="track"><i id="j-${name}" style="background:#7ecbff"></i></div>`;
     el.appendChild(row);
   }
 }
@@ -339,6 +339,11 @@ function paintJoints(fly) {
       + Math.abs((u.trFlex || 0) - (u.trExt || 0))
       + Math.abs((u.coxaProm || 0) - (u.coxaRem || 0));
     el.style.width = (Math.min(1, net / 2) * 100).toFixed(1) + "%";
+    const lab = document.getElementById("jn-" + name);
+    if (lab) {
+      const gait = fly.cmd.walk > 0.04 ? (u._swing ? " W" : " S") : " ·";
+      lab.textContent = name + gait;
+    }
   }
 }
 
@@ -455,7 +460,7 @@ function onAny() {
       const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
       plantBit = physics.ok
         ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling"))
-        : ("planted " + (focus.planted ? "yes" : "…") + " |slip|=" + Number(slip).toFixed(3));
+        : ("planted " + (focus.planted ? "yes" : "…") + " S/W " + (focus.cmd?.stanceN ?? 6) + "/" + (focus.cmd?.swingN ?? 0) + " |slip|=" + Number(slip).toFixed(3));
     }
     $("lifeHint").textContent = flesh + " · " + plantBit + " · home · MN DLM " + dlm + " legs " + legs +
       (kinMode === "drone"
@@ -475,8 +480,18 @@ function onAny() {
   setW("mn-admn", e.ADMN || 0);
   setW("mn-legs", ((e.T1L || 0) + (e.T1R || 0) + (e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 6);
   setW("mn-neck", e.neck || 0);
-  setW("mn-abd", e.abdomen || 0);
+  setW("mn-abd", focus.cmd?.abdomen || e.abdomen || 0);
   setW("mn-mn9", Math.max(e.MN9 || 0, e.proboscis || 0));
+  setW("mn-ant", Math.max(focus.cmd?.antennaL || 0, focus.cmd?.antennaR || 0));
+  setW("mn-halt", focus.cmd?.fly || 0);
+  if ($("mapHint")) {
+    const st = focus.effectorStats || {};
+    const live = focus.liveMapped != null ? focus.liveMapped : 0;
+    const bound = focus.boundMapped != null ? focus.boundMapped : (st.mappedN || 0);
+    $("mapHint").textContent = "mapped " + (st.mappedN || bound) + " pools · empty " + (st.emptyN || 12)
+      + " (T2/T3 coxaProm+Ta*) · live MN " + live + "/" + bound
+      + " · soft: head+ant+abd×5+wings+halt+mouth";
+  }
   const o = focus.lastOdor;
   if (o && $("odorFL")) {
     $("odorFL").style.width = Math.min(100, o.foodL).toFixed(1) + "%";
