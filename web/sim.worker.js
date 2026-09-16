@@ -1,4 +1,9 @@
-/* LIF engine for the Male CNS connectome. Runs in a Web Worker. */
+/* LIF engine for the Male CNS connectome. Runs in a Web Worker.
+ *
+ * This is the primary brain: ~166k Traced cells, real chemical synapses,
+ * Poisson stim, STD, slow neuromod. Gap-fill lives outside (eye/ORN/proprio
+ * Hz write-in, plant adhesion). Do not add a behavior tree or CPG here.
+ */
 
 let n = 0;
 let indptr, indices, weight, group, nt;

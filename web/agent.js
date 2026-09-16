@@ -1,10 +1,17 @@
+/**
+ * Embodied male fly: sensory encoding → LIF worker → annotated MN readout → body.
+ *
+ * Connectome (sim.worker.js) is primary. This file is gap-fill + readout:
+ * world/cameras → Hz on *existing* pools; motEma → muscle/pose; planted slip.
+ * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
+ */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=follow1";
-import { CompoundEye } from "./eye.js?v=follow1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=follow1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=follow1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
-import { spinRotors } from "./chassis.js?v=follow1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=cns2";
+import { CompoundEye } from "./eye.js?v=cns2";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=cns2";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=cns2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=cns2";
+import { spinRotors } from "./chassis.js?v=cns2";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -81,10 +88,10 @@ function antagPair(posEma, negEma, gain = 3.25) {
   if (mag < 1e-4) return { pos: 0, neg: 0 };
   const raw = (p - n) / (mag + 0.045);
   const d = Math.tanh(raw * 2.15);
-  const lose = 0.48; // suppress loser so flex/ext do not cancel
+  const lose = 0.62; // stronger winner-take-more — co-contraction was a twitch/seize
   return {
-    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.32)),
-    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.32)),
+    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.22)),
+    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.22)),
   };
 }
 
@@ -158,9 +165,9 @@ function gradedContact(dist, reach, peak = 100) {
   return peak * u * u;
 }
 
-const ARENA_R = 18; // small pad radius (matches world/procgen.js)
-const OPEN_WORLD = true; // soft XY clamp only — no hard cage walls
-const WORLD_SOFT_LIMIT = 15.8; // soft pad rim (~ARENA_R - 2.2)
+const ARENA_R = 12.5; // garden clearing (matches world/procgen.js)
+const OPEN_WORLD = true; // soft XY clamp only — garden hedge bounce, never punish
+const WORLD_SOFT_LIMIT = 10.8; // ~ARENA_R - 1.7
 /** Flight translation OFF by default — walking-focused. Re-enable with ?flight=1 */
 function flightEnabledFromUrl() {
   try {
@@ -174,14 +181,14 @@ export const FLIGHT_ENABLED = typeof location !== "undefined" && flightEnabledFr
 function bodyModeFromUrl() {
   try {
     const q = new URLSearchParams(location.search).get("body");
-    if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
+    if (q === "drone" || q === "quad" || q === "quadrotor") return "drone";
     if (q === "cube" || q === "box") return "cube";
-    return "drone";
+    return "fly";
   } catch (_) {
-    return "drone";
+    return "fly";
   }
 }
-export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "drone";
+export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "fly";
 function isKinematicChassis(mode) {
   return mode === "drone" || mode === "cube";
 }
@@ -211,8 +218,8 @@ export class EmbodiedFly {
   }) {
     this.sex = "male"; // public sim: male CNS only
     this.body = body;
-    // Default drone chassis; ?body=cube keeps box; ?body=fly restores NMF / MuJoCo.
-    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "drone";
+    // Default NeuroMechFly; ?body=cube box; ?body=drone quadrotor.
+    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "fly";
     this.plantLabel = plantLabelFor(this.bodyMode);
     this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0, pitch: 0, throttle: 1.45 };
     this.onReady = onReady;
@@ -756,17 +763,22 @@ export class EmbodiedFly {
     } else {
       // Kinematic fallback if the plant is down: MN → leg pose → stance slip.
       // No cmd.walk thruster — ground motion from foot slip only.
-      // Flight translation gated (default OFF); wing mesh still follows wing MNs in poseSoftParts.
+      // Thrive default: stay planted (no T1-extensor hop / vault). Flight translation
+      // stays gated off unless ?flight=1; wing mesh still follows wing MNs in poseSoftParts.
       const stand = this.body.userData.standZ || 1.3;
-      const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
-      if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
       const flying = FLIGHT_ENABLED && cmd.fly > 0.58;
-      if (flying) {
+      if (!FLIGHT_ENABLED) {
+        this.vy = 0;
+        this.y = stand;
+      } else if (flying) {
         this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
-      } else this.vy -= 18 * dt;
-      this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && !flying) this.vy = 0;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+      } else {
+        this.vy -= 18 * dt;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+        if (this.y === stand) this.vy = 0;
+      }
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
       if (flying) {
@@ -775,16 +787,29 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Stance-slip from MN foot motion (no thruster / CPG). Scale with leg MN
-        // asymmetry so quiet co-contraction does not thrash XY.
-        const asym = Math.min(1.4, Math.abs(legR - legL) * 2.2 + softDrive(legs, 2.4));
-        const slipGain = 2.2 + 1.6 * asym;
-        const sx = (slip.x / slip.n) * slipGain;
-        const sz = (slip.z / slip.n) * slipGain;
-        this.body.position.x += sx;
-        this.body.position.z += sz;
-        this.heading += (slip.yawR - slip.yawL) * (1.2 + 0.6 * asym);
-        this.lastSlipAbs = Math.hypot(sx, sz);
+        // Stance-slip from MN foot motion (no thruster / CPG). Dead-zone quiet
+        // co-contraction so idle MNs do not thrash XY / yaw (the seize look).
+        const walkDrive = softDrive(legs, 2.35);
+        const meanAbs = slip.meanAbs != null ? slip.meanAbs : Math.hypot(slip.x, slip.z) / slip.n;
+        if (walkDrive < 0.05 || meanAbs < 0.00055) {
+          this.lastSlipAbs = 0;
+        } else {
+          const asym = Math.min(1.15, Math.abs(legR - legL) * 2.0 + walkDrive);
+          const slipGain = (1.15 + 1.05 * asym) * walkDrive;
+          let sx = (slip.x / slip.n) * slipGain;
+          let sz = (slip.z / slip.n) * slipGain;
+          const step = Math.hypot(sx, sz);
+          const maxStep = 0.042;
+          if (step > maxStep) {
+            const k = maxStep / step;
+            sx *= k; sz *= k;
+          }
+          this.body.position.x += sx;
+          this.body.position.z += sz;
+          const dyaw = (slip.yawR - slip.yawL) * (0.7 + 0.45 * asym) * walkDrive;
+          this.heading += THREE.MathUtils.clamp(dyaw, -0.07, 0.07);
+          this.lastSlipAbs = Math.hypot(sx, sz);
+        }
       } else {
         this.lastSlipAbs = 0;
       }
@@ -795,7 +820,10 @@ export class EmbodiedFly {
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? slipMag / 0.035
         : cmd.fly) * 0.7;
-      // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
+      this.planted = !flying && this.y <= stand + 0.08;
+      this.plantNLeg = slip && slip.n ? slip.n : 0;
+      this.plantLabel = physics.ok ? "fly" : "kinematic NMF";
+      // Garden hedge: bounce/redirect past WORLD_SOFT_LIMIT, never punish.
       if (OPEN_WORLD) {
         const rad = Math.hypot(this.body.position.x, this.body.position.z);
         if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
@@ -804,20 +832,26 @@ export class EmbodiedFly {
           this.body.position.z *= s;
         }
       }
+      // Shade is visual/sensory only while flight is off. Auto-lift onto the
+      // old pole perch vaulted the thorax (y→~2.4) whenever he walked near it.
       const perch = this.world.perch;
       this.onPerch = false;
-      if (perch) {
+      if (FLIGHT_ENABLED && perch) {
         const px = this.body.position.x, pz = this.body.position.z;
         const dp = Math.hypot(px - perch.x, pz - perch.z);
-        const cap = 0.48, top = perch.h || 2.18;
-        if (dp < cap && this.y > top - 0.55 && this.y < top + stand + 0.2 && cmd.fly < 0.28) {
+        const cap = 0.42, top = perch.h || 2.18;
+        if (dp < cap && this.y > top - 0.2 && this.y < top + 0.45 && cmd.fly < 0.28) {
           this.onPerch = true;
           this.vy = 0;
-          this.y = top + stand - 0.05;
+          this.y = top + 0.12;
         }
       }
+      if (!FLIGHT_ENABLED) {
+        this.y = stand;
+        this.vy = 0;
+      }
       this.body.position.y = this.y;
-      this.body.rotation.y = this.heading;
+      this.body.rotation.set(0, this.heading, 0);
     }
 
     let lead = "rest", leadV = cmd.rest;
@@ -1044,7 +1078,7 @@ export class EmbodiedFly {
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
     this.prevDistO = distQ;
-    const day = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 0.012));
+    const day = 0.82 + 0.10 * (0.5 + 0.5 * Math.sin(t * 0.008));
     this.day = day;
     const head = this.body.userData.head;
     if (head) head.getWorldPosition(_head);
@@ -1066,6 +1100,7 @@ export class EmbodiedFly {
       food: beacon,
       water: this.world.water,
       bitter: this.world.bitter,
+      assayBeacon: this.world.assayBeacon,
       perch: this.world.perch,
       bomb: bombPos,
       // Procgen landmarks — required for vision→walk toward chunk targets.
@@ -1125,9 +1160,10 @@ export class EmbodiedFly {
     const nearFloor = this.y < stand + 0.36;
     // Graded GRN / ppk contact — not binary on/off.
     const sweetHz = nearFloor ? gradedContact(distF, 1.35, 70) : gradedContact(distF, 0.7, 16);
-    const distB = this.world.bitter
+    const bitterOnMap = this.world.bitter && Math.hypot(this.world.bitter.x, this.world.bitter.z) < 40;
+    const distB = bitterOnMap
       ? Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) : 99;
-    const bitterHz = nearFloor ? gradedContact(distB, 1.35, 65) : 0;
+    const bitterHz = bitterOnMap && nearFloor ? gradedContact(distB, 1.35, 65) : 0;
     const taste = Math.max(sweetHz, bitterHz * 0.85);
     const hygroL = 4 + moistL * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
     const hygroR = 4 + moistR * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
@@ -1144,7 +1180,7 @@ export class EmbodiedFly {
     const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    // Open world: no cage wall mechanosensation.
+    // Garden home: no cage-wall mechanosensation (hedge is visual + bounce only).
     const wall = 0;
     const touch = wall + (grounded ? 8 + this.speedS * 24 : 3) + ppkBase * 0.12;
 

@@ -1,12 +1,16 @@
-# Lesion assay — take the fly apart on purpose
+# Intact-first heading assay (optional)
 
-**North star:** not "make a smarter fly." First animal we can take apart on purpose. Real male CNS → NeuroMechFly, sensory in / muscles out, no hand-coded walk. Hard job: see a thing, remember where it is, go get it after lights/world rotate (tiny thought, not a twitch).
+**Not the homepage.** The public default is a thriving male in his fly body ([`THRIVE.md`](THRIVE.md)). This page is an **optional diagnostic**: can an intact CNS see a landmark, keep a heading in the dark, and walk toward it after a yaw?
 
-Grok (or any worker) runs mass virtual surgeries on the **LIF connectome path** — silence a cell type, boost, cut a bundle, swap L/R, add synaptic delay, hunger via neuromod. Keep only **weird specific deficits** (still walks + sees but lost memory/heading), not "falls over."
+Prefer intact function. Pool mute / cut / delay tools exist for people who ask (`?assay=1`, `?lesion=…`) — they are not the default HUD.
 
-Encore = **robot controller** (`web/controller/portable.js`): vision→steering → `{v, omega}` for cube or hardware. **Now:** assay + lesion harness + that API.
+Hard job: see a thing, remember where it is, go get it after lights/world rotate (tiny thought, not a twitch). Real male CNS → NeuroMechFly (or portable MN chassis), sensory in / muscles out, no hand-coded walk.
 
-Constraints for this scaffolding: **male-only, MN-only body drive, calm gains, no thrusters / cosmetics / invented MNs.**
+Keep only **weird specific deficits** (still walks + sees but lost memory/heading), not “falls over.”
+
+Optional robot controller (`web/controller/portable.js`): vision→steering → `{v, omega}` for cube or hardware.
+
+Constraints: **male-only, MN-only body drive, calm gains, no thrusters / cosmetics / invented MNs.**
 
 ## Philosophy
 
