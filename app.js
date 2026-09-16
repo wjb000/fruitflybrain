@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=cns4";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns4";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns4";
-import { EmbodiedFly } from "./agent.js?v=cns4";
-import { drawOmmatidia } from "./eye.js?v=cns4";
-import { OdorWorld } from "./plume.js?v=cns4";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns4";
-import { parseLesionFlag } from "./lesion.js?v=cns4";
-import { mountAssayPanel } from "./assay/panel.js?v=cns4";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns4";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns4";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns4";
+import { loadNmf, createMaleFly } from "./fly.js?v=cns4sense";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=cns4sense";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=cns4sense";
+import { EmbodiedFly } from "./agent.js?v=cns4sense";
+import { drawOmmatidia } from "./eye.js?v=cns4sense";
+import { OdorWorld } from "./plume.js?v=cns4sense";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=cns4sense";
+import { parseLesionFlag } from "./lesion.js?v=cns4sense";
+import { mountAssayPanel } from "./assay/panel.js?v=cns4sense";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=cns4sense";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=cns4sense";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=cns4sense";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -422,8 +422,9 @@ function onAny() {
     ? droneSetpoints(portableControls(focus))
     : chassisSetpoints(portableControls(focus)));
   if ($("steerHint")) {
-    const salT = steer.salTarget ?? focus.lastVisionSal?.salTarget ?? focus.eye?.lastSummary?.salTarget ?? 0;
-    const asym = steer.asymFood ?? focus.lastVisionSal?.asymFood ?? focus.eye?.lastSummary?.asymFood ?? 0;
+    const loom = 0.5 * ((focus.lastVisionSal?.loomL || 0) + (focus.lastVisionSal?.loomR || 0));
+    const hsL = focus.lastVisionSal?.hsL ?? focus.opticEma?.HS_L ?? 0;
+    const hsR = focus.lastVisionSal?.hsR ?? focus.opticEma?.HS_R ?? 0;
     if (kinMode === "drone") {
       $("steerHint").textContent =
         "thr " + (steer.throttle ?? 1.45).toFixed(2) +
@@ -431,16 +432,16 @@ function onAny() {
         "  pitch " + (steer.pitch ?? 0).toFixed(2) +
         "  | v=" + (steer.v ?? 0).toFixed(2) +
         " ω=" + (steer.omega ?? 0).toFixed(2) +
-        "  sal " + Number(salT).toFixed(2) +
-        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+        "  loom " + Number(loom).toFixed(2) +
+        " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     } else {
       $("steerHint").textContent =
         "fwd " + (steer.forward ?? 0).toFixed(2) +
         "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
         "  | v=" + (steer.v ?? 0).toFixed(2) +
         " ω=" + (steer.omega ?? 0).toFixed(2) +
-        "  sal " + Number(salT).toFixed(2) +
-        " Δ" + (asym >= 0 ? "+" : "") + Number(asym).toFixed(2);
+        "  loom " + Number(loom).toFixed(2) +
+        " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     }
   }
   if ($("lifeHint")) {
