@@ -1,7 +1,8 @@
 /**
- * Simple chassis embodiments for Pages (cube box, visual quadrotor).
- * Male CNS still runs; plant motion is kinematic from portable MN steering only.
- * No NeuroMechFly mesh posing, no MuJoCo vault plant (unless ?body=fly).
+ * Optional chassis embodiments (cube box, visual quadrotor).
+ * Homepage default is the NeuroMechFly mesh (`?body=fly` / omitted).
+ * Cube/drone: male CNS still runs; motion is kinematic from portable MN steering.
+ * No MuJoCo on cube/drone — those stay ?body=cube / ?body=drone.
  */
 import * as THREE from "three";
 
@@ -242,17 +243,17 @@ export function spinRotors(body, dt, throttle = HOVER_Z) {
 }
 
 /**
- * Parse ?body= — default drone; ?body=cube keeps the box plant;
- * ?body=fly|nmf|mujoco restores NeuroMechFly / MuJoCo.
+ * Parse ?body= — default fly (NeuroMechFly mesh + MN drive).
+ * ?body=cube keeps the box plant; ?body=drone the quadrotor.
  */
 export function bodyModeFromUrl() {
   try {
     const q = new URLSearchParams(location.search).get("body");
-    if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
+    if (q === "drone" || q === "quad" || q === "quadrotor") return "drone";
     if (q === "cube" || q === "box") return "cube";
-    return "drone";
+    return "fly";
   } catch (_) {
-    return "drone";
+    return "fly";
   }
 }
 

@@ -5,8 +5,8 @@
  */
 import * as THREE from "three";
 
-const ARENA_R = 17.4;
-const PUFF_MAX_R2 = 2400 * 2400; // open world — don't cull at dish rim
+const ARENA_R = 12.5;
+const PUFF_MAX_R2 = 2400 * 2400; // don't cull at garden rim
 const MAX_PUFFS = 560;
 
 function makeSprite() {
@@ -27,12 +27,12 @@ function makeSprite() {
 const SPRITE = makeSprite();
 
 function windAt(x, z, t) {
-  const mx = -1.05 + 0.35 * Math.sin(t * 0.19);
-  const mz = -0.42 + 0.28 * Math.sin(t * 0.14 + 0.9);
-  const e1 = 0.55 * Math.sin(0.31 * x + 1.3 * t);
-  const e2 = 0.45 * Math.cos(0.27 * z - 1.1 * t);
-  const e3 = 0.32 * Math.sin(0.18 * (x + z) + 0.7 * t);
-  return { x: mx + e1 + 0.5 * e3, z: mz + e2 - 0.4 * e3 };
+  const mx = -0.32 + 0.12 * Math.sin(t * 0.15);
+  const mz = -0.14 + 0.10 * Math.sin(t * 0.11 + 0.9);
+  const e1 = 0.18 * Math.sin(0.22 * x + 0.9 * t);
+  const e2 = 0.14 * Math.cos(0.19 * z - 0.8 * t);
+  const e3 = 0.10 * Math.sin(0.14 * (x + z) + 0.5 * t);
+  return { x: mx + e1 + 0.4 * e3, z: mz + e2 - 0.3 * e3 };
 }
 
 class PuffField {
@@ -233,16 +233,19 @@ export class OdorWorld {
     const flock = world.flies || [];
     this.wind = windAt(0, 0, t);
     this.food.acc += dt * this.food.emitHz;
+    const foodSources = (world.foods && world.foods.length) ? world.foods : [food];
     while (this.food.acc >= 1) {
       this.food.acc -= 1;
-      this.food.emit(food.x, 0.32, food.z, this.wind);
+      const src = foodSources[this.food.puffs.length % foodSources.length] || food;
+      this.food.emit(src.x, 0.32, src.z, this.wind);
     }
     this.moist.acc += dt * this.moist.emitHz;
     while (this.moist.acc >= 1) {
       this.moist.acc -= 1;
       this.moist.emit(water.x, 0.28, water.z, this.wind);
     }
-    if (bitter) {
+    const bitterOn = bitter && Math.hypot(bitter.x || 0, bitter.z || 0) < 40;
+    if (bitterOn) {
       this.bitter.acc += dt * this.bitter.emitHz;
       while (this.bitter.acc >= 1) {
         this.bitter.acc -= 1;
