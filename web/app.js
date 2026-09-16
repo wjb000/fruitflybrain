@@ -1,17 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=dynw1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=dynw1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=dynw1";
-import { EmbodiedFly } from "./agent.js?v=dynw1";
-import { drawOmmatidia } from "./eye.js?v=dynw1";
-import { OdorWorld } from "./plume.js?v=dynw1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=dynw1";
-import { parseLesionFlag } from "./lesion.js?v=dynw1";
-import { mountAssayPanel } from "./assay/panel.js?v=dynw1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=dynw1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=dynw1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=dynw1";
+import { loadNmf, createMaleFly } from "./fly.js?v=linked1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=linked1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=linked1";
+import { EmbodiedFly } from "./agent.js?v=linked1";
+import { drawOmmatidia } from "./eye.js?v=linked1";
+import { OdorWorld } from "./plume.js?v=linked1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=linked1";
+import { parseLesionFlag } from "./lesion.js?v=linked1";
+import { mountAssayPanel } from "./assay/panel.js?v=linked1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=linked1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=linked1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=linked1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -341,8 +341,9 @@ function paintJoints(fly) {
     el.style.width = (Math.min(1, net / 2) * 100).toFixed(1) + "%";
     const lab = document.getElementById("jn-" + name);
     if (lab) {
-      const gait = fly.cmd.walk > 0.04 ? (u._swing ? " W" : " S") : " ·";
-      lab.textContent = name + gait;
+          const gait = fly.cmd.walk > 0.04 ? (u._swing ? " W" : " S") : " ·";
+          const coup = u._coupled ? "~" : "";
+          lab.textContent = name + gait + coup;
     }
   }
 }
@@ -484,7 +485,7 @@ function onAny() {
   setW("mn-abd", focus.cmd?.abdomen || e.abdomen || 0);
   setW("mn-mn9", Math.max(e.MN9 || 0, e.proboscis || 0));
   setW("mn-ant", Math.max(focus.cmd?.antennaL || 0, focus.cmd?.antennaR || 0));
-  setW("mn-halt", focus.cmd?.fly || 0);
+  setW("mn-halt", Math.max(focus.cmd?.haltere?.L || 0, focus.cmd?.haltere?.R || 0, focus.cmd?.fly || 0));
   const syn = focus.syn || {};
   setW("syn-u", syn.meanU || 0);
   setW("syn-x", syn.meanX != null ? syn.meanX : 1);
@@ -505,15 +506,19 @@ function onAny() {
     const bound = focus.boundMapped != null ? focus.boundMapped : (st.mappedN || 0);
     $("mapHint").textContent = "mapped " + (st.mappedN || bound) + " pools · empty " + (st.emptyN || 12)
       + " (T2/T3 coxaProm+Ta*) · live MN " + live + "/" + bound
-      + " · soft: head+ant+abd×5+wings+halt+mouth";
+      + " · linked: head+ant×3+abd×5+wings L/R+halt gyro+mouth · proprio loop";
   }
   const o = focus.lastOdor;
+  const sense = focus.lastSense || {};
   if (o && $("odorFL")) {
     $("odorFL").style.width = Math.min(100, o.foodL).toFixed(1) + "%";
     $("odorFR").style.width = Math.min(100, o.foodR).toFixed(1) + "%";
     $("odorPL").style.width = Math.min(100, o.pherL).toFixed(1) + "%";
     $("odorPR").style.width = Math.min(100, o.pherR).toFixed(1) + "%";
   }
+  if ($("odorJL")) $("odorJL").style.width = Math.min(100, sense.joL || 0).toFixed(1) + "%";
+  if ($("odorJR")) $("odorJR").style.width = Math.min(100, sense.joR || 0).toFixed(1) + "%";
+  if ($("odorHY")) $("odorHY").style.width = Math.min(100, 0.5 * ((sense.hygroL || 0) + (sense.hygroR || 0))).toFixed(1) + "%";
 }
 
 const pauseBtn = $("pause");

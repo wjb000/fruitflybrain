@@ -57,9 +57,12 @@ export const EMPTY_MALE_MUSCLE_POOLS = [
 export const ABD_SEG_KEYS = ["abdomen12", "abdomen3", "abdomen4", "abdomen5", "abdomen6"];
 export const ABD_SEG_WEIGHTS = [0.28, 0.48, 0.68, 0.86, 1.00];
 export const ABD_POSE_GATE = 0.30;
+export const ABD_YAW_SPAN = 0.14;
 export const IDLE_WALK_GATE = 0.05;
 export const ANTENNA_JO_BASE = 8;
 export const ANTENNA_SPAN = 0.16;
+/** Funiculus is the JO joint (pedicel–funiculus). Pedicel/arista follow smaller. */
+export const ANTENNA_PARTS = { pedicel: 0.38, funiculus: 0.82, arista: 0.22 };
 
 /** Visual neck spans (rad). Plant has no neck joint. */
 export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
@@ -188,16 +191,37 @@ export function neckFromEma(e) {
  * flap or tap the mesh. Flight translation is gated separately (?flight=1).
  * No cosmetic idle CPG — below WING_FLAP_GATE the mesh stays at rest.
  */
+function wingSide(e, side) {
+  const dead = 0.12;
+  const pick = (base) => {
+    const k = `${base}_${side}`;
+    const v = e[k];
+    return v != null && v > 0 ? v : (e[base] || 0);
+  };
+  const dlm = softDrive(Math.max(0, pick("DLM") - dead), 1.45);
+  const dvm = softDrive(Math.max(0, pick("DVM") - dead), 1.45);
+  const admn = softDrive(Math.max(0, pick("ADMN") - dead), 1.30);
+  return { dlm, dvm, admn, power: 0.42 * dlm + 0.38 * dvm + 0.22 * admn };
+}
+
 export function wingFromEma(e) {
   const dead = 0.12;
   const dlm = softDrive(Math.max(0, (e.DLM || 0) - dead), 1.45);
   const dvm = softDrive(Math.max(0, (e.DVM || 0) - dead), 1.45);
   const admn = softDrive(Math.max(0, (e.ADMN || 0) - dead), 1.30);
   const power = 0.42 * dlm + 0.38 * dvm + 0.22 * admn;
+  const L = wingSide(e, "L");
+  const R = wingSide(e, "R");
   if (power < WING_FLAP_GATE) {
-    return { dlm: 0, dvm: 0, admn: 0, power: 0, fly: 0 };
+    return {
+      dlm: 0, dvm: 0, admn: 0, power: 0, fly: 0,
+      dlmL: 0, dlmR: 0, dvmL: 0, dvmR: 0, admnL: 0, admnR: 0,
+    };
   }
-  return { dlm, dvm, admn, power, fly: power };
+  return {
+    dlm, dvm, admn, power, fly: power,
+    dlmL: L.dlm, dlmR: R.dlm, dvmL: L.dvm, dvmR: R.dvm, admnL: L.admn, admnR: R.admn,
+  };
 }
 
 /**
@@ -281,13 +305,13 @@ export function abdomenFromEma(e, court = 0, state = null, dt = 0.032) {
     state.abdTonic = (state.abdTonic || 0) + (mag - (state.abdTonic || 0)) * a;
     const phasic = Math.max(0, mag - 0.92 * state.abdTonic);
     if (phasic < 0.06 && courtV < 0.10) {
-      return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0 };
+      return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0, yaw: 0 };
     }
     driveMag = phasic;
   }
   const drive = softDrive(driveMag, 1.22);
   if (drive < ABD_POSE_GATE && courtV < 0.10) {
-    return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0 };
+    return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0, yaw: 0 };
   }
   const curl = Math.min(1, drive * 0.42 + courtV);
   const sum = segs.reduce((a, b) => a + b, 0);
@@ -295,7 +319,15 @@ export function abdomenFromEma(e, court = 0, state = null, dt = 0.032) {
     const base = sum > 0.02 ? softDrive(s, 1.25) : curl * ABD_SEG_WEIGHTS[i];
     return Math.min(1, base);
   });
-  return { curl, segs: outSegs, court: courtV };
+  // Lateral bend from soma-X split of the *same* 207 abdomen MN IDs.
+  const latDead = 0.18;
+  const aL = Math.max(0, (e.abdomen_L || e.abdomenL || 0) - latDead);
+  const aR = Math.max(0, (e.abdomen_R || e.abdomenR || 0) - latDead);
+  let yaw = 0;
+  if (aL + aR > 0.10 && (drive > ABD_POSE_GATE * 0.4 || courtV > 0.08)) {
+    yaw = Math.tanh((aR - aL) * 2.1) * 0.42;
+  }
+  return { curl, segs: outSegs, court: courtV, yaw };
 }
 
 /**
@@ -306,6 +338,86 @@ export function antennaFromJo(hz) {
   const x = Math.max(0, (hz || 0) - ANTENNA_JO_BASE);
   const v = Math.tanh(x / 95);
   return v < 0.05 ? 0 : v;
+}
+
+/** Pedicel / funiculus / arista shares of a JO Hz (same IDs, denser mesh). */
+export function antennaPartsFromJo(hz) {
+  const mag = antennaFromJo(hz);
+  return {
+    mag,
+    pedicel: mag * ANTENNA_PARTS.pedicel,
+    funiculus: mag * ANTENNA_PARTS.funiculus,
+    arista: mag * ANTENNA_PARTS.arista,
+  };
+}
+
+/**
+ * Haltere pose from body yaw-rate (gyro) + wing MN power.
+ * No dedicated haltere MN pool in FlyEM export — not invented. Quiet at rest
+ * (no beat CPG). Turn → small deflection; wing gate → beat with DLM/DVM/ADMN.
+ */
+export function haltereFromSense({ yawRate = 0, wingPower = 0 } = {}, side = "L") {
+  const yaw = yawRate || 0;
+  const ipsi = side === "L" ? Math.max(0, -yaw) : Math.max(0, yaw);
+  const gyro = Math.tanh(Math.abs(yaw) * 0.42) * 0.50 + Math.tanh(ipsi * 0.55) * 0.20;
+  const beat = (wingPower || 0) > 0 ? wingPower : 0;
+  const mag = Math.min(1, beat * 0.90 + gyro * 0.55);
+  return mag < 0.035 ? 0 : mag;
+}
+
+/**
+ * IDs in `all` that are not in any `used` list. Worker drive is max-merge, so
+ * residual bind lets untyped aggregate cells see the world without overwriting
+ * typed ORN / GRN / proprio channels.
+ */
+export function residualIds(all, ...used) {
+  const skip = new Set();
+  for (const list of used) {
+    if (!list) continue;
+    for (const i of list) skip.add(i);
+  }
+  const out = [];
+  for (const i of all || []) if (!skip.has(i)) out.push(i);
+  return out;
+}
+
+/**
+ * Close proprio: neck / abdomen / yaw / wing load into *existing* cho/hp/csa
+ * pools. Haltere gyro → metathoracic campaniform (`csaT3`). Neck hair plates
+ * → `hpT1`. Abdomen curl → hind `propT3`/`choT3`.
+ */
+export function closeLoopProprio(rates, extra = {}) {
+  const out = { ...(rates || {}) };
+  const add = (k, v) => {
+    if (!(v > 0)) return;
+    out[k] = Math.min(95, (out[k] || 0) + v);
+  };
+  const yaw = extra.yawRate || 0;
+  const absYaw = Math.abs(yaw);
+  const neck = extra.neckMag || 0;
+  const headYaw = extra.headYaw || 0;
+  const abd = extra.abd || 0;
+  const wingP = extra.wingP || 0;
+  const antL = extra.antL || 0;
+  const antR = extra.antR || 0;
+  // Haltere / gyro: metathorax campaniform (csaT3 n=199).
+  add("csaT3", absYaw * 16 + wingP * 10);
+  add("csaT3L", Math.max(0, -yaw) * 20 + wingP * 8);
+  add("csaT3R", Math.max(0, yaw) * 20 + wingP * 8);
+  add("campaniform", absYaw * 7 + wingP * 5);
+  // Neck hair plates sit in the prothorax.
+  add("hpT1", neck * 22);
+  add("hpT1L", neck * 10 + Math.max(0, -headYaw) * 16);
+  add("hpT1R", neck * 10 + Math.max(0, headYaw) * 16);
+  add("hairplate", neck * 8);
+  // Abdomen posture → hind proprio / chordotonal.
+  add("propT3", abd * 20);
+  add("choT3", abd * 12);
+  add("proprio", abd * 5 + neck * 4 + absYaw * 3);
+  // Antenna joint load (JO already carries wind; this is pose feedback).
+  add("choT1L", antL * 10);
+  add("choT1R", antR * 10);
+  return out;
 }
 
 /**

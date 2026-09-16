@@ -53,9 +53,13 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate; **tonic saturated T2/T3 is high-passed** so crawl is not a constant push |
 | Abdomen segments (`abdomenFromEma`) | 207-cell pool + one mesh joint was a butt twitch | Dead-zone + gate + **phasic high-pass**; soma-Y split of **those** abdomen MN IDs → NMF abdomen12–6 posture chain |
 | Time-varying synapse weights | Unit/always-on hits + mild per-cell STD looped the same MN pools | Connectome `chemWeight` × TM `u·x` per chemical edge; HUD `syn u/x/eff` |
-| Antenna JO reflex | NMF antennae were static (tips for odor only) | Calm pedicel deflection from real `JO` L/R Hz after head FK. No antennal MN IDs invented. |
+| Antenna JO reflex | NMF antennae were static (tips for odor only) | Calm **pedicel + funiculus + arista** from real `JO` L/R Hz after head FK. No antennal MN IDs invented. Pose feeds back into JO. |
 | Head/abdomen FK | Flat NMF segments did not follow neck/abdomen joints | Pose `c_head` children (eyes, antennae, mouth) and abdomen3–6 from the driven joints |
-| Halteres | Mesh existed, never posed | Rest when wings folded; beat only above `WING_FLAP_GATE` (same DLM/DVM/ADMN) |
+| Halteres | Mesh existed, never posed | Rest when still; beat above `WING_FLAP_GATE` (same DLM/DVM/ADMN); **yaw-rate gyro** when folded. Sense: `csaT3` campaniform. |
+| Residual smell/taste/touch | Aggregate stim keys double-covered typed ORN/GRN/proprio | Bind leftover IDs only; untyped cells get world Hz. Worker max-merge. |
+| `closeLoopProprio` | Leg-only proprio left neck/abdomen/halteres mute | Neck → `hpT1`; abdomen → `propT3`/`choT3`; yaw/wing → `csaT3`. Existing IDs. |
+| Abdomen L/R yaw | 207-cell pool was curl-only | Soma-X split of **those** abdomen MN IDs → NMF lateral bend |
+| Wing L/R | One ADMN/DLM/DVM blob posed both wings | Soma-X split of **those** wing MN IDs → per-wing stroke |
 | Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
 | Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` |
 | Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate; **tonic saturated T2/T3 is high-passed** so crawl is not a constant push |
@@ -105,7 +109,7 @@ Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=dynw1`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=linked1`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -142,7 +146,7 @@ eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=dynw1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=linked1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -231,7 +235,7 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (dynw1 / utopia garden)
+### Embodiment status (linked1 / dynw1 / utopia garden)
 
 Closed or kept honest on the homepage fly body:
 
@@ -241,9 +245,9 @@ Closed or kept honest on the homepage fly body:
 | Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
 | Synapses | Connectome edge weights (`chemWeight`) × NT-aware TM STD/STF on chemical edges. Efficacy `u·x` varies over time. Not unit hits. Tiny hΔ Δw on 45 traced cells |
 | Six-leg gait | Idle: all planted at rest. Walk: T2/T3+DNa **phasic** gate (tonic saturation is not a constant slip push); per-leg flex/ext → stance vs swing |
-| Soft parts | Head+eyes+antennae+mouth FK from neck; abdomen12–6 from abdomen MNs; wings folded below gate; halteres rest/beat with wings; JO antenna reflex |
+| Soft parts | Head+eyes+antennae+mouth FK from neck; abdomen12–6 **and** soma-X yaw from abdomen MNs; wings L/R from DLM/DVM/ADMN split; halteres rest / beat with wings / **gyro from yaw-rate**; JO antenna **pedicel+funiculus+arista** |
 | Vision → legs | Compound eye → `visionL/R` + optic Hz (R16/R7/R8, L1/L2, T4/T5, HS/VS from flow/loom) → LIF → annotated MNs → pose → stance-slip. No RGB dump, no salFood→HS, no bearing thruster |
-| Other senses | ORN plumes; JO + self-motion/yaw airflow; hygro L/R; taste; ppk/IR52b; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R splits of existing IDs; calm clock |
+| Other senses | ORN plumes; **residual smell** (untyped ORNs) gets a multi-plume blend; JO + self-motion + **antenna pose feedback**; hygro L/R; taste residual; ppk/IR52b; **courtship** from other-fly proximity; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R; **proprio loop** (neck→hpT1, yaw→csaT3, abdomen→propT3); calm clock |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
 | Abdomen | Dead-zoned + **phasic** 207-cell pool; soma-Y segments; quiet unless meaningfully driven |
@@ -257,8 +261,12 @@ Still open (not invented around):
 - Connectome may not produce a strong tripod from vision write-in; swing/stance follows real MN flex/ext, not a clock.
 - Pages kinematic path is not full MuJoCo contact; attach `?plant=` for the 42-DoF plant.
 - No annotated antennal motor pool — antenna motion is JO reflex + head FK only.
+- No annotated haltere MN pool — mesh is wing-MN beat + yaw gyro; sense is `csaT3` campaniform.
 - Courtship song posture is not a closed 3D kinematic.
+- `DNp` (320) and `fru` (2611) shape the connectome / mild court label; they are not fake leg muscles.
 - Headless lesion/hΔ packs are not the browser eye + NMF loop.
+
+Honest coverage table: [`LINKAGE.md`](LINKAGE.md).
 
 ## Regenerating maps
 

@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import {
   MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
-  WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ANTENNA_SPAN,
+  WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ABD_YAW_SPAN,
+  ANTENNA_SPAN, ANTENNA_PARTS,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=dynw1";
+} from "./poseMap.js?v=linked1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const GROUND_Y = 0.05;
@@ -440,23 +441,32 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
     const rest = w.userData.restQuat;
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
+    const dlmI = i === 0 ? (wing.dlmL != null ? wing.dlmL : dlm) : (wing.dlmR != null ? wing.dlmR : dlm);
+    const dvmI = i === 0 ? (wing.dvmL != null ? wing.dvmL : dvm) : (wing.dvmR != null ? wing.dvmR : dvm);
+    const admnI = i === 0 ? (wing.admnL != null ? wing.admnL : admn) : (wing.admnR != null ? wing.admnR : admn);
     w.quaternion.copy(rest);
     // Below gate: exact rest (folded). No residual rotateZ that read as tapping.
     if (power > 0 && wingSoft.amp > 0.01) {
       _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.20 + over * 0.25));
       w.quaternion.multiply(_flapQ);
-      w.rotateZ(s * (over * 0.12 + admn * 0.04));
-      w.rotateX((dlm - dvm) * 0.06 * s * over);
+      w.rotateZ(s * (over * 0.12 + admnI * 0.04));
+      w.rotateX((dlmI - dvmI) * 0.06 * s * over);
     }
   }
-  // Halteres: rest when wings folded; beat with wing MNs only (same gate).
+  // Halteres: rest when still. Beat with wing MNs; otherwise gyro from yaw (no CPG).
   const halt = d.halteres || [];
+  const haltCmd = cmd.haltere || {};
   for (let i = 0; i < halt.length; i++) {
     const h = halt[i];
     resetAnatomical(h);
+    const s = i === 0 ? -1 : 1;
+    const gyro = i === 0 ? (haltCmd.L || 0) : (haltCmd.R || 0);
     if (power > 0 && wingSoft.amp > 0.01) {
-      const s = i === 0 ? -1 : 1;
       h.rotateX(flap * 0.55 * s);
+      if (gyro > 0.04) h.rotateZ(gyro * 0.10 * s);
+    } else if (gyro > 0.04) {
+      h.rotateX(gyro * 0.22 * s);
+      h.rotateZ(gyro * 0.10 * s);
     }
   }
 
@@ -465,11 +475,15 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
   for (const body of abdChain) resetAnatomical(body);
   const segs = cmd.abdSegs || [];
   const curlCmd = cmd.abdomen || 0;
-  if (curlCmd > 0.01 || segs.some((v) => v > 0.01)) {
+  const abdYaw = cmd.abdYaw || 0;
+  if (curlCmd > 0.01 || Math.abs(abdYaw) > 0.01 || segs.some((v) => v > 0.01)) {
     for (let i = 0; i < abdChain.length; i++) {
       const w = segs[i] != null ? segs[i] : curlCmd * (ABD_SEG_WEIGHTS[i] ?? 1);
       const ang = -0.012 + w * 0.38;
       applyPivotDelta(abdChain, abdChain[i], _axis.set(1, 0, 0), ang);
+      if (Math.abs(abdYaw) > 0.008) {
+        applyPivotDelta(abdChain, abdChain[i], _axis.set(0, 1, 0), abdYaw * ABD_YAW_SPAN * (0.40 + 0.14 * i));
+      }
     }
   }
 
@@ -493,19 +507,32 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
     applyPivotDelta(headChain, d.head, _axis.set(0, 0, 1), pose.roll);
   }
 
-  // Antennae: calm JO reflex on pedicel after head FK (no thrash).
+  // Antennae: JO organ is the pedicel–funiculus joint. Denser chain from the
+  // same JO Hz (no antennal MN IDs invented).
   const antSoft = d.antSoft || (d.antSoft = { L: 0, R: 0 });
   antSoft.L = follow(antSoft.L, cmd.antennaL || 0, tau, NECK_TAU);
   antSoft.R = follow(antSoft.R, cmd.antennaR || 0, tau, NECK_TAU);
   const chains = d.antennaChains || {};
   for (const side of ["L", "R"]) {
     const chain = chains[side] || [];
-    const ped = chain[0];
-    if (!ped) continue;
-    const a = (side === "L" ? antSoft.L : antSoft.R) * ANTENNA_SPAN;
+    const mag = side === "L" ? antSoft.L : antSoft.R;
+    if (mag < 0.02 || !chain.length) continue;
     const sgn = side === "L" ? -1 : 1;
-    applyPivotDelta(chain, ped, _axis.set(0, 1, 0), a * 0.55 * sgn);
-    applyPivotDelta(chain, ped, _axis.set(1, 0, 0), a * 0.35);
+    const span = mag * ANTENNA_SPAN;
+    const ped = chain[0];
+    const fun = chain[1];
+    const ari = chain[2];
+    if (ped) {
+      applyPivotDelta(chain, ped, _axis.set(0, 1, 0), span * ANTENNA_PARTS.pedicel * 0.70 * sgn);
+      applyPivotDelta(chain, ped, _axis.set(1, 0, 0), span * ANTENNA_PARTS.pedicel * 0.45);
+    }
+    if (fun) {
+      applyPivotDelta(chain, fun, _axis.set(0, 1, 0), span * ANTENNA_PARTS.funiculus * 0.85 * sgn);
+      applyPivotDelta(chain, fun, _axis.set(1, 0, 0), span * ANTENNA_PARTS.funiculus * 0.50);
+    }
+    if (ari) {
+      applyPivotDelta(chain, ari, _axis.set(1, 0, 0), span * ANTENNA_PARTS.arista);
+    }
   }
 
   const mouth = d.mouthSoft || (d.mouthSoft = { feed: 0 });
@@ -518,8 +545,9 @@ function poseSoftParts(d, dt, t, cmd, flyA, feed) {
   if (d.haustellum && mouth.feed > 0.01) {
     d.haustellum.rotateX(mouth.feed * 0.12);
   }
-  // Eye glow tracks MN/behavior cmds only (no fake activity).
-  const glow = 0.08 + power * 0.25 + (cmd.walk || 0) * 0.2 + mouth.feed * 0.08 + (cmd.court || 0) * 0.18;
+  // Eye glow tracks photoreceptor write-in (cmd.eyeGlow) plus MN/behavior.
+  const glow = 0.08 + (cmd.eyeGlow || 0) * 0.50 + power * 0.12
+    + (cmd.walk || 0) * 0.12 + mouth.feed * 0.08 + (cmd.court || 0) * 0.12;
   for (const e of d.eyes) if (e.material) e.material.emissiveIntensity = glow;
 }
 
