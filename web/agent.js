@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=thrive1";
-import { CompoundEye } from "./eye.js?v=thrive1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=thrive1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=thrive1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=thrive1";
-import { spinRotors } from "./chassis.js?v=thrive1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=utopia1";
+import { CompoundEye } from "./eye.js?v=utopia1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=utopia1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=utopia1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=utopia1";
+import { spinRotors } from "./chassis.js?v=utopia1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_NAMES = [
@@ -158,9 +158,9 @@ function gradedContact(dist, reach, peak = 100) {
   return peak * u * u;
 }
 
-const ARENA_R = 18; // small pad radius (matches world/procgen.js)
-const OPEN_WORLD = true; // soft XY clamp only — no hard cage walls
-const WORLD_SOFT_LIMIT = 15.8; // soft pad rim (~ARENA_R - 2.2)
+const ARENA_R = 12.5; // garden clearing (matches world/procgen.js)
+const OPEN_WORLD = true; // soft XY clamp only — garden hedge bounce, never punish
+const WORLD_SOFT_LIMIT = 10.8; // ~ARENA_R - 1.7
 /** Flight translation OFF by default — walking-focused. Re-enable with ?flight=1 */
 function flightEnabledFromUrl() {
   try {
@@ -803,7 +803,7 @@ export class EmbodiedFly {
       this.planted = !flying && this.y <= stand + 0.08;
       this.plantNLeg = slip && slip.n ? slip.n : 0;
       this.plantLabel = physics.ok ? "fly" : "kinematic NMF";
-      // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
+      // Garden hedge: bounce/redirect past WORLD_SOFT_LIMIT, never punish.
       if (OPEN_WORLD) {
         const rad = Math.hypot(this.body.position.x, this.body.position.z);
         if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
@@ -1052,7 +1052,7 @@ export class EmbodiedFly {
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
     this.prevDistO = distQ;
-    const day = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 0.012));
+    const day = 0.82 + 0.10 * (0.5 + 0.5 * Math.sin(t * 0.008));
     this.day = day;
     const head = this.body.userData.head;
     if (head) head.getWorldPosition(_head);
@@ -1074,6 +1074,7 @@ export class EmbodiedFly {
       food: beacon,
       water: this.world.water,
       bitter: this.world.bitter,
+      assayBeacon: this.world.assayBeacon,
       perch: this.world.perch,
       bomb: bombPos,
       // Procgen landmarks — required for vision→walk toward chunk targets.
@@ -1133,9 +1134,10 @@ export class EmbodiedFly {
     const nearFloor = this.y < stand + 0.36;
     // Graded GRN / ppk contact — not binary on/off.
     const sweetHz = nearFloor ? gradedContact(distF, 1.35, 70) : gradedContact(distF, 0.7, 16);
-    const distB = this.world.bitter
+    const bitterOnMap = this.world.bitter && Math.hypot(this.world.bitter.x, this.world.bitter.z) < 40;
+    const distB = bitterOnMap
       ? Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) : 99;
-    const bitterHz = nearFloor ? gradedContact(distB, 1.35, 65) : 0;
+    const bitterHz = bitterOnMap && nearFloor ? gradedContact(distB, 1.35, 65) : 0;
     const taste = Math.max(sweetHz, bitterHz * 0.85);
     const hygroL = 4 + moistL * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
     const hygroR = 4 + moistR * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
@@ -1152,7 +1154,7 @@ export class EmbodiedFly {
     const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    // Open world: no cage wall mechanosensation.
+    // Garden home: no cage-wall mechanosensation (hedge is visual + bounce only).
     const wall = 0;
     const touch = wall + (grounded ? 8 + this.speedS * 24 : 3) + ppkBase * 0.12;
 

@@ -7,7 +7,7 @@
 ## Pipeline
 
 ```
-Dish (light, odor, contact, proprio)
+Garden utopia (light, odor, contact, proprio)
   → sensory pools (stim/effectors IDs)
     → LIF worker (sim.worker.js): Poisson drive + connectome synapses
       → MN / effector pool rates (Hz → soft 0–1)
@@ -25,7 +25,7 @@ Embodiment is the **male NeuroMechFly mesh** with MN→hinge pose and **planted 
 **Control law (connectome-only; no beacon-chase gain tweaks):**
 
 ```
-eye L/R salience (food beacon + landmarks)
+eye L/R salience (ripe fruit + garden landmarks)
   → visionL/R + optic pools (Hz write-in, klinotaxis contrast)
     → LIF connectome
       → descending + leg MN EMAs
@@ -33,13 +33,13 @@ eye L/R salience (food beacon + landmarks)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=thrive1`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=utopia1`.
 
-Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Soft rim bounce preserved in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**.
+Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
 ## Robot controller — optional drone / cube
 
-`?body=drone` is a visual quadrotor on the small pad (`web/chassis.js` `createDroneChassis`). The male connectome, compound eye, and optional odor still run. Cube (`?body=cube`) is the kinematic box.
+`?body=drone` is a visual quadrotor in the same garden (`web/chassis.js` `createDroneChassis`). The male connectome, compound eye, and optional odor still run. Cube (`?body=cube`) is the kinematic box.
 
 **Control law (connectome-only; stim-map → drone axes — no beacon-chase gain tweaks):**
 
@@ -70,7 +70,7 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=thrive1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=utopia1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -117,12 +117,12 @@ they are **not** sent as free-joint thrusters.
 
 ### Vision → walking (sensory write-in)
 
-Compound eye (`eye.js`, including procgen food **beacon** + `landmarks`) →
+Compound eye (`eye.js`, including ripe fruit + garden `landmarks`) →
 stronger Hz on `visionL/R` and optic channels (`R16*`, `L1–L3`, `T4*/T5*`,
 `HS`/`VS`) with L/R klinotaxis contrast → LIF (`sim.worker.js`) →
 descending/leg MN pools → MN hinge pose → stance-slip (fly) or portable
 `forward`/`yawRate` (cube/drone). No bypass that sets turn/walk from food bearing.
-Default spawn faces the food beacon so L/R vision has a target.
+Default spawn faces the ripe fruit so L/R vision has a target. Assay beacon only if `?assay=1`.
 
 ## Mapped vs unmapped (annotation limits)
 
@@ -157,17 +157,19 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (thrive1)
+### Embodiment status (utopia1)
 
 Closed or kept honest on the homepage fly body:
 
 | Aspect | Status |
 |---|---|
 | Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
+| Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
 | Planted walk | Kinematic: no T1-extensor hop; y held at `standZ`; stance band slightly generous. MuJoCo: existing vault/weak-plant settle in `physics.py` |
-| Vision → legs | Eye → `visionL/R` + optic Hz → LIF → annotated MNs → pose → stance-slip. Spawn faces food beacon. No bearing thruster |
+| Vision → legs | Eye → `visionL/R` + optic Hz → LIF → annotated MNs → pose → stance-slip. Spawn faces ripe fruit. No bearing thruster |
 | Proprio / touch | `readProprio` / `readProprioMj` + graded `tact*` / `ppk*` / GRNs remain bound |
-| Soft arena | Pad radius 18, rim bounce, `WORLD_SOFT_LIMIT` |
+| Soft home | Clearing radius 12.5, hedge bounce/redirect (never punish), `WORLD_SOFT_LIMIT` ~10.8 |
+| Aversives | Bitter / assay pole / scent bomb **off** unless `?bitter=1` / `?assay=1` / HUD toggle |
 | Flight | Off unless `?flight=1` |
 | Plant / mesh sync | `applyMujoco` copies thorax XYZ + bones when a plant is live; Pages skips auto-tunnel |
 | Empty MN pools | Stay 0 (male T2/T3 coxaProm, taDep/taLev) |
