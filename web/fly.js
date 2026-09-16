@@ -2,14 +2,14 @@ import * as THREE from "three";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const MUSCLE_SPAN = {
-  // Walkable spans: clear stance-slip XY on kinematic path (no thruster/CPG).
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.92],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.62],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.55],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 1.05],
-  "trochanterfemur-roll": ["feRed", null, 0.42],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.95],
-  "tarsus1-pitch": ["taLev", "taDep", 0.55],
+  // Calm planted spans: enough foot travel for stance-slip, not T1-extensor hop.
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.72],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.48],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.40],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.78],
+  "trochanterfemur-roll": ["feRed", null, 0.32],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.72],
+  "tarsus1-pitch": ["taLev", "taDep", 0.40],
 };
 const GROUND_Y = 0.05;
 const MUSCLE_TAU = 0.05;
@@ -299,7 +299,10 @@ function poseLegFromMuscle(leg, muscle, dt) {
     let pos = m[spec[0]] || 0;
     const neg = spec[1] ? (m[spec[1]] || 0) : 0;
     if (key === "trochanterfemur-pitch") pos = pos + 0.6 * (m.feRed || 0);
-    const tgt = h.userData.rest + spec[2] * antagonist(pos, neg);
+    const span = spec[2];
+    const raw = span * antagonist(pos, neg);
+    const lim = span * 0.92;
+    const tgt = h.userData.rest + Math.max(-lim, Math.min(lim, raw));
     const cur = h.userData.angle ?? h.userData.rest;
     setHinge(h, follow(cur, tgt, dt));
   }
@@ -334,17 +337,9 @@ export function stepLife(fly, dt, t, cmd) {
   const hy = fly.rotation.y;
   const cy = Math.cos(hy), sy = Math.sin(hy);
   const idt = 1 / Math.max(dt, 1e-4);
-  // Stance vs world floor, not absolute mesh Y — body at standZ ≈ 1.3 puts tips near 0.
-  // Generous plant band so calm MN pose stays grounded (no air-cycle / vault).
-  const floorY = GROUND_Y + 0.28;
-  // Prefer lowest feet as planted when several hover slightly above floor.
-  let minFy = Infinity;
-  for (let i = 0; i < d.legs.length; i++) {
-    if (d.legs[i].tarsusTip) d.legs[i].tarsusTip.getWorldPosition(_foot);
-    else _foot.set(prev[i].x, prev[i].y, prev[i].z);
-    if (_foot.y < minFy) minFy = _foot.y;
-  }
-  const stanceCut = Math.min(floorY, minFy + 0.16);
+  // Stance vs world floor only — do not mark a swinging cluster as planted
+  // (that turned idle MN twitch into XY/yaw seizure).
+  const floorY = GROUND_Y + 0.18;
   d.legs.forEach((leg, i) => {
     if (leg.tarsusTip) leg.tarsusTip.getWorldPosition(_foot);
     else _foot.set(prev[i].x, prev[i].y, prev[i].z);
@@ -354,7 +349,7 @@ export function stepLife(fly, dt, t, cmd) {
     leg.foot.x = _foot.x;
     leg.foot.y = _foot.y;
     leg.foot.z = _foot.z;
-    leg.foot.stance = flyA < 0.40 && _foot.y <= stanceCut;
+    leg.foot.stance = flyA < 0.40 && _foot.y <= floorY;
     leg.foot.vx = dx * idt;
     leg.foot.vy = dy * idt;
     leg.foot.vz = dz * idt;

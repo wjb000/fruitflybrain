@@ -32,7 +32,7 @@ WORLD_SOFT_LIMIT = 10.8  # ~ARENA_R - 1.7
 FLY_CEILING = 5.8
 SPAWN_Z = 0.55  # free-joint seed; stand_z remeasured after warmup (~1.15)
 VISUAL_THORAX_Y = 1.18  # nmf visual thorax height; client standZ syncs to plant pose.y
-PERCH = dict(three_x=-2.4, three_z=-3.4, r_pole=0.08, r_cap=0.42, h=1.12)
+PERCH = dict(three_x=-1.6, three_z=-2.2, r_pole=0.08, r_cap=0.55, h=1.35)
 
 OUR_LEGS = ["L1", "L2", "L3", "R1", "R2", "R3"]  # maps 1:1 onto NMF lf,lm,lh,rf,rm,rh
 NMF_TO_OUR = dict(zip(NMF_LEGS, OUR_LEGS))
