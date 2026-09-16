@@ -1,18 +1,11 @@
 import * as THREE from "three";
+import {
+  MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU,
+  antagonist, follow, isForeleg, slipWeight,
+} from "./poseMap.js?v=cns3";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
-const MUSCLE_SPAN = {
-  // Calm planted spans: enough foot travel for stance-slip, not T1-extensor hop.
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.72],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.48],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.40],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.78],
-  "trochanterfemur-roll": ["feRed", null, 0.32],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.72],
-  "tarsus1-pitch": ["taLev", "taDep", 0.40],
-};
 const GROUND_Y = 0.05;
-const MUSCLE_TAU = 0.05;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();
@@ -277,34 +270,24 @@ function applyMuscleFk(leg, nodes) {
   }
 }
 
-function antagonist(pos, neg) {
-  const p = pos || 0, n = neg || 0;
-  const mag = p + n;
-  // Quiet pools stay limp. Stronger flex/ext contrast so feet push, not twitch.
-  if (mag < 0.01) return 0;
-  const raw = (p - n) / (mag + 0.04);
-  return Math.tanh(raw * 1.85);
-}
-
-function follow(cur, target, dt) {
-  const a = 1 - Math.exp(-dt / MUSCLE_TAU);
-  return cur + (target - cur) * a;
-}
-
 function poseLegFromMuscle(leg, muscle, dt) {
   const m = muscle || {};
+  // Forelegs already scaled in poseMap; still cap T1 hinge travel so "arms"
+  // cannot throw up even if a small MN pool saturates.
+  const t1k = isForeleg(leg.name) ? 0.72 : 1;
   for (const [key, spec] of Object.entries(MUSCLE_SPAN)) {
     const h = leg.hinges[key];
     if (!h) continue;
     let pos = m[spec[0]] || 0;
     const neg = spec[1] ? (m[spec[1]] || 0) : 0;
-    if (key === "trochanterfemur-pitch") pos = pos + 0.6 * (m.feRed || 0);
-    const span = spec[2];
+    const feAssist = isForeleg(leg.name) ? 0.22 : 0.45;
+    if (key === "trochanterfemur-pitch") pos = pos + feAssist * (m.feRed || 0);
+    const span = spec[2] * t1k;
     const raw = span * antagonist(pos, neg);
-    const lim = span * 0.92;
+    const lim = span * 0.88;
     const tgt = h.userData.rest + Math.max(-lim, Math.min(lim, raw));
     const cur = h.userData.angle ?? h.userData.rest;
-    setHinge(h, follow(cur, tgt, dt));
+    setHinge(h, follow(cur, tgt, dt, MUSCLE_TAU));
   }
 }
 
@@ -355,10 +338,12 @@ export function stepLife(fly, dt, t, cmd) {
     leg.foot.vz = dz * idt;
     if (leg.foot.stance) {
       // Planted foot: body slips opposite the world foot displacement.
-      slipX -= dx;
-      slipZ -= dz;
-      n += 1;
-      const back = -(dx * sy + dz * cy);
+      // T2/T3 carry walk; T1 (foreleg) is reach/groom so it must not thrash XY.
+      const w = slipWeight(leg.name);
+      slipX -= dx * w;
+      slipZ -= dz * w;
+      n += w;
+      const back = -(dx * sy + dz * cy) * w;
       if (leg.side < 0) yawL += back * 0.85;
       else yawR += back * 0.85;
     }
@@ -367,10 +352,10 @@ export function stepLife(fly, dt, t, cmd) {
   d.slip = { x: slipX, z: slipZ, n, yawL, yawR, meanAbs };
   // EMA for HUD / diagnostics (kinematic Pages path).
   d.slipMeanAbs = (d.slipMeanAbs || 0) * 0.85 + meanAbs * 0.15;
-  poseSoftParts(d, t, cmd, flyA, feed);
+  poseSoftParts(d, dt, t, cmd, flyA, feed);
 }
 
-function poseSoftParts(d, t, cmd, flyA, feed) {
+function poseSoftParts(d, dt, t, cmd, flyA, feed) {
   // Wings move ONLY from wing-MN drive (cmd.fly ← DLM/DVM/ADMN). Quiet MNs → rest pose.
   // No always-on idle flap / cosmetic CPG. Mesh pose only — body translation/lift
   // is gated separately in agent.js / physics.py (flight default OFF).
@@ -380,7 +365,7 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   const admn = wing.admn != null ? wing.admn : flyA * 0.7;
   const power = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
   // Gate noise flaps — only clear wing-MN drive moves wings.
-  const flapHz = power > 0.08 ? 10 + power * 140 : 0;
+  const flapHz = power > 0.12 ? 10 + power * 140 : 0;
   const flapAmp = power * 0.85; // zero when MNs quiet
   const flap = flapHz > 0 ? Math.sin(t * flapHz) * flapAmp : 0;
   for (let i = 0; i < d.wings.length; i++) {
@@ -389,7 +374,7 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
     if (!rest) continue;
     const s = i === 0 ? -1 : 1;
     w.quaternion.copy(rest);
-    if (power > 0.08) {
+    if (power > 0.12) {
       _flapQ.setFromAxisAngle(_axis.set(1, 0, 0), flap * (0.28 + power * 0.45));
       w.quaternion.multiply(_flapQ);
       w.rotateZ(s * (0.015 + power * 0.22 + admn * 0.1));
@@ -408,14 +393,23 @@ function poseSoftParts(d, t, cmd, flyA, feed) {
   if (d.head) {
     const rest = d.head.userData.restQuat;
     if (rest) {
-      // Magnitude from neck MN pool; yaw from annotated neckL/neckR asymmetry.
-      const hy = THREE.MathUtils.clamp(
-        (cmd.headYaw != null ? cmd.headYaw : 0) * 0.85 + (cmd.head || 0) * 0.12,
-        -0.85, 0.85
+      // Pitch from neck pool magnitude; yaw/roll from neckL vs neckR.
+      // Smoothed — raw EMA on 25 CvN cells was a head-thrash.
+      const pose = d.headPose || (d.headPose = { yaw: 0, pitch: 0, roll: 0 });
+      const yawT = THREE.MathUtils.clamp((cmd.headYaw || 0) * NECK_SPAN.yaw, -NECK_SPAN.yaw, NECK_SPAN.yaw);
+      const pitchT = THREE.MathUtils.clamp(
+        (cmd.head || 0) * NECK_SPAN.pitch + (feed > 0.18 ? feed * 0.10 : 0),
+        -NECK_SPAN.pitch, NECK_SPAN.pitch + 0.06
       );
+      const rollT = THREE.MathUtils.clamp((cmd.headRoll || 0) * NECK_SPAN.roll, -NECK_SPAN.roll, NECK_SPAN.roll);
+      const tau = dt != null ? dt : 0.032;
+      pose.yaw = follow(pose.yaw, yawT, tau, NECK_TAU);
+      pose.pitch = follow(pose.pitch, pitchT, tau, NECK_TAU);
+      pose.roll = follow(pose.roll, rollT, tau, NECK_TAU);
       d.head.quaternion.copy(rest);
-      d.head.rotateY(hy);
-      d.head.rotateX(feed * 0.55 - power * 0.2);
+      d.head.rotateY(pose.yaw);
+      d.head.rotateX(pose.pitch);
+      d.head.rotateZ(pose.roll);
     }
   }
   if (d.proboscis) {
@@ -458,7 +452,7 @@ export function applyPhysicsPose(fly, pose, dt, t, cmd) {
     leg.foot.vy = 0;
   }
   d.slip = { x: 0, z: 0, n: 0, yawL: 0, yawR: 0 };
-  poseSoftParts(d, t, cmd, flyA, feed);
+  poseSoftParts(d, dt, t, cmd, flyA, feed);
 }
 
 export function wanderFemale(female, dt, t) {
