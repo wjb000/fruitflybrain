@@ -13,14 +13,14 @@ He needs the **full Male CNS connectome**, plus **coded logic only where the map
   ────────────────────                         ──────────────────────
   web/data/{neurons,connectome}.bin            world → Hz into *existing* pools
   ~166k Traced cells, real synapses            (eye, ORN, proprio, clock)
-  sim.worker.js LIF + NT-aware weights + TM STD           kinematic plant / adhesion / settle
+  sim.worker.js LIF + NT-aware weights + TM STD           in-browser MuJoCo / contact plant
                                                utopia garden affordances
                                                optional hΔ Δw on real hDelta types
          │                                              │
          └──────── annotated MN / effector Hz ──────────┘
                            │
                            ▼
-              NeuroMechFly pose → stance-slip / MuJoCo contact
+              NeuroMechFly pose → in-browser MuJoCo / contact plant
 ```
 
 ### What is the connectome (do not replace)
@@ -43,7 +43,7 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 |---|---|---|
 | `eye.js` + `encodeOpticRates` / `visFromEye` | Cameras / garden have no native ommatidial spike trains | Compound-eye R1–R6 / R7 / R8 → L1 ON / L2 OFF → T4/T5 (HR + parallax/loom) → HS/VS Hz on **real** IDs. **Not** RGB frames, **not** food-salience blobs into motion cells, **not** a bearing PID. See [`SENSORY.md`](SENSORY.md). |
 | `plume.js` + ORN write-in | World odor is not an EM filament | Hz into real `foodORN` / `pherORN` / `co2ORN` / `aversiveORN` / `JO` |
-| `readProprio` / `readProprioMj` | Browser kinematic path has no campaniform organs | Joint/contact → existing `cho*` `hp*` `csa*` `tact*` `prop*` (L/R = soma-X split of those IDs) |
+| `readProprio` / `readProprioMj` | Browser needs campaniform-like load | Joint/contact from in-browser plant (or kinematic FK) → existing `cho*` `hp*` `csa*` `tact*` `prop*` (L/R = soma-X split of those IDs) |
 | Clock / neuromod calm Hz | No circadian photodiode on l-LNv except CRY path | Low Hz on real `sLNv` `lLNv` `LNd` `DN1*` `DAN` `OA` `HT` `pep` |
 | `poseMap.js` `antagPair` / `softDrive` | Co-contraction of real flex/ext would cancel DoF; small pools saturate | Contrast from **those** pool EMAs; unipolar empty partner stays a modest rest offset — no invented antagonists, no CPG |
 | T1 (foreleg) pose scale | T1 has coxaProm + Ta* (T2/T3 do not); sparse 2–8 cell pools were saturating | Scale T1 hinges down so reach/groom stays, arm-flail dies. Same real MN IDs |
@@ -68,7 +68,8 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Abdomen L/R yaw | 207-cell pool was curl-only | Soma-X split of **those** abdomen MN IDs → NMF lateral bend |
 | Wing L/R | One ADMN/DLM/DVM blob posed both wings | Soma-X split of **those** wing MN IDs → per-wing stroke |
 | Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
-| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` + `standSettle` |
+| Planted stance-slip (`fly.js`) | Kinematic fallback if the in-browser plant failed | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` + `standSettle` |
+| In-browser plant (`browserPlant.js` / `nmfMjcf.js`) | GitHub Pages cannot run Python flygym | MuJoCo WASM (jsDelivr) or JS contact/gravity/adhesion. Capsule/sphere NMF tree; not byte-identical flygym XML. `DEFAULT_PLANT` empty |
 | Anatomical NMF hinges | World-XYZ puppet axes flexed mid/hind legs wrong | Bone-frame pitch/yaw/roll from `nmf.json` rest; L/R mirrored; `NMF_JOINT_LIMIT` |
 | Stance plant IK | Rest tarsi floated/clipped vs moss | Tibia/tarsus contact on `GROUND_Y` when MN stance; no CPG |
 | Organ-split proprio | One flex blend into cho/hp/csa | hp ← coxa; cho ← FeTi; csa ← stance/load. Existing IDs |
@@ -98,15 +99,16 @@ Garden utopia (light, odor, contact, proprio)
     → LIF worker (sim.worker.js): Poisson drive + connectome synapses
       → MN / effector pool rates (Hz → soft 0–1)
         → agent.js cmd.walk/turn (+ muscle/wing/…) from bilateral leg + descending EMAs
-          → DEFAULT: NeuroMechFly mesh (fly.js) → planted stance-slip
-               or MuJoCo plant (physics.py) when a live plant is opted in
+          → DEFAULT: in-browser MuJoCo WASM / contact plant (Pages; no Mac)
+               kinematic FK only if that plant failed
+               optional Python flygym (`?plant=` lab override)
           → ?body=cube: portable.js → cube chassis (kinematic box)
           → ?body=drone: portable.js steering.forward/yawRate → droneSetpoints (quadrotor)
 ```
 
 ## Fly body — NeuroMechFly (Pages default)
 
-Embodiment is the **male NeuroMechFly mesh as his OG body**: MN → antagonist muscles → anatomical NMF hinges (not world-XYZ puppet axes), NMF-like joint limits, stance tarsi on the moss, proprio from those joints. Flight translation is off unless `?flight=1`. Pages does **not** auto-dial a remote MuJoCo tunnel (that vaulted/seized the thorax); kinematic NMF is the thrive path. Opt in with `?plant=https://…` — then visual root tracks plant thorax XYZ (`applyMujoco`). See [`OG_BODY.md`](OG_BODY.md).
+Embodiment is the **male NeuroMechFly mesh as his OG body**: MN → antagonist muscles → anatomical NMF hinges (not world-XYZ puppet axes), NMF-like joint limits, in-browser plant (gravity, adhesive tarsi, 42 leg DoFs). Flight translation is off unless `?flight=1`. Pages is the full animal **in this tab** — MuJoCo WASM from jsDelivr, or the JS contact plant. No Mac and no paid host. `DEFAULT_PLANT` is empty; `?plant=https://…` is a lab override. Visual root tracks plant thorax XYZ (`applyMujoco`). See [`OG_BODY.md`](OG_BODY.md).
 
 **Control law (connectome-only; no beacon-chase gain tweaks):**
 
@@ -116,12 +118,12 @@ Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
     → LIF connectome
       → descending + leg MN EMAs
         → cmd.muscle[L1…R3] (empty pools stay 0)
-          → pose legs → stance-slip XY / yaw
+          → pose legs → in-browser plant (contact / WASM) / kinematic fallback
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=ogbody1`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=browseranimal1`.
 
-Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
+Plant URL: `web/plantConfig.js` (Pages → in-browser plant; remote only with `?plant=`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a **remote** plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
 ## Robot controller — optional drone / cube
 
@@ -156,7 +158,7 @@ eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=ogbody1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=browseranimal1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -197,8 +199,8 @@ Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold 
 | Courtship (`aIPg`/`pIP1`/`DNg02`/`fru`) | Can add abdomen curl when sustained |
 | `DNp01` | Mode label only (arousal path; not a default stim) |
 
-Ground translation: **stance slip from MN-posed feet** (kinematic) or
-**MuJoCo contact** (plant). Flight translation: **off by default**; with
+Ground translation: **in-browser plant contact** (WASM or JS adhesion) or
+**stance slip from MN-posed feet** (kinematic fallback). Flight translation: **off by default**; with
 `?flight=1` / `allow_flight`, wing-MN–gated free-joint lift/thrust only.
 `cmd.walk` / `cmd.turn` are UI labels derived from bilateral leg MN pools —
 they are **not** sent as free-joint thrusters.
@@ -237,11 +239,8 @@ Do **not** invent MNs for these:
 
 ### Structural limits (not annotation holes)
 
-- NeuroMechFly plant position-actuates **42 leg DoFs** only; head / abdomen /
-  proboscis / wing mesh motion is MN-driven in the browser (`poseSoftParts`)
-  while the plant may apply wing-MN–gated free-joint flight forces only when `allow_flight` is set.
-- No muscle-level neck joint in the plant — head yaw/pitch is visual from
-  `neck*` MN rates.
+- In-browser MJCF position-actuates **42 leg DoFs + neck 3 + abdomen + wings + 6 adhesion**. Antennae / halteres / mouth stay visual FK (`poseSoftParts`). Exact flygym `range=` / tendon tarsi need the optional Python plant.
+- Browser MJCF is a capsule/sphere tree from `nmf.json`, **not** byte-identical to flygym’s compiled NeuroMechFly XML.
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
@@ -251,12 +250,12 @@ Closed or kept honest on the homepage fly body:
 
 | Aspect | Status |
 |---|---|
-| Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
+| Default body | NeuroMechFly mesh + in-browser plant (`plantMode: fly`) |
 | Default world | Happier fly utopia: warm daylight, living moss + grass, several fruit clusters, extra dew, leafy shade, six blossoms, gentle breeze, hedge bounce |
 | Synapses | Connectome edge weights (`chemWeight`) × NT-aware TM STD/STF on chemical edges. Efficacy `u·x` varies over time. Not unit hits. Tiny hΔ Δw on 45 traced cells |
-| Six-leg gait | Idle: all planted at rest. Walk: T2/T3+DNa **phasic** gate; stance-slip **EMA** so MN jitter is not a fidget loop |
+| Six-leg gait | Idle: planted at rest. Walk: T2/T3+DNa **phasic** gate; plant contacts (or kinematic stance-slip fallback) |
 | Soft parts | Head+eyes+antennae+mouth FK from neck; abdomen12–6 **and** soma-X yaw from abdomen MNs; wings L/R from DLM/DVM/ADMN split; halteres rest / beat with wings / **gyro from yaw-rate**; JO antenna **pedicel+funiculus+arista** |
-| Vision → legs | Compound eye → `visionL/R` + optic Hz (R16/R7/R8, L1/L2, T4/T5, HS/VS from flow/loom) → LIF → annotated MNs → pose → stance-slip. No RGB dump, no salFood→HS, no bearing thruster |
+| Vision → legs | Compound eye → `visionL/R` + optic Hz → LIF → annotated MNs → plant pose. No RGB dump, no salFood→HS, no bearing thruster |
 | Other senses | ORN plumes; **residual smell** including **floral**; fruit CO₂; JO + self-motion + antenna pose; hygro L/R + extra dew/shade; nearest-fruit taste/IR52b; ppk; courtship; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R; **residual campaniform/proprio**; **l-LNv CRY from R7**; DAN from sugar |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
@@ -269,7 +268,7 @@ Still open (not invented around):
 
 - Male T2/T3 coxa promotor and tarsus MNs are unlabeled — mid/hind coxa/ta have **no cell IDs**; walking uses kinematic couple only.
 - Connectome may not produce a strong tripod from vision write-in; swing/stance follows real MN flex/ext, not a clock.
-- Pages kinematic path is not full MuJoCo contact; attach `?plant=` for the 42-DoF plant.
+- Browser MJCF is NMF-compatible, not byte-identical flygym XML (no tendon-coupled tarsi, no exact micro-CT `range=`).
 - No annotated antennal motor pool — antenna motion is JO reflex + head FK only.
 - No annotated haltere MN pool — mesh is wing-MN beat + yaw gyro; sense is `csaT3` campaniform.
 - Courtship song posture is not a closed 3D kinematic.

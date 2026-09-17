@@ -9,14 +9,14 @@ world (light, odor, contact, proprio)
   → sensory pools
     → LIF connectome (sim.worker.js) — connectome weights × TM STD/STF
       → annotated motor neurons
-        → NeuroMechFly pose (fly.js)
-          → planted stance-slip  (Pages kinematic default)
-          → MuJoCo contact       (local / ?plant=)
+        → in-browser MuJoCo WASM / contact plant  (Pages default; no Mac)
+        → kinematic FK only if the browser plant failed
+        → optional Python flygym  (`?plant=` lab override)
 ```
 
 Quiet annotated pools → quiet actuators. Empty annotation pools stay empty (no invented MNs, no cosmetic gait, no free-joint walk thrusters). Flight translation is **off** unless `?flight=1`.
 
-Hard-refresh: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Chemical synapse strength varies over time (connectome edge weights × NT-aware short-term depression/facilitation). Optional labs: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=ogbody1).
+Hard-refresh: [`?v=browseranimal1`](https://wjb000.github.io/fruitflybrain/?v=browseranimal1). The full animal runs **in the browser** (MuJoCo WASM from jsDelivr, or a contact/gravity/adhesion plant). No Mac and no paid host. Optional labs: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=browseranimal1).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -31,7 +31,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python prepare.py          # first time: builds web/data from the public Male CNS files
 python export_effectors.py # MN→muscle + proprio pools → web/data/effectors.json
-python serve.py            # opens http://127.0.0.1:8787/?v=ogbody1
+python serve.py            # opens http://127.0.0.1:8787/?v=browseranimal1
 ```
 
 `prepare.py` expects the public tables already under `data/` (annotations, neurotransmitters, connectome-weights, brain/VNC meshes). Those are CC-BY from [male-cns.janelia.org](https://male-cns.janelia.org/).
@@ -43,17 +43,19 @@ python serve.py --host 127.0.0.1 --port 8787   # default (local)
 python serve.py --host 0.0.0.0 --port 8787 --no-open   # containers / public plant
 ```
 
-CORS is `Access-Control-Allow-Origin: *` so a static GitHub Pages front-end can call a remote MuJoCo plant.
+CORS is `Access-Control-Allow-Origin: *` so a static GitHub Pages front-end can optionally call a lab Python plant (`?plant=`). The public fly does **not** need that.
 
-### Remote plant (optional)
+### Remote plant (optional lab override)
 
-Pages default is **kinematic NeuroMechFly** so a dead tunnel cannot vault or seize the fly. To attach a live plant:
+The public animal is **in this tab**: MuJoCo WASM from jsDelivr, or the JS contact/gravity/adhesion plant. `DEFAULT_PLANT` is empty. No Mac, Fly.io, Railway, or other user-owned host.
+
+To attach a Python flygym plant in a lab (optional):
 
 1. Query string: `?plant=https://your-plant.example`
-2. Or `localStorage.ffbPlant = "https://your-plant.example"`
+2. Or the HUD “connect remote” box (session only on github.io)
 3. Local `serve.py` still probes same-origin `/physics`
 
-See `web/plantConfig.js`. The Docker image (`Dockerfile`) runs `serve.py --host 0.0.0.0` for plant hosting.
+See `web/plantConfig.js`. A `Dockerfile` exists only for that optional Python plant — it is **not** how the public fly runs.
 
 ## What you are seeing
 
@@ -62,7 +64,7 @@ Closed loop:
 1. Light and odor from procedural landmarks drive the real sensory neurons.
 2. Spikes propagate through the connectome (LIF + short-term depression, fast EPSP vs slow neuromod).
 3. Descending + VNC **motor neurons** pose the NeuroMechFly legs (empty pools stay limp).
-4. **Default (Pages):** planted stance-slip from MN foot motion in the garden utopia. **Live plant:** MuJoCo contact, mesh synced to thorax. **`?body=cube`:** box from portable `{v,ω}`. **`?body=drone`:** visual quadrotor from portable axes.
+4. **Default (Pages):** in-browser MuJoCo WASM / contact plant (gravity, adhesive tarsi, NMF joint ranges). Mesh tracks plant thorax. **Kinematic FK** only if that plant failed. **Live Python plant:** optional `?plant=`. **`?body=cube`:** box from portable `{v,ω}`. **`?body=drone`:** visual quadrotor from portable axes.
 
 **x-ray CNS** shows the reconstructed brain inside the cuticle. Light / scent / taste / touch are gentle sensory extras — motion still only emerges if MNs fire.
 
@@ -74,7 +76,7 @@ See [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md) for the sensory→MN→actu
 
 **hΔ fast-weight lab:** [`web/hdelta.html?v=lab1`](web/hdelta.html). Freeze Δw mid-run. Methods: [`docs/FAST_WEIGHT_HDELTA.md`](docs/FAST_WEIGHT_HDELTA.md).
 
-**Stim map:** `?stim=1&v=fullfly1` — gentle Hz inject through the LIF onto named pools. Not surgery; not a chassis cheat.
+**Stim map:** `?stim=1&v=browseranimal1` — gentle Hz inject through the LIF onto named pools. Not surgery; not a chassis cheat.
 
 **Portable robot API** (cube / drone / hardware):
 

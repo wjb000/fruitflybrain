@@ -15,7 +15,7 @@ Table of connectome vs gap-fill: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md#architect
 - Leave empty annotation pools empty. No invented MNs, cosmetic CPG gait, or walk thrusters.
 - Let the traced graph be primary; helpers only write into real pools or plant state (`poseMap.js` is readout, not a behavior tree).
 - Offer labs as **links**: hΔ mid-run learning, follow-me (drone), stim-map exploration.
-- Prefer kinematic NMF on Pages if a remote plant would hang, vault, or seize.
+- Prefer the **in-browser** MuJoCo / contact plant on Pages so he is a full animal without a Mac. Remote `?plant=` is a lab override only.
 - Speak **home / utopia / thrive** — not lab cage, dish, or pad.
 
 ## Don't (as the homepage default)

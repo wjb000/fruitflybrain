@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=ogbody1";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=ogbody1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=ogbody1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=ogbody1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=ogbody1";
-import { spinRotors } from "./chassis.js?v=ogbody1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=browseranimal1";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=browseranimal1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=browseranimal1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=browseranimal1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=browseranimal1";
+import { spinRotors } from "./chassis.js?v=browseranimal1";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=ogbody1";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=ogbody1";
+} from "./poseMap.js?v=browseranimal1";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=browseranimal1";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=ogbody1");
+    this.worker = new Worker("sim.worker.js?v=browseranimal1");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -869,7 +869,15 @@ export class EmbodiedFly {
         dlm: cmd.wing?.dlm ?? (e.DLM || 0),
         dvm: cmd.wing?.dvm ?? (e.DVM || 0),
         admn: cmd.wing?.admn ?? (e.ADMN || 0),
-        // allow_flight gates free-joint lift/thrust in physics.py (default off).
+        neck: e.neck || 0,
+        head: cmd.head || 0,
+        headYaw: cmd.headYaw || 0,
+        headRoll: cmd.headRoll || 0,
+        abdomen: cmd.abdomen || 0,
+        abdomenYaw: cmd.abdomenYaw || cmd.abdYaw || 0,
+        abdSegs: cmd.abdSegs || [],
+        t: this.clock,
+        // allow_flight gates free-joint lift/thrust (default off).
         allow_flight: FLIGHT_ENABLED,
         fly: FLIGHT_ENABLED ? (cmd.fly || 0) : 0,
         x: this.body.position.x,
@@ -1126,8 +1134,16 @@ export class EmbodiedFly {
       pz *= s;
     }
     this.body.position.set(px, py, pz);
-    this.body.rotation.set(0, pose.yaw, 0);
+    if (pose.quat && pose.quat.length === 4) {
+      this.body.quaternion.set(pose.quat[1], pose.quat[2], pose.quat[3], pose.quat[0]);
+    } else {
+      this.body.rotation.order = "YXZ";
+      this.body.rotation.set(pose.pitch || 0, pose.yaw || 0, pose.roll || 0);
+    }
     applyPhysicsPose(this.body, pose, dt, this.clock, cmd);
+    this.plantLabel = physics.kind === "mujoco-wasm"
+      ? "full MuJoCo animal"
+      : (physics.kind === "browser-contact" ? "full animal (browser plant)" : "full MuJoCo animal");
     this.speedS = this.speedS * 0.3 + Math.min(1.4, (pose.speed || 0) / 8) * 0.7;
     this.plantNLeg = pose.n_leg != null ? pose.n_leg : 0;
     this.planted = !!pose.planted;

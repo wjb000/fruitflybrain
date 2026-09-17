@@ -4,7 +4,7 @@ Honest coverage of **sensory world → encoder → annotated pools → LIF (weig
 
 Public runtime: **male CNS**, NeuroMechFly **OG body**, utopia garden, Earth-fly vision path, **dynw1** time-varying synapses. No invented MNs, no CPG, no thrusters.
 
-Cache: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md). Native morphology: [`OG_BODY.md`](OG_BODY.md).
+Cache: [`?v=browseranimal1`](https://wjb000.github.io/fruitflybrain/?v=browseranimal1). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md). Native morphology: [`OG_BODY.md`](OG_BODY.md).
 
 ## Pipeline
 
@@ -14,9 +14,9 @@ Garden (light, odor, wind, contact, pose)
     → stim.json + effectors.json IDs  (Hz write-in; residual bind for aggregates)
       → sim.worker.js LIF  (connectome chemWeight × TM u·x)
         → motEma on annotated MN / effector pools
-          → poseMap.js (antagonist DoFs; empty pools stay 0)
-            → fly.js NeuroMechFly mesh (42 leg hinges + soft parts)
-              → planted stance-slip  or  MuJoCo 42-DoF plant
+            → poseMap.js (antagonist DoFs; empty pools stay 0)
+              → in-browser MuJoCo WASM / contact plant  (mesh ← thorax + bones)
+              → kinematic FK only if the browser plant failed
 ```
 
 Worker drive is **max-merge** across overlapping channels. Typed pools (foodORN, choT1, …) keep their own Hz. Aggregate leftovers (`smell` minus typed ORNs, `taste` minus GRNs, `touch` minus proprio) get residual world drive so untyped annotated cells are not idle.
@@ -29,6 +29,15 @@ Worker drive is **max-merge** across overlapping channels. Typed pools (foodORN,
 | **HALF-LINKED** | Path exists but is kinematic fill, aggregate-only, or readout without a dedicated mesh joint |
 | **EMPTY-BY-ANNOTATION** | FlyEM type strings have **zero** cells; we do not invent IDs |
 | **STRUCTURAL** | Mesh/plant has no joint; documented limit, not a missing label |
+
+## Newly linked in `browseranimal1`
+
+| Gap | What changed | IDs used |
+|---|---|---|
+| Public fly needed a Mac plant | In-browser MuJoCo WASM (jsDelivr) + JS contact/gravity/adhesion plant | same MN IDs |
+| Pages pretended kinematic was enough | HUD: full MuJoCo animal / full animal (browser plant) / honest kinematic fail | — |
+| Neck/abdomen/wings unwelded in browser MJCF | Position actuators from existing neck / abdomen / DLM·DVM·ADMN | same pools |
+| Mesh vs thorax desync | `applyMujoco` copies plant thorax XYZ + quat; bones thorax-relative | — |
 
 ## Newly linked in `ogbody1`
 
@@ -140,17 +149,17 @@ Walking may **kinematically couple** those hinges from tibia/trochanter (`embody
 
 ## Pages (github.io)
 
-Kinematic default on static hosts: **no** `/physics/health` fetch unless `?plant=` (`plantConfig.plantProbeOrigins` from linked2). Connectome loader reports ~38MB progress (`loadutil.js`). Female BANC is not shipped. Cache [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). OG morphology: [`OG_BODY.md`](OG_BODY.md).
+**Full animal in the tab** — MuJoCo WASM or browser contact plant. No `/physics/health` on github.io unless `?plant=` (lab override). `DEFAULT_PLANT` is empty. Connectome loader reports ~38MB (`loadutil.js`). Female BANC is not shipped. Cache [`?v=browseranimal1`](https://wjb000.github.io/fruitflybrain/?v=browseranimal1). OG morphology: [`OG_BODY.md`](OG_BODY.md).
 
 ## Plant vs kinematic
 
-| DoF | Kinematic Pages (OG mesh) | MuJoCo plant |
-|---|---|---|
-| 42 leg hinges | Anatomical NMF axes + `NMF_JOINT_LIMIT` + stance plant IK | Position-actuated MJCF ranges |
-| Ground contact | Tarsus claw on moss; thorax `standSettle` | Contacts + adhesion |
-| Head / neck | Visual FK (`poseSoftParts`) | **STRUCTURAL** — no neck joint |
-| Abdomen 3–6 | Visual FK | Visual (plant does not curl segments) |
-| Wings / halteres / mouth / antennae | Visual | Visual; flight force only if `?flight=1` |
+| DoF | In-browser plant (default) | Kinematic fallback | Python flygym (`?plant=`) |
+|---|---|---|---|
+| 42 leg hinges | MJCF / contact + `NMF_JOINT_LIMIT` | Anatomical FK + stance IK | Exact MJCF `range=` |
+| Ground | Contacts + adhesion | Tarsus claw IK | Contacts + adhesion |
+| Head / neck | Actuated (3-DoF) from neck MNs | Visual FK | **STRUCTURAL** — no neck joint |
+| Abdomen 3–6 | Actuated pitch (+ yaw A1–2) | Visual FK | Visual |
+| Wings | Actuated, still `WING_FLAP_GATE` | Visual | Visual; flight force if `?flight=1` |
 
 ## What we will not add
 
@@ -167,4 +176,5 @@ python export_effectors.py   # web/data/{effectors,stim}.json
 node tools/linked1_linkage_sanity.mjs
 node tools/utopia2_linkage_sanity.mjs
 node tools/ogbody1_pose_sanity.mjs
+node tools/browseranimal1_plant_sanity.mjs
 ```

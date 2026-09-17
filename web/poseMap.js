@@ -168,7 +168,7 @@ export const ANTENNA_SPAN = 0.16;
 /** Funiculus is the JO joint (pedicel–funiculus). Pedicel/arista follow smaller. */
 export const ANTENNA_PARTS = { pedicel: 0.38, funiculus: 0.82, arista: 0.22 };
 
-/** Visual neck spans (rad). Plant has no neck joint. */
+/** Visual neck spans (rad). Browser MJCF actuates 3 neck hinges; flygym locomotion NMF does not. */
 export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
 
 export const POSE_EMA_ALPHA = 0.38; // slower muscle/neck EMA (was 0.85)

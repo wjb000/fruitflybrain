@@ -1,20 +1,17 @@
-/** Remote MuJoCo plant origin.
+/** Remote MuJoCo plant origin — OPTIONAL lab override.
  *
- * Static hosts (GitHub Pages, Netlify, …) ship UI + connectome data only.
- * Empty `plantBase` must NEVER become a same-origin `/physics/health` fetch —
- * that 404s as `https://<user>.github.io/physics/health` and clutters the
- * console. Use kinematic NeuroMechFly quietly instead.
+ * The public full animal runs **in the browser** (MuJoCo WASM or JS contact
+ * plant). GitHub Pages does not host Python/flygym. Do not require a Mac,
+ * Fly.io, or any user-owned compute.
  *
- * Probe a plant only when one is actually configured:
- *   1. `?plant=` absolute URL (opt-in, including on github.io)
- *   2. `localStorage.ffbPlant` on local/dev — never on static hosts
- *   3. `DEFAULT_PLANT` on non-static, non-localhost hosts (lab tunnel example)
- *   4. localhost / 127.0.0.1 `serve.py` same-origin `/physics`
+ * Remote `/physics` is opt-in only:
+ *   1. `?plant=` absolute URL (lab Mac / local tunnel)
+ *   2. localhost `serve.py` same-origin `/physics` (optional real flygym)
  *
- * `DEFAULT_PLANT` is not auto-probed on github.io (dead tunnels seize the fly).
- * Pass it via `?plant=` to opt in.
+ * Empty DEFAULT_PLANT: never auto-hit a dead Cloudflare tunnel.
+ * Static hosts never fetch `/physics/health` on github.io itself.
  */
-export const DEFAULT_PLANT = "https://candidate-however-bishop-promoted.trycloudflare.com";
+export const DEFAULT_PLANT = "";
 
 const STATIC_HOST_RE = /(\.github\.io|\.gitlab\.io|\.netlify\.app|\.pages\.dev|\.vercel\.app|\.surge\.sh)$/i;
 
@@ -38,7 +35,6 @@ export function isLocalPlantHost(hostname) {
   return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1";
 }
 
-/** github.io, other static CDNs, and file: — no plant unless ?plant= is set. */
 export function isStaticHost(hostname, protocol) {
   const loc = currentLocation();
   const h = String(hostname ?? loc.hostname ?? "").toLowerCase();
@@ -49,7 +45,6 @@ export function isStaticHost(hostname, protocol) {
   return STATIC_HOST_RE.test(h);
 }
 
-/** @deprecated alias — prefer isStaticHost. True for GitHub Pages. */
 export function isPagesHost(hostname) {
   const loc = currentLocation();
   const h = String(hostname ?? loc.hostname ?? "").toLowerCase();
@@ -66,14 +61,19 @@ function readStoredPlant() {
   }
 }
 
-function persistPlant(url) {
+export function persistPlant(url) {
   try {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem("ffbPlant", url);
+    if (!url) localStorage.removeItem("ffbPlant");
+    else localStorage.setItem("ffbPlant", url);
   } catch (_) {}
 }
 
-/** Resolve the configured remote plant origin ("" if none). */
+export function clearStoredPlant() {
+  persistPlant("");
+}
+
+/** Resolve a *remote* plant origin ("" if none). Browser plant is separate. */
 export function resolvePlantBase({
   hostname,
   search,
@@ -95,7 +95,7 @@ export function resolvePlantBase({
     }
   } catch (_) {}
 
-  // Static hosts: ignore a stale ffbPlant (dead tunnel → vault/seize).
+  // Static hosts: ignore stale ffbPlant (dead tunnel seized the fly).
   if (isStaticHost(host, proto)) return "";
 
   const stored = storedPlant === undefined ? readStoredPlant() : storedPlant;
@@ -110,37 +110,27 @@ export function plantBase() {
 }
 
 /**
- * Origins to health-check. `""` means same-origin `/physics` (local serve.py).
- * Static hosts with no `?plant=` → `[]` (kinematic, no fetch).
+ * Remote origins to health-check. `""` means same-origin `/physics`.
+ * Does **not** include the in-browser plant.
  */
 export function plantProbeOrigins(env = {}) {
   const loc = currentLocation();
   const hostname = env.hostname ?? loc.hostname;
   const protocol = env.protocol ?? loc.protocol;
-  const defaultPlant = env.defaultPlant === undefined ? DEFAULT_PLANT : env.defaultPlant;
   const base = env.base !== undefined ? env.base : resolvePlantBase(env);
   const origins = [];
   if (base) origins.push(base);
-  if (isStaticHost(hostname, protocol)) {
-    return origins;
-  }
+  if (isStaticHost(hostname, protocol)) return origins;
   if (isLocalPlantHost(hostname) && protocol !== "file:") {
     if (!origins.includes("")) origins.push("");
-    return origins;
-  }
-  if (!base && defaultPlant) {
-    const d = String(defaultPlant).trim().replace(/\/$/, "");
-    if (d) origins.push(d);
   }
   return origins;
 }
 
-/** True when connectPhysics should hit the network. */
 export function plantConfigured(env) {
   return plantProbeOrigins(env).length > 0;
 }
 
-/** Build a plant API URL. path like "/physics/health". Empty if no plant. */
 export function plantUrl(path, env) {
   const p = path.startsWith("/") ? path : ("/" + path);
   const loc = currentLocation();
@@ -152,8 +142,23 @@ export function plantUrl(path, env) {
   return "";
 }
 
-/** Health endpoint for a probe origin (`""` = same-origin local serve). */
 export function plantHealthUrl(origin) {
   if (origin) return String(origin).replace(/\/$/, "") + "/physics/health";
   return "/physics/health";
+}
+
+/** Flesh label for HUD. */
+export function plantHudLabel(physics) {
+  if (!physics || !physics.ok) {
+    return "kinematic NMF (full animal plant failed)";
+  }
+  const k = physics.kind || "";
+  if (k === "mujoco-wasm") return "full MuJoCo animal";
+  if (k === "browser-contact") return "full animal (browser plant)";
+  if (k === "remote-mujoco" || physics.source === "remote") {
+    const o = physics.plantOrigin || "";
+    if (o && o !== "(same-origin)") return "full MuJoCo animal (remote)";
+    return "full MuJoCo animal";
+  }
+  return "full animal";
 }

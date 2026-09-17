@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=ogbody1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=ogbody1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=ogbody1";
-import { EmbodiedFly } from "./agent.js?v=ogbody1";
-import { drawOmmatidia } from "./eye.js?v=ogbody1";
-import { OdorWorld } from "./plume.js?v=ogbody1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=ogbody1";
-import { parseLesionFlag } from "./lesion.js?v=ogbody1";
-import { mountAssayPanel } from "./assay/panel.js?v=ogbody1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=ogbody1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=ogbody1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=ogbody1";
-import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=ogbody1";
+import { loadNmf, createMaleFly } from "./fly.js?v=browseranimal1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=browseranimal1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=browseranimal1";
+import { EmbodiedFly } from "./agent.js?v=browseranimal1";
+import { drawOmmatidia } from "./eye.js?v=browseranimal1";
+import { OdorWorld } from "./plume.js?v=browseranimal1";
+import { physics, connectPhysics, clearPhysics, flushPhysics, connectRemotePlant, useBrowserPlant, plantHudLabel } from "./physics.js?v=browseranimal1";
+import { parseLesionFlag } from "./lesion.js?v=browseranimal1";
+import { mountAssayPanel } from "./assay/panel.js?v=browseranimal1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=browseranimal1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=browseranimal1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=browseranimal1";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=browseranimal1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -287,7 +287,7 @@ fillJoints($("joints"));
 if (BODY_MODE === "fly") {
   setLoad(0.88, "NeuroMechFly body");
   await loadNmf();
-  setLoad(0.92, "closing the loop");
+  setLoad(0.92, "in-browser MuJoCo plant");
   await connectPhysics();
   // Ghost hygiene: clear plant bodies from prior tabs/sessions, then spawn a fresh flock.
   if (physics.ok) {
@@ -302,9 +302,16 @@ if ($("flesh")) {
     $("flesh").textContent = BODY_MODE === "cube" ? "cube chassis" : "drone chassis";
   } else {
     const origin = physics.plantOrigin || "";
-    $("flesh").textContent = physics.ok
-      ? (origin && origin !== "(same-origin)" ? "MuJoCo remote" : "MuJoCo")
-      : "fly body";
+    $("flesh").textContent = plantHudLabel(physics);
+    if ($("plantStatus")) {
+      $("plantStatus").textContent = physics.ok
+        ? (physics.source === "browser"
+          ? (physics.kind === "mujoco-wasm"
+            ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
+            : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+          : ("remote " + origin))
+        : "kinematic NMF (full animal plant failed)";
+    }
   }
 }
 if ($("info")) {
@@ -313,12 +320,16 @@ if ($("info")) {
   } else if (BODY_MODE === "cube") {
     $("info").textContent = "Optional cube chassis: male CNS + compound eye → optic/visionL/R → LIF → leg/descending MNs → portable {v,ω}. Homepage default is the fly body. No food-bearing thruster.";
   } else {
-    const plantHint = physics.plantOrigin && physics.plantOrigin !== "(same-origin)"
-      ? (" Plant @ " + physics.plantOrigin + ".")
-      : "";
+    const plantHint = physics.ok
+      ? (physics.source === "browser"
+        ? (physics.kind === "mujoco-wasm"
+          ? " Full animal: in-browser MuJoCo WASM (jsDelivr) + NMF MJCF. No Mac."
+          : " Full animal: in-browser contact/gravity/adhesion plant (WASM unavailable).")
+        : (" Remote plant @ " + (physics.plantOrigin || "") + "."))
+      : " Kinematic NMF fallback — full animal plant failed to start.";
     $("info").textContent = physics.ok
-      ? ("Home: a fly utopia. Full Male CNS LIF is primary; chemical synapses use connectome weights × NT-aware short-term depression/facilitation (efficacy varies over time). Gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → connectome → leg MNs → MuJoCo contact. Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Fruit, dew, shade, blossoms. Empty MN pools stay quiet." + plantHint)
-      : ("Home: a fly utopia. Full Male CNS LIF is primary; chemical synapses use connectome weights × NT-aware short-term depression/facilitation (efficacy varies over time). Gap-fill is encoding + plant only (no CPG/thrusters). Eyes → optic/visionL/R → LIF → annotated MNs → pose → planted stance-slip. Abdomen quiet unless phasic. Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
+      ? ("Home: a fly utopia. Full Male CNS LIF is primary; chemical synapses use connectome weights × NT-aware short-term depression/facilitation. Eyes → optic/visionL/R → connectome → leg MNs → in-browser MuJoCo plant (contacts, adhesion, gravity, NMF joint ranges). Planted walk; flight " + (FLIGHT_ENABLED ? "ON (?flight=1)" : "off") + ". Empty MN pools stay quiet." + plantHint)
+      : ("Home: a fly utopia. Full Male CNS LIF is primary. Kinematic NMF fallback (full animal plant failed). Flight " + (FLIGHT_ENABLED ? "ON" : "off") + ". Soft garden rim — bounce, never punish." + plantHint);
   }
 }
 
@@ -423,10 +434,17 @@ function onAny() {
   const kinMode = focus.bodyMode || BODY_MODE;
   const flesh = isKinematicChassis(kinMode)
     ? (kinMode === "cube" ? "cube chassis" : "drone chassis")
-    : (physics.ok
-      ? ("MuJoCo" + (physics.plantOrigin && physics.plantOrigin !== "(same-origin)" ? " remote" : ""))
-      : "fly body");
+    : plantHudLabel(physics);
   if ($("flesh")) $("flesh").textContent = flesh;
+  if ($("plantStatus") && !isKinematicChassis(kinMode)) {
+    $("plantStatus").textContent = physics.ok
+      ? (physics.source === "browser"
+        ? (physics.kind === "mujoco-wasm"
+          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
+          : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+        : ("remote " + (physics.plantOrigin || "")))
+      : "kinematic NMF (full animal plant failed)";
+  }
   const eMn = focus.motEma || {};
   const dlm = (eMn.DLM || 0).toFixed(2);
   const legs = (((eMn.T1L||0)+(eMn.T1R||0)+(eMn.T2L||0)+(eMn.T2R||0)+(eMn.T3L||0)+(eMn.T3R||0))/6).toFixed(2);
@@ -544,6 +562,48 @@ $("reset").onclick = () => {
     f.resetPose(s.x, s.z, s.yaw);
   }
 };
+
+function refreshPlantUi() {
+  if ($("flesh") && BODY_MODE === "fly") $("flesh").textContent = plantHudLabel(physics);
+  if ($("plantStatus") && BODY_MODE === "fly") {
+    $("plantStatus").textContent = physics.ok
+      ? (physics.source === "browser"
+        ? (physics.kind === "mujoco-wasm"
+          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
+          : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+        : ("remote " + (physics.plantOrigin || "")))
+      : "kinematic NMF (full animal plant failed)";
+  }
+}
+const plantGo = $("plantGo");
+const plantUrlIn = $("plantUrlIn");
+const plantBrowser = $("plantBrowser");
+if (plantGo && plantUrlIn) {
+  plantGo.onclick = async () => {
+    const u = String(plantUrlIn.value || "").trim();
+    plantGo.disabled = true;
+    try {
+      const ok = await connectRemotePlant(u);
+      refreshPlantUi();
+      if (!ok && $("plantStatus")) $("plantStatus").textContent = "remote failed — " + (physics.err || "not ok");
+    } finally { plantGo.disabled = false; }
+  };
+}
+if (plantBrowser) {
+  plantBrowser.onclick = async () => {
+    plantBrowser.disabled = true;
+    try {
+      await useBrowserPlant();
+      if (physics.ok) {
+        try { await clearPhysics(); } catch (_) {}
+        for (const f of flies) {
+          try { f._ensurePlant?.(); } catch (_) {}
+        }
+      }
+      refreshPlantUi();
+    } finally { plantBrowser.disabled = false; }
+  };
+}
 function syncFollow() {
   $("followFlock").parentElement.classList.toggle("on", followMode === "flock");
   $("followSel").parentElement.classList.toggle("on", followMode === "selected");

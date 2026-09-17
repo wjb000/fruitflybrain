@@ -2,7 +2,19 @@
 
 The connectome should inhabit the **same animal** the map was traced from: adult male *Drosophila*, NeuroMechFly skeleton, MANC/BANC muscle names. This is gap-fill **plant geometry**, not a second controller.
 
-Cache: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Pipeline: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Coverage: [`LINKAGE.md`](LINKAGE.md).
+Cache: [`?v=browseranimal1`](https://wjb000.github.io/fruitflybrain/?v=browseranimal1). Pipeline: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Coverage: [`LINKAGE.md`](LINKAGE.md).
+
+## Full animal on GitHub Pages (zero user-hosted compute)
+
+The public fly is a **full animal in this tab**. No Mac, no Fly.io, no paid plant.
+
+1. **Preferred:** MuJoCo **WASM** (`@mujoco/mujoco` from jsDelivr, ~9 MB, single-threaded — GitHub Pages has no COOP/COEP) loads an NMF-compatible MJCF (`web/nmfMjcf.js`) and steps gravity, contacts, adhesion, and position actuators from MN commands.
+2. **Always-on fallback:** if WASM cannot start, a **browser contact plant** (`web/browserPlant.js`) still runs gravity, tarsus contact/adhesion, and NMF joint limits, and returns the same pose/contacts snapshot so the mesh syncs.
+3. **Optional lab override:** `?plant=https://…` or the HUD “connect remote” box talks to a Python `serve.py` flygym plant. `DEFAULT_PLANT` is empty.
+
+HUD: **full MuJoCo animal** when WASM is up; **full animal (browser plant)** on the JS path; **kinematic NMF (full animal plant failed)** only if both fail.
+
+Honest vs flygym: the browser MJCF is a capsule/sphere tree from `nmf.json` rest poses (42 leg hinges + neck 3 + abdomen + wings + 6 adhesion). It is **not** byte-identical to flygym’s compiled NeuroMechFly XML (no tendon-coupled tarsi, no exact `range=` from the micro-CT MJCF). Antennae / halteres / mouth stay visual FK from existing IDs.
 
 ## What “OG body” means here
 
@@ -10,14 +22,14 @@ Cache: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Pipeli
 Annotated MN pools (effectors.json)
   → antagonist pairing (Azevedo / Soler → NMF 7 DoF)
     → hinge delta on *anatomical* axes, clamped to NMF-like limits
-      → FK of NMF rest segments (nmf.json / nmf.bin)
-        → stance tarsi meet the moss (contact IK, not a CPG)
+      → in-browser MuJoCo / contact plant  (or kinematic FK if plant failed)
+        → mesh bones follow thorax + joints
           → cho / hp / csa / prop Hz from those joints + load
 ```
 
 Quiet MN pools → anatomical rest (NMF neutral pose). Driven pools → coherent whole-body: head, six legs, abdomen, gated wings, JO antennae, MN9 mouth.
 
-## Anatomical directions (Pages kinematic)
+## Anatomical directions
 
 Virtual world-XYZ hinges made mid/hind legs flex like a bilateral puppet. Axes now come from **NMF rest bone directions**:
 
@@ -37,7 +49,9 @@ Tarsus tip is the distal claw (tarsus4→5), not the tarsus5 mesh origin.
 
 ## Ground contact
 
-When MNs mark a leg **stance**, tibia/tarsus IK plants that claw on `GROUND_Y` (moss). Swing legs may leave the floor. Thorax `standSettle` eases so the median stance foot sits on the moss. This is contact, not a walk thruster.
+**In-browser plant:** tarsus spheres vs a plane, friction, adhesion actuators (stance sticky, swing peels). Gravity on the thorax free joint — **9810 mm/s²** in WASM; the JS Euler plant uses a reduced *g* so explicit integration stays planted (honest: not the same integrator). Mesh root = plant thorax (XYZ + quat).
+
+**Kinematic fallback only:** tibia/tarsus IK plants claws on `GROUND_Y`; thorax `standSettle`. Not a walk thruster.
 
 ## Proprioception (closed loop)
 
@@ -50,24 +64,22 @@ When MNs mark a leg **stance**, tibia/tarsus IK plants that claw on `GROUND_Y` (
 
 Neck → `hpT1`. Abdomen → `propT3` / `choT3`. Yaw / wings → `csaT3`. Same IDs as before — no invented sensors.
 
-## OG kinematic vs remaining plant limits
+## Plant DoF (browser vs flygym)
 
-| Piece | Pages kinematic (OG mesh) | MuJoCo plant (`?plant=`) |
+| Piece | In-browser MJCF / contact | Python flygym (`?plant=`) |
 |---|---|---|
-| 42 leg DoFs | Anatomical axes + NMF-like half-ranges around rest | Real MJCF joint ranges + position actuators |
-| Ground | Tarsus-Y plant IK + thorax settle | Contacts, friction, adhesion |
-| Thorax free joint | Yaw + planted Y; XY from stance-slip | Full 6-DoF physics |
-| Neck / abdomen 3–6 / wings / mouth / antennae | Visual FK from existing MNs / JO | **STRUCTURAL** — plant has no neck; soft parts stay visual |
-| T2/T3 coxaProm, Ta* | Empty IDs; hinge couple while walking | Same empty IDs |
-| Haltere MN | None — gyro + wing MNs | Same |
+| 42 leg DoFs | Anatomical axes + `NMF_JOINT_LIMIT` position actuators | Exact MJCF `range=` + NMF position actuators |
+| Ground | Contacts + adhesion (WASM) or contact/adhesion JS | Contacts, friction, adhesion |
+| Thorax free joint | 6-DoF + gravity | 6-DoF + gravity |
+| Neck / abdomen / wings | **Actuated** from existing MN pools (browser extra vs locomotion NMF) | **STRUCTURAL** on `make_locomotion_fly` — visual FK |
+| Antennae / halteres / mouth | Visual FK (no MN pool / no extra joint) | Visual FK |
+| T2/T3 coxaProm, Ta* | Empty IDs; hinge may still exist | Same empty IDs |
 | Flight translation | Off unless `?flight=1` | Same gate |
-
-Exact MJCF `range=` numbers live in the flygym XML. The browser cannot read them without shipping the plant; `NMF_JOINT_LIMIT` is the documented NMF-like clamp for the kinematic path.
 
 ## What we will not add
 
 - Invented T2/T3 promotor / tarsus MN cell IDs
 - CPG / tripod clock
-- Walk/turn thrusters that bypass MN foot slip
-- Fake neck joint on the plant
+- Walk/turn thrusters that bypass MN foot contact
+- User-owned always-on Python host as the public default
 - Female BANC on Pages
