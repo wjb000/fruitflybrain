@@ -2,12 +2,12 @@ import * as THREE from "three";
 import {
   MUSCLE_SPAN, NECK_SPAN, MUSCLE_TAU, NECK_TAU, WING_TAU, FEED_TAU,
   WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ABD_YAW_SPAN,
-  ANTENNA_SPAN, ANTENNA_PARTS,
+  ANTENNA_SPAN, ANTENNA_PARTS, GROUND_Y,
+  nmfJointLimit, clampJointDelta, anatomicalLegAxes, tarsusTipOffset,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=utopia2";
+} from "./poseMap.js?v=ogbody1";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
-const GROUND_Y = 0.05;
 const _foot = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _flapQ = new THREE.Quaternion();
@@ -131,6 +131,26 @@ function wireLegHinges(leg) {
   leg.hinges["tarsus1-pitch"] = makeVirtualHinge([1, 0, 0]);
 }
 
+/** Replace world-XYZ puppet axes with NMF bone frames (L/R mirrored). */
+function setAnatomicalHinges(leg, nodes) {
+  const posOf = (n) => {
+    const b = nodes[n]?.body;
+    const p = b?.userData?.anatomicalRestPos || b?.position;
+    return p ? [p.x, p.y, p.z] : null;
+  };
+  const coxa = posOf(`${leg.code}_coxa`);
+  const femur = posOf(`${leg.code}_trochanterfemur`);
+  const tibia = posOf(`${leg.code}_tibia`);
+  const tarsus = posOf(`${leg.code}_tarsus1`);
+  if (!coxa || !femur || !tibia || !tarsus) return;
+  const axes = anatomicalLegAxes(leg.side, { coxa, femur, tibia, tarsus });
+  for (const [key, h] of Object.entries(leg.hinges)) {
+    const a = axes[key];
+    if (!a || !h) continue;
+    h.userData.axis.set(a[0], a[1], a[2]);
+  }
+}
+
 function applyRest(node, seg) {
   node.position.fromArray(seg.restPos || [0, 0, 0]);
   setQuatWxyz(node, seg.restQuat || [1, 0, 0, 0]);
@@ -168,8 +188,19 @@ function buildFly({ female = false } = {}) {
   for (const name of LEG_NAMES) {
     const code = codes[name];
     const tarsus = nodes[`${code}_tarsus5`]?.body;
+    const tarsus4 = nodes[`${code}_tarsus4`]?.body;
     const tip = new THREE.Object3D();
-    if (tarsus) tarsus.add(tip);
+    if (tarsus) {
+      tarsus.add(tip);
+      const p5 = tarsus.userData.anatomicalRestPos || tarsus.position;
+      const p4 = tarsus4
+        ? (tarsus4.userData.anatomicalRestPos || tarsus4.position)
+        : null;
+      const off = p4
+        ? tarsusTipOffset([p4.x, p4.y, p4.z], [p5.x, p5.y, p5.z])
+        : [0, -0.04, 0];
+      tip.position.set(off[0], off[1], off[2]);
+    }
     const leg = {
       name,
       side: name.startsWith("L") ? -1 : 1,
@@ -190,6 +221,7 @@ function buildFly({ female = false } = {}) {
       foot: { x: 0, y: 0, z: 0, stance: true, vx: 0, vy: 0, vz: 0 },
     };
     wireLegHinges(leg);
+    setAnatomicalHinges(leg, nodes);
     legs.push(leg);
   }
 
@@ -318,22 +350,95 @@ function resetAnatomical(body) {
 
 function poseLegFromMuscle(leg, muscle, dt) {
   const m = muscle || {};
-  // Forelegs already scaled in poseMap; still cap T1 hinge travel so "arms"
-  // cannot throw up even if a small MN pool saturates.
-  const t1k = isForeleg(leg.name) ? 0.72 : 1;
   for (const [key, spec] of Object.entries(MUSCLE_SPAN)) {
     const h = leg.hinges[key];
     if (!h) continue;
     let pos = m[spec[0]] || 0;
     const neg = spec[1] ? (m[spec[1]] || 0) : 0;
-    const feAssist = isForeleg(leg.name) ? 0.22 : 0.45;
+    const feAssist = isForeleg(leg.name) ? 0.18 : 0.40;
     if (key === "trochanterfemur-pitch") pos = pos + feAssist * (m.feRed || 0);
-    const span = spec[2] * t1k;
+    const span = nmfJointLimit(leg.name, key);
     const raw = span * antagonist(pos, neg);
-    const lim = span * 0.88;
-    const tgt = h.userData.rest + Math.max(-lim, Math.min(lim, raw));
+    const tgt = h.userData.rest + clampJointDelta(leg.name, key, raw);
     const cur = h.userData.angle ?? h.userData.rest;
     setHinge(h, follow(cur, tgt, dt, MUSCLE_TAU));
+  }
+}
+
+function recordJointAngles(leg) {
+  const d = (key) => {
+    const h = leg.hinges[key];
+    if (!h) return 0;
+    return (h.userData.angle ?? h.userData.rest ?? 0) - (h.userData.rest || 0);
+  };
+  const coxa = Math.abs(d("coxa-yaw")) + Math.abs(d("coxa-pitch")) + Math.abs(d("coxa-roll"));
+  const femur = Math.abs(d("trochanterfemur-pitch")) + Math.abs(d("trochanterfemur-roll"));
+  const tibia = Math.abs(d("tibia-pitch"));
+  const tarsus = Math.abs(d("tarsus1-pitch"));
+  leg.angles = {
+    coxa, femur, tibia, tarsus,
+    coxaYaw: d("coxa-yaw"),
+    coxaPitch: d("coxa-pitch"),
+    coxaRoll: d("coxa-roll"),
+    femurPitch: d("trochanterfemur-pitch"),
+    tibiaPitch: d("tibia-pitch"),
+    tarsusPitch: d("tarsus1-pitch"),
+  };
+}
+
+/**
+ * Stance contact: tarsi that the MNs plant must meet the moss, not float or
+ * clip. Swing feet may leave the floor. Jacobian IK on tibia/tarsus only —
+ * no CPG, no invented MNs. Clamped to NMF joint limits.
+ */
+function plantStanceFeet(leg, nodes, swinging, root) {
+  if (!leg.tarsusTip) return;
+  const ti = leg.hinges["tibia-pitch"];
+  const ta = leg.hinges["tarsus1-pitch"];
+  if (!ti) return;
+  const readY = () => {
+    applyMuscleFk(leg, nodes);
+    if (root) root.updateMatrixWorld(true);
+    leg.tarsusTip.getWorldPosition(_foot);
+    return _foot.y;
+  };
+  let y = readY();
+  let err = y - GROUND_Y;
+  if (swinging && err > 0.02) return;
+  for (let i = 0; i < 3 && Math.abs(err) > 0.014; i++) {
+    const saved = ti.userData.angle ?? 0;
+    ti.userData.angle = saved + 0.035;
+    const yProbe = readY();
+    const jac = (yProbe - y) / 0.035;
+    ti.userData.angle = saved;
+    if (Math.abs(jac) < 1e-4) break;
+    let da = -err / jac;
+    da = Math.max(-0.10, Math.min(0.10, da));
+    const next = clampJointDelta(
+      leg.name,
+      "tibia-pitch",
+      (saved - (ti.userData.rest || 0)) + da
+    ) + (ti.userData.rest || 0);
+    setHinge(ti, next);
+    y = readY();
+    err = y - GROUND_Y;
+  }
+  if (ta && Math.abs(err) > 0.018 && !(swinging && err > 0)) {
+    const saved = ta.userData.angle ?? 0;
+    ta.userData.angle = saved + 0.04;
+    const yProbe = readY();
+    const jac = (yProbe - y) / 0.04;
+    ta.userData.angle = saved;
+    if (Math.abs(jac) > 1e-4) {
+      let da = Math.max(-0.08, Math.min(0.08, -err / jac));
+      const next = clampJointDelta(
+        leg.name,
+        "tarsus1-pitch",
+        (saved - (ta.userData.rest || 0)) + da
+      ) + (ta.userData.rest || 0);
+      setHinge(ta, next);
+      readY();
+    }
   }
 }
 
@@ -359,6 +464,14 @@ export function stepLife(fly, dt, t, cmd) {
   for (const leg of d.legs) {
     poseLegFromMuscle(leg, muscle[leg.name], dt);
     applyMuscleFk(leg, d.nodes);
+  }
+
+  fly.updateMatrixWorld(true);
+  for (const leg of d.legs) {
+    const mus = muscle[leg.name] || {};
+    const swinging = !!mus._swing && flyA < 0.40;
+    plantStanceFeet(leg, d.nodes, swinging, fly);
+    recordJointAngles(leg);
   }
 
   fly.updateMatrixWorld(true);
@@ -401,6 +514,22 @@ export function stepLife(fly, dt, t, cmd) {
   d.slip = { x: slipX, z: slipZ, n, yawL, yawR, meanAbs };
   // EMA for HUD / diagnostics (kinematic Pages path).
   d.slipMeanAbs = (d.slipMeanAbs || 0) * 0.85 + meanAbs * 0.15;
+  // Thorax settle so the median stance tarsus sits on the moss (OG stand).
+  const stanceYs = [];
+  for (const leg of d.legs) {
+    if (leg.foot && leg.foot.stance) stanceYs.push(leg.foot.y);
+  }
+  let settle = d.standSettle || 0;
+  if (stanceYs.length) {
+    stanceYs.sort((a, b) => a - b);
+    const mid = stanceYs[Math.floor(stanceYs.length / 2)];
+    const err = mid - GROUND_Y;
+    const tgt = Math.max(-0.16, Math.min(0.16, settle - err * 0.50));
+    settle = follow(settle, tgt, dt, 0.22);
+  } else {
+    settle = follow(settle, 0, dt, 0.28);
+  }
+  d.standSettle = settle;
   poseSoftParts(d, dt, t, cmd, flyA, feed);
 }
 

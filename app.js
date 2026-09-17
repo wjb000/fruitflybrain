@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=utopia2";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=utopia2";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=utopia2";
-import { EmbodiedFly } from "./agent.js?v=utopia2";
-import { drawOmmatidia } from "./eye.js?v=utopia2";
-import { OdorWorld } from "./plume.js?v=utopia2";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=utopia2";
-import { parseLesionFlag } from "./lesion.js?v=utopia2";
-import { mountAssayPanel } from "./assay/panel.js?v=utopia2";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=utopia2";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=utopia2";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=utopia2";
-import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=utopia2";
+import { loadNmf, createMaleFly } from "./fly.js?v=ogbody1";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=ogbody1";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=ogbody1";
+import { EmbodiedFly } from "./agent.js?v=ogbody1";
+import { drawOmmatidia } from "./eye.js?v=ogbody1";
+import { OdorWorld } from "./plume.js?v=ogbody1";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=ogbody1";
+import { parseLesionFlag } from "./lesion.js?v=ogbody1";
+import { mountAssayPanel } from "./assay/panel.js?v=ogbody1";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=ogbody1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=ogbody1";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=ogbody1";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=ogbody1";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
