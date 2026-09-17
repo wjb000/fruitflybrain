@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Home — Male CNS in a fly utopia</title>
+    <title>Home — Male CNS · full animal in-browser</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=ogbody1" />
+  <link rel="stylesheet" href="style.css?v=browseranimal1" />
   <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}.stim-map-panel{position:fixed;right:12px;bottom:88px;max-width:360px;z-index:6;max-height:min(70vh,560px);overflow:auto}.stim-map-panel.collapsed .panel-body{display:none}</style>
   <script type="importmap">
   {
@@ -23,7 +23,7 @@
   <div class="loader" id="loader">
     <div class="kicker">FlyEM · Janelia · Cambridge · Google</div>
     <h2>Male fruit fly CNS</h2>
-    <p>Full adult male Drosophila: Male CNS LIF drives NeuroMechFly — six legs, head, antennae, abdomen, wings, mouth. Gap-fill is encoding + plant only — no CPG, no thrusters. Cube or drone via ?body=cube / ?body=drone.</p>
+    <p>Full adult male Drosophila on GitHub Pages: Male CNS LIF drives an in-browser NeuroMechFly plant (MuJoCo WASM when the browser allows it, contact/gravity/adhesion otherwise). No Mac. Cube or drone via ?body=cube / ?body=drone.</p>
     <p class="loadhint">Large connectome ~38MB — please wait. Use desktop Chrome (this tab is memory-hungry).</p>
     <div class="progress"><i id="bar"></i></div>
     <p id="loadmsg">fetching maps…</p>
@@ -34,7 +34,7 @@
       <div class="kicker">Thrive · home</div>
       <div class="panel-body">
         <h1>He lives in a fly utopia</h1>
-                <div class="sub"><b>Connectome first</b> (native NeuroMechFly body): garden → compound eye (R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS) + ORN/JO/proprio → <b>full Male CNS LIF</b> with <b>time-varying synaptic weights</b> (connectome edge counts × NT-aware Tsodyks–Markram STD/STF) → annotated MNs → anatomical NMF hinges. Antennae, halteres, abdomen segments, and neck are linked from existing IDs. Empty T2/T3 coxaProm/Ta* stay empty. No CPG, no thrusters. Cache <code>?v=ogbody1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=ogbody1" style="color:#4de4ff">stim map</a>.</div>
+                <div class="sub"><b>Connectome first</b> (full animal in the browser): garden → compound eye (R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS) + ORN/JO/proprio → <b>full Male CNS LIF</b> with <b>time-varying synaptic weights</b> → annotated MNs → <b>in-browser MuJoCo</b> (WASM from jsDelivr, or contact plant). Gravity, adhesive tarsi, NMF joint ranges. Optional lab override <code>?plant=</code>. Empty T2/T3 coxaProm/Ta* stay empty. No CPG, no thrusters. Cache <code>?v=browseranimal1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=browseranimal1" style="color:#4de4ff">stim map</a>.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
@@ -47,6 +47,16 @@
         <div class="row" id="flock"></div>
         <div class="row">
           <button id="addM">+ male</button>
+        </div>
+        <div class="plant-box" id="plantBox">
+          <div class="kicker">full animal</div>
+          <div class="hint" id="plantStatus">starting in-browser plant…</div>
+          <div class="hint">Pages runs MuJoCo in this tab (WASM from jsDelivr, free). A Mac or paid host is not required. Optional lab override:</div>
+          <div class="row plant-row">
+            <input id="plantUrlIn" type="url" spellcheck="false" placeholder="https://…/ optional ?plant=" />
+            <button type="button" id="plantGo">connect remote</button>
+            <button type="button" id="plantBrowser">use in-browser</button>
+          </div>
         </div>
         <div class="row" id="stims"></div>
         <div class="row">
@@ -115,7 +125,7 @@
         <button class="collapse" type="button" title="collapse">–</button>
         <div class="kicker">His home</div>
         <div class="panel-body">
-          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. NeuroMechFly is his native body (anatomical hinges, stance plant). Coverage is in <code>docs/LINKAGE.md</code> / <code>docs/OG_BODY.md</code>. Leftover campaniform/proprio and floral smell use existing IDs. Chemical synapse strength varies over time (connectome weights × STD). Empty pools stay empty.</div>
+          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. The body is an in-browser NeuroMechFly plant (MuJoCo WASM or contact/gravity/adhesion). Coverage: <code>docs/LINKAGE.md</code> / <code>docs/OG_BODY.md</code>. Optional <code>?plant=</code> for a lab Python plant. Empty pools stay empty.</div>
         </div>
       </div>
     </div>
@@ -126,6 +136,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=ogbody1"></script>
+  <script type="module" src="app.js?v=browseranimal1"></script>
 </body>
 </html>
