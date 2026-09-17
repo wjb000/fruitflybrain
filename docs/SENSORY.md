@@ -39,13 +39,13 @@ Pool IDs: `web/data/stim.json` (`R16` 1394, `R7` 1384, `R8` 1329, `L1–L3` ~177
 
 | Sense | World | Pools |
 |---|---|---|
-| Olfaction | Lagrangian plumes (`plume.js`) at antenna tips | `foodORN` `pherORN` `co2ORN` `aversiveORN` L/R |
-| Wind / JO | Body-frame wind + self-motion airflow | `JO` L/R |
-| Taste | Graded contact at fruit / (opt-in) bitter | `sweet` `bitter` `taste` |
-| Hygro | Moist plume + dew proximity | `hygro` ← `hygrosensory` |
-| Contact / courtship | Other-fly / food proximity | `ppk23` `ppk25` `IR52b` L/R |
-| Proprio / campaniform / hair plates | MN pose or MuJoCo contacts | `cho*` `hp*` `csa*` `tact*` `prop*` (L/R = soma-X of those IDs) |
-| Clock / neuromod | Day, hunger, sleep, arousal — **calm Hz** | `sLNv` `lLNv` `LNd` `DN1a` `DN1p` `DAN` `OA` `HT` `pep` |
+| Olfaction | Lagrangian plumes (`plume.js`) at antenna tips | `foodORN` `pherORN` `co2ORN` `aversiveORN` L/R; **residual smell** also gets floral |
+| Wind / JO | Gentle garden breeze + self-motion airflow | `JO` L/R |
+| Taste | Graded contact at **nearest fruit** / (opt-in) bitter | `sweet` `bitter` `taste` |
+| Hygro | Moist plume + dew (including extra puddle) + shade | `hygro` ← `hygrosensory` |
+| Contact / courtship | Other-fly / nearest-food proximity | `ppk23` `ppk25` `IR52b` L/R |
+| Proprio / campaniform / hair plates | MN pose or MuJoCo contacts | `cho*` `hp*` `csa*` `tact*` `prop*` (L/R); **residual campaniform / proprio** |
+| Clock / neuromod | **l-LNv CRY from R7 UV**; DAN from sugar; hunger/sleep/arousal — calm Hz | `sLNv` `lLNv` `LNd` `DN1a` `DN1p` `DAN` `OA` `HT` `pep` |
 
 No extra types. If a pool is empty in the Male CNS export, write-in is a no-op.
 
@@ -63,4 +63,4 @@ with Tsodyks–Markram `u` (facilitation, per pre cell) and `x` (depression, per
 
 ## Cache
 
-Pages: [`?v=linked1`](https://wjb000.github.io/fruitflybrain/?v=linked1). Coverage table: [`LINKAGE.md`](LINKAGE.md).
+Pages: [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2). Coverage table: [`LINKAGE.md`](LINKAGE.md).

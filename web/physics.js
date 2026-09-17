@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase, isPagesHost } from "./plantConfig.js?v=linked1";
+import { plantUrl, plantBase, isPagesHost } from "./plantConfig.js?v=utopia2";
 
 export const physics = {
   ok: false,
@@ -30,8 +30,9 @@ export async function connectPhysics() {
   const candidates = [];
   const base = plantBase();
   if (base) candidates.push(base);
-  // same-origin last (Pages has no /physics; local serve.py does)
-  candidates.push("");
+  // Pages has no /physics (404). Stay kinematic unless ?plant= is set.
+  // Local serve.py still probes same-origin.
+  if (!isPagesHost()) candidates.push("");
 
   for (const c of candidates) {
     const origin = c || "(same-origin)";

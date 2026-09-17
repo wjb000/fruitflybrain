@@ -8,8 +8,8 @@
  * Enable: ?stim=1 / ?map=1 (also default on cube/drone). Disable: ?stim=0.
  * Homepage fly-body default leaves this off — link from the HUD.
  */
-import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=linked1";
-import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=linked1";
+import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=utopia2";
+import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=utopia2";
 
 export function stimMapWanted(bodyMode = "fly") {
   try {
@@ -30,7 +30,7 @@ export function stimMapUrl(on = true) {
   } else {
     u.searchParams.set("stim", "0");
   }
-  u.searchParams.set("v", "linked1");
+  u.searchParams.set("v", "utopia2");
   return u.pathname + u.search + u.hash;
 }
 

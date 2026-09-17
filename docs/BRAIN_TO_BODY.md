@@ -57,6 +57,13 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Head/abdomen FK | Flat NMF segments did not follow neck/abdomen joints | Pose `c_head` children (eyes, antennae, mouth) and abdomen3–6 from the driven joints |
 | Halteres | Mesh existed, never posed | Rest when still; beat above `WING_FLAP_GATE` (same DLM/DVM/ADMN); **yaw-rate gyro** when folded. Sense: `csaT3` campaniform. |
 | Residual smell/taste/touch | Aggregate stim keys double-covered typed ORN/GRN/proprio | Bind leftover IDs only; untyped cells get world Hz. Worker max-merge. |
+| Residual campaniform / proprio | Aggregate keys double-covered typed `csaT*` / `propT*` | Bind leftover IDs only (~219 campaniform, ~316 proprio) |
+| Nearest fruit / extra dew | Only spawn food and one pool were tasted / hygro | All food clusters → sweet/IR52b; extra puddle + shade → hygro |
+| Floral volatiles | Blossoms were visual-only | Residual smell (untyped ORNs) ← flower plume. Not foodORN. |
+| l-LNv CRY | Clock used a fake sine “day” | `lLNv` from compound-eye R7 UV; shade dims local day |
+| DAN sugar | DAN was arousal-only | Sweet contact adds Hz on existing DAN |
+| Fruit CO₂ | CO₂ only from other flies | Ripe fruit fermentation → `co2ORN` |
+| Calmer whole-body | MN Poisson jittered XY/yaw | Stance-slip EMA + tighter yaw; slower hinge tau. Same MN IDs, no CPG |
 | `closeLoopProprio` | Leg-only proprio left neck/abdomen/halteres mute | Neck → `hpT1`; abdomen → `propT3`/`choT3`; yaw/wing → `csaT3`. Existing IDs. |
 | Abdomen L/R yaw | 207-cell pool was curl-only | Soma-X split of **those** abdomen MN IDs → NMF lateral bend |
 | Wing L/R | One ADMN/DLM/DVM blob posed both wings | Soma-X split of **those** wing MN IDs → per-wing stroke |
@@ -109,7 +116,7 @@ Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=linked1`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=utopia2`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -146,7 +153,7 @@ eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=linked1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=utopia2`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.
@@ -235,19 +242,19 @@ Do **not** invent MNs for these:
 - Descending interneurons (`DNp`, `DNg02`, …) shape behavior via the
   connectome and mode labels; they are not wired as fake leg muscles.
 
-### Embodiment status (linked1 / dynw1 / utopia garden)
+### Embodiment status (utopia2 / linked1 / dynw1)
 
 Closed or kept honest on the homepage fly body:
 
 | Aspect | Status |
 |---|---|
 | Default body | NeuroMechFly mesh + MN hinges (`plantMode: fly`) |
-| Default world | Fly utopia garden: moss floor, ripe fruit, berries, dew pool, shade plant, two blossoms, hedge bounce |
+| Default world | Happier fly utopia: warm daylight, living moss + grass, several fruit clusters, extra dew, leafy shade, six blossoms, gentle breeze, hedge bounce |
 | Synapses | Connectome edge weights (`chemWeight`) × NT-aware TM STD/STF on chemical edges. Efficacy `u·x` varies over time. Not unit hits. Tiny hΔ Δw on 45 traced cells |
-| Six-leg gait | Idle: all planted at rest. Walk: T2/T3+DNa **phasic** gate (tonic saturation is not a constant slip push); per-leg flex/ext → stance vs swing |
+| Six-leg gait | Idle: all planted at rest. Walk: T2/T3+DNa **phasic** gate; stance-slip **EMA** so MN jitter is not a fidget loop |
 | Soft parts | Head+eyes+antennae+mouth FK from neck; abdomen12–6 **and** soma-X yaw from abdomen MNs; wings L/R from DLM/DVM/ADMN split; halteres rest / beat with wings / **gyro from yaw-rate**; JO antenna **pedicel+funiculus+arista** |
 | Vision → legs | Compound eye → `visionL/R` + optic Hz (R16/R7/R8, L1/L2, T4/T5, HS/VS from flow/loom) → LIF → annotated MNs → pose → stance-slip. No RGB dump, no salFood→HS, no bearing thruster |
-| Other senses | ORN plumes; **residual smell** (untyped ORNs) gets a multi-plume blend; JO + self-motion + **antenna pose feedback**; hygro L/R; taste residual; ppk/IR52b; **courtship** from other-fly proximity; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R; **proprio loop** (neck→hpT1, yaw→csaT3, abdomen→propT3); calm clock |
+| Other senses | ORN plumes; **residual smell** including **floral**; fruit CO₂; JO + self-motion + antenna pose; hygro L/R + extra dew/shade; nearest-fruit taste/IR52b; ppk; courtship; `cho*` `hp*` `csa*` `tact*` `prop*` including L/R; **residual campaniform/proprio**; **l-LNv CRY from R7**; DAN from sugar |
 | Neck / T1 pose | `poseMap.js`: T1 scale + neck dead-zone/smoothing. Sparse-pool Hz decode in `sim.worker.js` |
 | Wings / mouth | High `WING_FLAP_GATE`; MN9/proboscis dead-zone. Idle mesh stays at rest. No cosmetic flap |
 | Abdomen | Dead-zoned + **phasic** 207-cell pool; soma-Y segments; quiet unless meaningfully driven |

@@ -36,13 +36,13 @@ Default world is a **warm garden clearing** (`web/world/procgen.js`), not a dish
 
 | Affordances (on by default) | Off unless opted in |
 |---|---|
-| Moss floor, warm earth + gold flecks | Bitter fruit (`?bitter=1`) |
-| Ripe fruit cluster (spawn faces this) | Assay beacon pole (`?assay=1`) |
-| Berry patch | Scent bomb (HUD toggle, default off) |
-| Dew / moisture pool | Shock / aversive stim |
-| Shade plant (perch) | Night-black lighting |
-| Magenta + gold blossoms | Metal cage walls |
-| Moss tufts + garden hedge (bounce/redirect, never punish) | |
+| Moss floor, grass blades, warm earth + gold flecks | Bitter fruit (`?bitter=1`) |
+| Ripe fruit + extra clusters (spawn faces the main one) | Assay beacon pole (`?assay=1`) |
+| Berry patch + hanging shade fruit | Scent bomb (HUD toggle, default off) |
+| Dew pool + small extra puddle | Shock / aversive stim |
+| Leafy shade plant (perch, dappled) | Night-black lighting |
+| Six blossoms (magenta + gold) with a gentle breeze | Metal cage walls |
+| Moss tufts, ferns, leafy hedge (bounce/redirect, never punish) | |
 
 Scale: clearing radius **12.5**, soft hedge bounce at **~10.8**. Cozy enough to feel like home, large enough to wander. Ambient light is warm and stable (no night orbit). Male CNS in the fly body remains the default embodiment.
 

@@ -6,21 +6,21 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=linked1";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=linked1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=linked1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=linked1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=linked1";
-import { spinRotors } from "./chassis.js?v=linked1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=utopia2";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=utopia2";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=utopia2";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=utopia2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=utopia2";
+import { spinRotors } from "./chassis.js?v=utopia2";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
   softDrive, muscleFromEma, embodyMuscle, neckFromEma, walkDriveFromEma,
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
-  residualIds, closeLoopProprio,
+  residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=linked1";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=linked1";
+} from "./poseMap.js?v=utopia2";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=utopia2";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=linked1");
+    this.worker = new Worker("sim.worker.js?v=utopia2");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -448,6 +448,20 @@ export class EmbodiedFly {
           stim.touch || [],
           ...proprioUsed,
           this.odor.JO?.L, this.odor.JO?.R,
+        );
+        // Untyped campaniform / proprio (not in neuromere splits) get world strain
+        // without max-merging on top of typed csaT* / propT*.
+        channels.campaniform = residualIds(
+          stim.campaniform || P.campaniform || [],
+          stim.csaT1, stim.csaT2, stim.csaT3,
+          channels.csaT1L, channels.csaT1R, channels.csaT2L, channels.csaT2R,
+          channels.csaT3L, channels.csaT3R,
+        );
+        channels.proprio = residualIds(
+          stim.proprio || P.proprio || [],
+          stim.propT1, stim.propT2, stim.propT3,
+          channels.propT1L, channels.propT1R, channels.propT2L, channels.propT2R,
+          channels.propT3L, channels.propT3R,
         );
         // vision aggregate is already visionL ∪ visionR — keep L/R as the drive.
         // Stim-map / causal inject: bind effector+stim pools as drive channels.
@@ -737,7 +751,7 @@ export class EmbodiedFly {
     const other = this.world.other;
     const ox = other ? other.body.position.x : 0;
     const oz = other ? other.body.position.z : 0;
-    const distF = Math.hypot(this.world.food.x - x, this.world.food.z - z);
+    const distF = nearestXZ(x, z, this.world.foods, this.world.food).dist;
     const bitterPos = this.world.bitter;
     const distB = bitterPos ? Math.hypot(bitterPos.x - x, bitterPos.z - z) : 99;
     const distO = other ? Math.hypot(ox - x, oz - z) : 99;
@@ -897,23 +911,29 @@ export class EmbodiedFly {
         // Walk: stronger coupling so T2/T3 planted feet actually translate.
         if (walkDrive < IDLE_WALK_GATE) {
           this.lastSlipAbs = 0;
+          if (this._slipSmooth) {
+            this._slipSmooth.sx = 0;
+            this._slipSmooth.sz = 0;
+            this._slipSmooth.yaw = 0;
+          }
         } else {
           const asym = Math.min(1.25, Math.abs(walkR - walkL) * 2.0 + walkDrive);
           // No constant-push floor: saturated T2/T3 must not cruise from a 0.45 gain.
-          const slipGain = (2.10 + 1.55 * asym) * walkDrive;
+          const slipGain = (1.85 + 1.25 * asym) * walkDrive;
           let sx = (slip.x / slip.n) * slipGain;
           let sz = (slip.z / slip.n) * slipGain;
           const step = Math.hypot(sx, sz);
-          const maxStep = 0.085;
+          const maxStep = 0.072;
           if (step > maxStep) {
             const k = maxStep / step;
             sx *= k; sz *= k;
           }
-          this.body.position.x += sx;
-          this.body.position.z += sz;
-          const dyaw = (slip.yawR - slip.yawL) * (0.90 + 0.55 * asym) * walkDrive;
-          this.heading += THREE.MathUtils.clamp(dyaw, -0.08, 0.08);
-          this.lastSlipAbs = Math.hypot(sx, sz);
+          const dyawRaw = (slip.yawR - slip.yawL) * (0.72 + 0.42 * asym) * walkDrive;
+          const sm = smoothSlip(this._slipSmooth || (this._slipSmooth = {}), sx, sz, dyawRaw, dt);
+          this.body.position.x += sm.sx;
+          this.body.position.z += sm.sz;
+          this.heading += sm.dyaw;
+          this.lastSlipAbs = Math.hypot(sm.sx, sm.sz);
         }
       } else {
         this.lastSlipAbs = 0;
@@ -1139,12 +1159,12 @@ export class EmbodiedFly {
       ? (odors.sampleAntenna
         ? odors.sampleAntenna(_antL.x, _antL.y, _antL.z, this.heading, -1)
         : odors.sample(_antL.x, _antL.y, _antL.z))
-      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0, flower: 0 };
     const sampR = odors
       ? (odors.sampleAntenna
         ? odors.sampleAntenna(_antR.x, _antR.y, _antR.z, this.heading, 1)
         : odors.sample(_antR.x, _antR.y, _antR.z))
-      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0, flower: 0 };
     const foodL = sampL.food * hungerGain;
     const foodR = sampR.food * hungerGain;
     const pherL = sampL.pher, pherR = sampR.pher;
@@ -1158,14 +1178,17 @@ export class EmbodiedFly {
     let co2HzR = phasicTonic(this.ornFilt, "co2R", co2R);
     let avL = phasicTonic(this.ornFilt, "avL", sampL.bitter || 0);
     let avR = phasicTonic(this.ornFilt, "avR", sampR.bitter || 0);
+    let flowerL = phasicTonic(this.ornFilt, "flL", sampL.flower || 0);
+    let flowerR = phasicTonic(this.ornFilt, "flR", sampR.flower || 0);
     // Mild bilateral contrast — keep L/R asymmetry without pegging receptors.
     ({ L: smellL, R: smellR } = lrKlinotaxis(smellL, smellR, 0.40));
     ({ L: pherHzL, R: pherHzR } = lrKlinotaxis(pherHzL, pherHzR, 0.34));
     ({ L: co2HzL, R: co2HzR } = lrKlinotaxis(co2HzL, co2HzR, 0.30));
     ({ L: avL, R: avR } = lrKlinotaxis(avL, avR, 0.32));
+    ({ L: flowerL, R: flowerR } = lrKlinotaxis(flowerL, flowerR, 0.30));
     this.lastSmellL = smellL;
     this.lastSmellR = smellR;
-    this.lastOdor = { foodL: smellL, foodR: smellR, pherL: pherHzL, pherR: pherHzR, co2L: co2HzL, co2R: co2HzR };
+    this.lastOdor = { foodL: smellL, foodR: smellR, pherL: pherHzL, pherR: pherHzR, co2L: co2HzL, co2R: co2HzR, flowerL, flowerR };
     const windL = odors ? odors.windAt(_antL.x, _antL.z) : { x: 0, z: 0 };
     const windR = odors ? odors.windAt(_antR.x, _antR.z) : { x: 0, z: 0 };
     // Body-frame wind: side = left+, forward along heading.
@@ -1184,12 +1207,15 @@ export class EmbodiedFly {
     ({ L: joL, R: joR } = lrKlinotaxis(joL, joR, 0.28));
     this.lastJO = { L: joL, R: joR };
     const beacon = this.world.person || this.world.food || { x: 0, z: 0 };
-    const distF = Math.hypot(beacon.x - x, beacon.z - z);
-    const distW = Math.hypot(this.world.water.x - x, this.world.water.z - z);
+    const distF = nearestXZ(x, z, this.world.foods, beacon).dist;
+    const distW = nearestXZ(x, z, this.world.waters, this.world.water).dist;
+    const distFl = nearestXZ(x, z, this.world.flowers, null).dist;
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
     this.prevDistO = distQ;
-    const day = 0.82 + 0.10 * (0.5 + 0.5 * Math.sin(t * 0.008));
+    const shade = underCanopy(x, z, this.world.perch);
+    // Stable garden daylight (no night orbit). Shade canopy dims the local catch.
+    const day = shade ? 0.58 : 0.90;
     this.day = day;
     const head = this.body.userData.head;
     if (head) head.getWorldPosition(_head);
@@ -1235,21 +1261,22 @@ export class EmbodiedFly {
         color: [0.23, 0.47, 0.91],
       })),
     });
-    // Annotated clock / neuromod pools — calm world→Hz (day, hunger, arousal, sleep).
-    // Quiet life state → near-baseline rates; never invented neurons.
+    // Annotated clock / neuromod pools — calm world→Hz.
+    // l-LNv CRY from actual R7 UV (not a fake sine daylight dump).
     const night = 1 - day;
     const aro = this.life.arousal || 0;
     const hung = this.life.hunger || 0;
     const slp = this.life.sleep || 0;
     const esc = this.cmd.escape || 0;
+    const skyUv = 0.5 * ((eye.L?.r7 || 0) + (eye.R?.r7 || 0));
     const clockRates = {
-      lLNv: 3 + day * 22,
-      sLNv: 3 + day * 18 + Math.max(0, Math.sin(t * 0.012)) * 5,
+      lLNv: 3 + skyUv * 85,
+      sLNv: 3 + day * 16 + skyUv * 14,
       LNd: 2 + day * 11 + night * 7,
       DN1a: 2 + night * 14,
       DN1p: 2 + night * 16 + slp * 10,
-      DAN: 2 + aro * 8 + (1 - hung) * 3,
-      OA: 2 + aro * 12 + esc * 8,
+      DAN: 2 + aro * 6 + (1 - hung) * 3,
+      OA: 2 + aro * 10 + esc * 8,
       HT: 2 + slp * 10 + night * 5,
       pep: 2 + hung * 10,
     };
@@ -1297,8 +1324,10 @@ export class EmbodiedFly {
       ? Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) : 99;
     const bitterHz = bitterOnMap && nearFloor ? gradedContact(distB, 1.35, 65) : 0;
     const taste = Math.max(sweetHz, bitterHz * 0.85);
-    const hygroL = 4 + moistL * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
-    const hygroR = 4 + moistR * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
+    clockRates.DAN = Math.min(40, (clockRates.DAN || 0) + sweetHz * 0.12);
+    const shadeMoist = shade ? 7 : 0;
+    const hygroL = 4 + moistL * 40 + (distW < 1.4 && nearFloor ? gradedContact(distW, 1.4, 38) : 0) + shadeMoist;
+    const hygroR = 4 + moistR * 40 + (distW < 1.4 && nearFloor ? gradedContact(distW, 1.4, 38) : 0) + shadeMoist;
     const hygro = 0.5 * (hygroL + hygroR);
     // ppk courtship / contact — graded by proximity + slight L/R from bearing.
     const bOth = other ? bearingTo(other.body.position.x, other.body.position.z, x, z, c, s) : 0;
@@ -1308,10 +1337,12 @@ export class EmbodiedFly {
     const ppkR = Math.min(120, ppkBase * (1 + Math.max(0, bOth) * 0.28));
     // ppk25: contact pheromone; IR52b: food/leg contact — annotated receptor pools.
     const foodContact = nearFloor ? gradedContact(distF, 1.4, 55) : 0;
+    const nearestFood = nearestXZ(x, z, this.world.foods, this.world.food).pt || this.world.food;
+    const bFood = bearingTo(nearestFood.x, nearestFood.z, x, z, c, s);
     const ppk25L = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, -bOth) * 0.22));
     const ppk25R = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, bOth) * 0.22));
-    const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
-    const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
+    const irL = Math.min(110, foodContact * (1 + Math.max(0, -bFood) * 0.2) + ppkBase * 0.15);
+    const irR = Math.min(110, foodContact * (1 + Math.max(0, bFood) * 0.2) + ppkBase * 0.15);
     const grounded = this.y < stand + 0.18 || this.onPerch;
     // Garden home: no cage-wall mechanosensation (hedge is visual + bounce only).
     const wall = 0;
@@ -1321,8 +1352,10 @@ export class EmbodiedFly {
     const courtHz = extra.courtship
       || (other ? gradedContact(distQ, 3.2, 55) * (oView ? 1.15 : 0.50) : 0);
     // Residual smell (untyped ORNs) gets a multi-plume blend; typed ORNs keep their channels.
-    const smellBlendL = 0.42 * smellL + 0.32 * pherHzL + 0.16 * co2HzL + 0.10 * avL;
-    const smellBlendR = 0.42 * smellR + 0.32 * pherHzR + 0.16 * co2HzR + 0.10 * avR;
+    // Floral volatiles go here only — not dumped into foodORN (those are fruit esters).
+    const flowerNear = distFl < 1.8 ? gradedContact(distFl, 1.8, 16) : 0;
+    const smellBlendL = 0.36 * smellL + 0.24 * pherHzL + 0.14 * co2HzL + 0.08 * avL + 0.18 * flowerL + 0.10 * flowerNear;
+    const smellBlendR = 0.36 * smellR + 0.24 * pherHzR + 0.14 * co2HzR + 0.08 * avR + 0.18 * flowerR + 0.10 * flowerNear;
 
     let proprio = this.readProprio(wall, grounded);
     proprio = closeLoopProprio(proprio, {

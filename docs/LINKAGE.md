@@ -4,7 +4,7 @@ Honest coverage of **sensory world → encoder → annotated pools → LIF (weig
 
 Public runtime: **male CNS**, NeuroMechFly body, utopia garden, Earth-fly vision path, **dynw1** time-varying synapses. No invented MNs, no CPG, no thrusters.
 
-Cache: [`?v=linked1`](https://wjb000.github.io/fruitflybrain/?v=linked1). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md).
+Cache: [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md).
 
 ## Pipeline
 
@@ -29,6 +29,23 @@ Worker drive is **max-merge** across overlapping channels. Typed pools (foodORN,
 | **HALF-LINKED** | Path exists but is kinematic fill, aggregate-only, or readout without a dedicated mesh joint |
 | **EMPTY-BY-ANNOTATION** | FlyEM type strings have **zero** cells; we do not invent IDs |
 | **STRUCTURAL** | Mesh/plant has no joint; documented limit, not a missing label |
+
+## Newly linked in `utopia2`
+
+| Gap | What changed | IDs used |
+|---|---|---|
+| Untyped campaniform (~219) | Residual `campaniform` ← load/gyro/wing strain; typed `csaT*` keep neuromere channels | `stim.campaniform` minus `csaT1/2/3` |
+| Untyped proprio (~316) | Residual `proprio` ← joint blend; typed `propT*` stay on their channels | `stim.proprio` minus `propT1/2/3` |
+| All fruit, not just spawn food | Nearest cluster → `sweet` / `taste` / `IR52b` | existing GRN / IR52b |
+| Floral volatiles | Blossom plume + proximity → **residual smell only** (not foodORN) | leftover `smell` IDs |
+| Fruit fermentation CO₂ | Ripe fruit puffs → `co2ORN` | `ORN_V` 55 |
+| Extra dew | Second puddle + shade moisture → `hygro` L/R | `hygrosensory` 66 |
+| l-LNv CRY | Actual compound-eye **R7 UV**, not a fake sine day | `lLNv` 8 |
+| DAN reward | Sugar contact adds Hz on existing DAN | `DAN` 340 |
+| Shade canopy | Dims local day / raises hygro under the perch | clock + hygro (same IDs) |
+| Whole-body motion | Stance-slip EMA + tighter yaw; slower hinge tau | same MN IDs — no CPG |
+
+Kept from `linked1`: residual smell/taste/touch, courtship, antenna parts, haltere gyro, neck/abdomen proprio, abdomen yaw, wing L/R, eye glow, dynw1 synapses.
 
 ## Newly linked in `linked1`
 
@@ -87,16 +104,16 @@ Walking may **kinematically couple** those hinges from tibia/trochanter (`embody
 | HS / VS | 8 / 34 L/R | Wide-field from T4/T5 | **LINKED** |
 | `vision` aggregate | 4114 | Split → `visionL/R` (same IDs). Aggregate channel is UI extra only — **not double-driven** | **LINKED** (via split) |
 | food / pher / CO₂ / aversive ORN | 841 / 631 / 55 / 209 L/R | Antenna-tip plumes | **LINKED** |
-| `smell` aggregate | 2639 | Residual untyped ORNs ← blend; typed ORNs stay on their channels | **LINKED** (residual) |
+| `smell` aggregate | 2639 | Residual untyped ORNs ← blend **including floral**; typed ORNs stay on their channels | **LINKED** (residual) |
 | JO / wind | 672 L/R | Wind + self-motion + **antenna pose** | **LINKED** |
-| Hygro | 66 L/R | Moist plume + dew | **LINKED** |
-| Sweet / bitter / taste | 460 / 156 / 1486 | Contact; residual taste | **LINKED** |
-| ppk23 / ppk25 / IR52b | 269 / 257 / 226 L/R | Other-fly / food contact | **LINKED** |
+| Hygro | 66 L/R | Moist plume + dew (including extra puddle) + shade | **LINKED** |
+| Sweet / bitter / taste | 460 / 156 / 1486 | Contact at **nearest fruit**; residual taste | **LINKED** |
+| ppk23 / ppk25 / IR52b | 269 / 257 / 226 L/R | Other-fly / **nearest-food** contact | **LINKED** |
 | `courtship` | 3149 | Other-fly proximity/view (and UI extra) | **LINKED** |
 | `escape` | 2 (= DNp01) | UI extra / MN readout only — not a loom cheat into giant fiber | **HALF-LINKED** |
 | `touch` aggregate | 5756 | Residual after proprio/JO | **LINKED** (residual) |
-| Proprio cho/hp/csa/tact/prop | cho 425, hp 113, csa 426, … L/R by neuromere | Leg pose + **closeLoopProprio** | **LINKED** |
-| Clock / neuromod | sLNv 8, lLNv 8, LNd 10, DN1a 4, DN1p 12, DAN 340, OA 37, HT 8, pep 29 | Calm day/hunger/sleep/arousal Hz | **LINKED** |
+| Proprio cho/hp/csa/tact/prop | cho 425, hp 113, csa 426, … L/R by neuromere | Leg pose + **closeLoopProprio**; **residual campaniform (~219) and proprio (~316)** | **LINKED** |
+| Clock / neuromod | sLNv 8, lLNv 8, LNd 10, DN1a 4, DN1p 12, DAN 340, OA 37, HT 8, pep 29 | l-LNv from **R7 UV**; DAN from sugar; others calm day/hunger/sleep | **LINKED** |
 
 `neckL` / `neckR` also appear in `stim.json` (duplicate CvN IDs). They are **motor**, not sensory write-in.
 
@@ -133,4 +150,5 @@ Walking may **kinematically couple** those hinges from tibia/trochanter (`embody
 ```bash
 python export_effectors.py   # web/data/{effectors,stim}.json
 node tools/linked1_linkage_sanity.mjs
+node tools/utopia2_linkage_sanity.mjs
 ```
