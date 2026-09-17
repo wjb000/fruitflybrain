@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=linked1";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=linked1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=linked1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=linked1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=linked1";
-import { spinRotors } from "./chassis.js?v=linked1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=linked2";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=linked2";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=linked2";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=linked2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=linked2";
+import { spinRotors } from "./chassis.js?v=linked2";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=linked1";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=linked1";
+} from "./poseMap.js?v=linked2";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=linked2";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=linked1");
+    this.worker = new Worker("sim.worker.js?v=linked2");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {

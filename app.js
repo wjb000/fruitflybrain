@@ -1,17 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=linked1";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=linked1";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=linked1";
-import { EmbodiedFly } from "./agent.js?v=linked1";
-import { drawOmmatidia } from "./eye.js?v=linked1";
-import { OdorWorld } from "./plume.js?v=linked1";
-import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=linked1";
-import { parseLesionFlag } from "./lesion.js?v=linked1";
-import { mountAssayPanel } from "./assay/panel.js?v=linked1";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=linked1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=linked1";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=linked1";
+import { loadNmf, createMaleFly } from "./fly.js?v=linked2";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=linked2";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=linked2";
+import { EmbodiedFly } from "./agent.js?v=linked2";
+import { drawOmmatidia } from "./eye.js?v=linked2";
+import { OdorWorld } from "./plume.js?v=linked2";
+import { physics, connectPhysics, clearPhysics, flushPhysics } from "./physics.js?v=linked2";
+import { parseLesionFlag } from "./lesion.js?v=linked2";
+import { mountAssayPanel } from "./assay/panel.js?v=linked2";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=linked2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=linked2";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=linked2";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=linked2";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -34,25 +35,23 @@ const loadmsg = $("loadmsg");
 const MAX_FLIES = 8;
 
 function setLoad(p, msg) {
-  barEl.style.width = Math.round(p * 100) + "%";
-  if (msg) loadmsg.textContent = msg;
+  if (barEl) barEl.style.width = Math.round(Math.min(1, Math.max(0, p)) * 100) + "%";
+  if (msg && loadmsg) loadmsg.textContent = msg;
 }
-async function fetchBuf(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(url + " " + res.status);
-  return res.arrayBuffer();
-}
-async function fetchJson(url) { return (await fetch(url)).json(); }
 
-setLoad(0.04, "male CNS connectome");
+setLoad(0.04, connectomeWaitMsg());
 
 const [
   mNeu, mCsr, mBrain, mVnc, mStim, mEff, mMeta,
 ] = await Promise.all([
-  fetchBuf("data/neurons.bin"),
-  fetchBuf("data/connectome.bin"),
-  fetchBuf("data/brain.mesh"),
-  fetchBuf("data/vnc.mesh"),
+  fetchBufProgress("data/neurons.bin"),
+  fetchBufProgress("data/connectome.bin", (got, tot) => {
+    const t = tot || CONNECTOME_BYTES;
+    const frac = t ? Math.min(1, got / t) : 0;
+    setLoad(0.04 + 0.72 * frac, connectomeWaitMsg(got, t));
+  }, CONNECTOME_BYTES),
+  fetchBufProgress("data/brain.mesh"),
+  fetchBufProgress("data/vnc.mesh"),
   fetchJson("data/stim.json"),
   fetchJson("data/effectors.json"),
   fetchJson("data/meta.json"),
