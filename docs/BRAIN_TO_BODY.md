@@ -61,7 +61,7 @@ Restore cube: `?body=cube`. Restore fly body: `?body=fly`. Cache-bust: `?v=drone
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick; silence
 optic pools (`?lesion=silence:HS`) should weaken beacon-directed yaw.
 
-Plant URL: `web/plantConfig.js` (Pages → Mac tunnel by default).
+Plant URL: `web/plantConfig.js`. GitHub Pages is kinematic unless `?plant=` is set — empty `plantBase` must not fetch `/physics/health`.
 Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load; soft rim bounce
 preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 **off by default**.

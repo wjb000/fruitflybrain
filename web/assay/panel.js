@@ -18,15 +18,15 @@ export function mountAssayPanel({
   el.className = "panel assay-panel";
   el.innerHTML = `
     <button class="collapse" type="button" title="collapse">–</button>
-    <div class="kicker">assay · lesion</div>
+    <div class="kicker">assay · optional</div>
     <div class="panel-body">
-      <div class="hint">See landmark → lights out → yaw animal → DARK retrieve (memory). Lesions hit LIF, not joints. MN-only body.</div>
+      <div class="hint">Optional heading-memory check (see → dark → yaw → retrieve). Intact first. Pool mute is a diagnostic, not a default.</div>
       <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
         <button type="button" id="assayRun">run trial</button>
-        <button type="button" id="assaySilenceHS">silence HS</button>
-        <button type="button" id="assayClearLesion">clear lesion</button>
+        <button type="button" id="assaySilenceHS">mute HS</button>
+        <button type="button" id="assayClearLesion">restore intact</button>
       </div>
-      <label class="hint" style="display:block;margin-top:8px">lesion flag
+      <label class="hint" style="display:block;margin-top:8px">pool flag
         <input id="assayLesionIn" type="text" value="silence:HS" style="width:100%;margin-top:4px;font:inherit;background:#12151c;color:#e8ecf4;border:1px solid #2a3140;border-radius:6px;padding:4px 8px" />
       </label>
       <div class="hint" id="assayStatus" style="margin-top:8px">idle</div>
@@ -91,7 +91,7 @@ export function mountAssayPanel({
   el.querySelector("#assayClearLesion").onclick = () => {
     const fly = getFly();
     if (fly && clearLesion) clearLesion(fly);
-    status().textContent = "lesion cleared";
+    status().textContent = "intact restored";
   };
 
   const btn = el.querySelector(".collapse");

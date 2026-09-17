@@ -1,6 +1,6 @@
 # Fruit-fly CNS — live connectome driving a body
 
-The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) on a **small pad arena**. The public Pages default is a **robot controller**: sensors → LIF → leg/descending MNs → portable `forward`/`yawRate` → **quadrotor axes** (`pitch` / `yaw` / `strafe` / `throttle`, hover ~1.45) on a visual drone chassis (no NeuroMechFly mesh posing, no MuJoCo vault). Add `?body=cube` for the box plant or `?body=fly` to restore NeuroMechFly / MuJoCo. Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
+The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) at home in a **fly utopia** garden. The public Pages default is the **NeuroMechFly body** driven by the full Male CNS LIF (kinematic planted walk — Pages has no MuJoCo plant). Add `?body=cube` for the box plant or `?body=drone` for the quadrotor. Hard-refresh with [`?v=linked2`](https://wjb000.github.io/fruitflybrain/?v=linked2). Male CNS only; female BANC under `web/data/female/` is not shipped on Pages. The connectome bin is ~38MB — use desktop Chrome.
 
 ## Sex-swap digital twin (CVA-SST)
 
@@ -26,7 +26,7 @@ How to use:
 3. Move / drag the blob; drone yaws toward it and advances when centered via the brain path.
 4. Toggle fast weights ON to adapt while you move; freeze and jump sides to see worse reacquisition.
 
-**Robot controller / vision→steer:** compound eye (food beacon + landmarks) → optic/`visionL/R` pools → LIF → leg + descending MNs → [`web/controller/portable.js`](web/controller/portable.js) (`steering.forward` → pitch, `yawRate` → yaw; T2 strafe; wing MNs climb). Hard-refresh with `?v=follow1`. **Stim map** (default on drone, or `?stim=1`): click pools like T1L/T1R to Hz-inject through LIF and watch drone pitch/yaw/throttle — causal motor mapping, not beacon-chase tuning. Flight free-joint lift remains **off** unless `?flight=1` (fly mode only).
+**Vision→steer:** compound eye → optic/`visionL/R` pools → LIF → leg + descending MNs → NeuroMechFly pose (Pages default) or [`web/controller/portable.js`](web/controller/portable.js) drone/cube axes. Hard-refresh with `?v=linked2`. **Stim map** (`?stim=1`): click pools like T1L/T1R to Hz-inject through LIF. Flight free-joint lift remains **off** unless `?flight=1`.
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -55,13 +55,16 @@ python serve.py --host 0.0.0.0 --port 8787 --no-open   # containers / public pla
 
 CORS is `Access-Control-Allow-Origin: *` so a static GitHub Pages front-end can call a remote MuJoCo plant.
 
-### Remote plant (Pages → Fly.io, etc.)
+### Remote plant (Pages is kinematic unless you opt in)
 
-The static UI in `web/` talks to `/physics/*` on the same origin by default. To point at an external plant:
+GitHub Pages (and any other static host) has **no** MuJoCo plant. The UI must **not** request `/physics/health` same-origin — that 404s as `https://<user>.github.io/physics/health`. Empty `plantBase` → quiet kinematic fallback.
 
-1. Query string: `?plant=https://your-plant.example`
-2. Or `localStorage.ffbPlant = "https://your-plant.example"`
-3. Or leave unset → same-origin
+Probe a plant only when one is configured:
+
+1. Query string: `?plant=https://your-plant.example` (the Pages opt-in)
+2. `localStorage.ffbPlant` on local/dev only (ignored on github.io)
+3. `python serve.py` on localhost / 127.0.0.1 (same-origin `/physics`)
+4. `DEFAULT_PLANT` on non-static lab hosts — never auto-probed on github.io
 
 See `web/plantConfig.js`. The Docker image (`Dockerfile`) runs `serve.py --host 0.0.0.0` for plant hosting.
 
@@ -69,10 +72,10 @@ See `web/plantConfig.js`. The Docker image (`Dockerfile`) runs `serve.py --host 
 
 Closed loop:
 
-1. Light and odor from procedural landmarks drive the real sensory neurons.
+1. Light and odor from the garden drive the real sensory neurons.
 2. Spikes propagate through the connectome (LIF + short-term depression, fast EPSP vs slow neuromod).
-3. Descending + VNC **motor neurons** produce portable chassis commands (`forward`, `yawRate`).
-4. **Default (Pages):** a visual **quadrotor** maps those commands to pitch / yaw / strafe / throttle (hover ~1.45) on the small pad. **`?body=cube`:** box plant. **`?body=fly`:** NeuroMechFly mesh + MuJoCo (local/remote plant) or kinematic MN→pose→stance-slip.
+3. Descending + VNC **motor neurons** pose NeuroMechFly (or portable chassis commands on cube/drone).
+4. **Default (Pages):** kinematic NeuroMechFly in a fly utopia — no `/physics/health` probe. **`?body=cube`:** box plant. **`?body=drone`:** quadrotor. **`?plant=`:** remote MuJoCo.
 
 **x-ray CNS** shows the reconstructed brain (inside the cube or cuticle). Stim buttons bias sensory channels — motion still only emerges if MNs fire.
 
@@ -113,4 +116,3 @@ node tools/hdelta/run_experiments.mjs            # W1–W3 → results/hdelta/ex
 ```
 
 Interactive lab: [`web/hdelta.html?v=lab1`](web/hdelta.html) (Pages cache-bust). Freeze Δw mid-run, set η / decay, switch goal A/B or sequential A→B→A.
-

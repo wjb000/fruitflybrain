@@ -29,7 +29,7 @@ Toggle **hΔ plastic ON / frozen** on `follow.html`. This is a **client teaching
 3. Move / drag the blob; drone yaws toward it and advances when centered via the brain path.
 4. Toggle fast weights ON to adapt while you move; freeze and **jump side** to see worse reacquisition.
 
-Main sim: `index.html?v=follow1` (optional `?cam=1` thumbnail, same encoding). Fallback `?body=cube` / `?body=fly` unchanged.
+Main sim: `index.html?v=linked2` (fly utopia; optional `?cam=1` thumbnail, same encoding). Fallback `?body=cube` / `?body=drone`.
 
 ## Files
 
