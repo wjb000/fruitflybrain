@@ -128,6 +128,10 @@ Walking may **kinematically couple** those hinges from tibia/trochanter (`embody
 | `fru` | 2611 | Mild court label; synapses already in the graph | **HALF-LINKED** |
 | Optic readout (HS, VS, T4…) | — | Assay / portable / HUD; not actuators | **LINKED** (diagnostic) |
 
+## Pages (github.io)
+
+Kinematic default on static hosts: **no** `/physics/health` fetch unless `?plant=` (`plantConfig.plantProbeOrigins` from linked2). Connectome loader reports ~38MB progress (`loadutil.js`). Female BANC is not shipped. Cache [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2).
+
 ## Plant vs kinematic
 
 | DoF | Kinematic Pages | MuJoCo plant |

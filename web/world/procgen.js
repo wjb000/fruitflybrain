@@ -23,7 +23,7 @@ export const UTOPIA_HOME = { x: 0.12, z: 0.18 };
 const _leafGeo = new THREE.CircleGeometry(1, 13);
 const _sphere = new THREE.SphereGeometry(1, 14, 12);
 const _cyl = new THREE.CylinderGeometry(1, 1, 1, 8);
-const _cone = new THREE.ConeGeometry(0.04, 0.26, 5);
+const _cone = new THREE.ConeGeometry(0.016, 0.12, 5);
 const _dummy = new THREE.Object3D();
 
 function urlFlag(name) {
@@ -394,7 +394,7 @@ function hedgeClump(ang, R, s, sway) {
 }
 
 function addGrassField(parent) {
-  const n = 340;
+  const n = 560;
   const mat = new THREE.MeshStandardMaterial({
     color: 0x4aa03c,
     roughness: 0.86,
@@ -404,14 +404,15 @@ function addGrassField(parent) {
   mesh.receiveShadow = true;
   for (let i = 0; i < n; i++) {
     const ang = (i * 2.399963) % (Math.PI * 2);
-    const r = 0.45 + ((i * 17) % 92) * 0.095;
-    if (r > 9.8) {
+    const r = 0.38 + ((i * 17) % 118) * 0.078;
+    if (r > 9.6) {
       _dummy.scale.set(0, 0, 0);
     } else {
-      _dummy.position.set(Math.sin(ang) * r, 0.12, Math.cos(ang) * r);
-      _dummy.rotation.set(((i % 5) - 2) * 0.12, i * 0.7, ((i % 3) - 1) * 0.08);
-      const sc = 0.65 + (i % 8) * 0.07;
-      _dummy.scale.set(sc, 0.85 + (i % 5) * 0.12, sc);
+      // Short lawn blades at fly scale — not waist-high cones.
+      _dummy.position.set(Math.sin(ang) * r, 0.055, Math.cos(ang) * r);
+      _dummy.rotation.set(((i % 5) - 2) * 0.14, i * 0.7, ((i % 3) - 1) * 0.1);
+      const sc = 0.7 + (i % 8) * 0.055;
+      _dummy.scale.set(sc, 0.72 + (i % 5) * 0.1, sc);
     }
     _dummy.updateMatrix();
     mesh.setMatrixAt(i, _dummy.matrix);

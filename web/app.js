@@ -12,6 +12,7 @@ import { mountAssayPanel } from "./assay/panel.js?v=utopia2";
 import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=utopia2";
 import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=utopia2";
 import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=utopia2";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=utopia2";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -34,25 +35,22 @@ const loadmsg = $("loadmsg");
 const MAX_FLIES = 8;
 
 function setLoad(p, msg) {
-  barEl.style.width = Math.round(p * 100) + "%";
-  if (msg) loadmsg.textContent = msg;
+  if (barEl) barEl.style.width = Math.round(Math.min(1, Math.max(0, p)) * 100) + "%";
+  if (msg && loadmsg) loadmsg.textContent = msg;
 }
-async function fetchBuf(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(url + " " + res.status);
-  return res.arrayBuffer();
-}
-async function fetchJson(url) { return (await fetch(url)).json(); }
-
-setLoad(0.04, "male CNS connectome");
+setLoad(0.04, connectomeWaitMsg());
 
 const [
   mNeu, mCsr, mBrain, mVnc, mStim, mEff, mMeta,
 ] = await Promise.all([
-  fetchBuf("data/neurons.bin"),
-  fetchBuf("data/connectome.bin"),
-  fetchBuf("data/brain.mesh"),
-  fetchBuf("data/vnc.mesh"),
+  fetchBufProgress("data/neurons.bin"),
+  fetchBufProgress("data/connectome.bin", (got, tot) => {
+    const t = tot || CONNECTOME_BYTES;
+    const frac = t ? Math.min(1, got / t) : 0;
+    setLoad(0.04 + 0.72 * frac, connectomeWaitMsg(got, t));
+  }, CONNECTOME_BYTES),
+  fetchBufProgress("data/brain.mesh"),
+  fetchBufProgress("data/vnc.mesh"),
   fetchJson("data/stim.json"),
   fetchJson("data/effectors.json"),
   fetchJson("data/meta.json"),
@@ -71,9 +69,9 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 80);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 80);
 if (BODY_MODE === "fly") {
-  camera.position.set(UTOPIA_HOME.x + 0.92, 1.08, UTOPIA_HOME.z + 1.85);
+  camera.position.set(UTOPIA_HOME.x + 1.55, 1.32, UTOPIA_HOME.z + 2.75);
 } else if (BODY_MODE === "drone") {
   camera.position.set(0, 5.4, 9.2);
 } else {
@@ -86,12 +84,12 @@ controls.rotateSpeed = 0.55;
 controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.72;
-controls.maxDistance = 11;
+controls.minDistance = 1.15;
+controls.maxDistance = 12;
 controls.target.set(
-  BODY_MODE === "fly" ? UTOPIA_HOME.x + 0.45 : 0,
-  BODY_MODE === "fly" ? 0.38 : 0.55,
-  BODY_MODE === "fly" ? UTOPIA_HOME.z + 0.35 : 0
+  BODY_MODE === "fly" ? UTOPIA_HOME.x + 0.35 : 0,
+  BODY_MODE === "fly" ? 0.42 : 0.55,
+  BODY_MODE === "fly" ? UTOPIA_HOME.z + 0.28 : 0
 );
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
@@ -673,8 +671,8 @@ function overviewCamera() {
   userDriving = false;
   followMode = "off";
   syncFollow();
-  controls.target.set(UTOPIA_HOME.x + 0.35, 0.38, UTOPIA_HOME.z + 0.25);
-  camera.position.set(UTOPIA_HOME.x + 1.15, 1.15, UTOPIA_HOME.z + 2.05);
+  controls.target.set(UTOPIA_HOME.x + 0.3, 0.42, UTOPIA_HOME.z + 0.22);
+  camera.position.set(UTOPIA_HOME.x + 1.85, 1.55, UTOPIA_HOME.z + 3.15);
   controls.update();
 }
 
@@ -901,8 +899,8 @@ function loop() {
     camera.position.add(delta);
     const offset = camera.position.clone().sub(controls.target);
     let radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length()));
-    const span = Math.max(2.4, maxx - minx, maxz - minz);
-    const comfort = Math.min(6.2, Math.max(2.35, 2.45 + span * 0.24));
+    const span = Math.max(2.8, maxx - minx, maxz - minz);
+    const comfort = Math.min(7.2, Math.max(2.85, 2.85 + span * 0.26));
     radius += (comfort - radius) * 0.02;
     offset.setLength(radius);
     camera.position.copy(controls.target).add(offset);
