@@ -4,11 +4,12 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createDroneChassis } from "./chassis.js?v=follow1";
-import { createOpenWorld } from "./world/procgen.js?v=follow1";
-import { EmbodiedFly } from "./agent.js?v=follow1";
-import { portableControls, droneSetpoints } from "./controller/portable.js?v=follow1";
-import { createHandCam, applyCamToFly } from "./handcam.js?v=follow1";
+import { createDroneChassis } from "./chassis.js?v=ogbody1";
+import { createOpenWorld } from "./world/procgen.js?v=ogbody1";
+import { EmbodiedFly } from "./agent.js?v=ogbody1";
+import { portableControls, droneSetpoints } from "./controller/portable.js?v=ogbody1";
+import { createHandCam, applyCamToFly } from "./handcam.js?v=ogbody1";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=ogbody1";
 
 const $ = (id) => document.getElementById(id);
 const loaderEl = $("loader");
@@ -16,24 +17,21 @@ const barEl = $("bar");
 const loadmsg = $("loadmsg");
 
 function setLoad(p, msg) {
-  if (barEl) barEl.style.width = Math.round(p * 100) + "%";
+  if (barEl) barEl.style.width = Math.round(Math.min(1, Math.max(0, p)) * 100) + "%";
   if (msg && loadmsg) loadmsg.textContent = msg;
 }
 
-async function fetchBuf(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(url + " " + res.status);
-  return res.arrayBuffer();
-}
-async function fetchJson(url) { return (await fetch(url)).json(); }
-
-setLoad(0.06, "male CNS connectome");
+setLoad(0.04, connectomeWaitMsg());
 
 const [mNeu, mCsr, mBrain, mVnc, mStim, mEff, mMeta] = await Promise.all([
-  fetchBuf("data/neurons.bin"),
-  fetchBuf("data/connectome.bin"),
-  fetchBuf("data/brain.mesh"),
-  fetchBuf("data/vnc.mesh"),
+  fetchBufProgress("data/neurons.bin"),
+  fetchBufProgress("data/connectome.bin", (got, tot) => {
+    const t = tot || CONNECTOME_BYTES;
+    const frac = t ? Math.min(1, got / t) : 0;
+    setLoad(0.04 + 0.50 * frac, connectomeWaitMsg(got, t));
+  }, CONNECTOME_BYTES),
+  fetchBufProgress("data/brain.mesh"),
+  fetchBufProgress("data/vnc.mesh"),
   fetchJson("data/stim.json"),
   fetchJson("data/effectors.json"),
   fetchJson("data/meta.json"),

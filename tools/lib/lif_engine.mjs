@@ -1,9 +1,11 @@
 /**
  * Headless male-CNS LIF (subset of web/sim.worker.js) for lesion sweeps.
  * Sensory in → connectome → MN/effector rates out. No Three.js / joints.
+ * Chemical synapses: connectome weights × NT-aware Tsodyks–Markram STD/STF.
  */
 import fs from "fs";
 import path from "path";
+import { chemWeight, NT_STP, ntSign } from "../../web/stp.js";
 
 export function loadBins(dataDir) {
   const neu = fs.readFileSync(path.join(dataDir, "neurons.bin"));
@@ -61,8 +63,11 @@ export class LifEngine {
     this.mDA = new Float32Array(n);
     this.mOA = new Float32Array(n);
     this.m5 = new Float32Array(n);
-    this.uStd = new Float32Array(n);
-    this.uStd.fill(1);
+    this.uFac = new Float32Array(n);
+    this.xStd = new Float32Array(nnz);
+    this.xStd.fill(1);
+    this.tLastStd = new Float32Array(n);
+    this.tLastStd.fill(-1e6);
     this.gainOut = new Float32Array(n); this.gainOut.fill(1);
     this.edgeScale = new Float32Array(nnz); this.edgeScale.fill(1);
     this.delaySteps = new Int16Array(n);
@@ -70,8 +75,8 @@ export class LifEngine {
     this.hungerMod = 1;
     this.params = {
       dt: 0.5, tau: 20, tauSynFast: 4.5, tauSynInhib: 7, tauAdapt: 90, tauMod: 1400,
-      tauStd: 220, vRest: 0, vReset: 0, vThresh: 1, refractory: 2,
-      wScale: 0.012, inhibGain: 2.15, stimAmp: 0.11, stdUse: 0.12, facOA: 0.08,
+      tauStd: 420, vRest: 0, vReset: 0, vThresh: 1, refractory: 2,
+      wScale: 0.028, inhibGain: 2.15, stimAmp: 0.11, stdUse: 0.40, facOA: 0.08,
     };
     this.sign = new Float32Array(n);
     this._rebuildSign();
@@ -93,6 +98,7 @@ export class LifEngine {
     this.fastWEta = 0.08;
     this.fastWDecay = 0.996;
     this.fastWClip = 2.5;
+    this.lastSyn = { meanU: 0, meanX: 1, meanEff: 1, meanW: 0, nDepressed: 0, nEdges: 0, nPre: 0 };
   }
 
   /**
@@ -206,7 +212,7 @@ export class LifEngine {
     for (let i = 0; i < this.n; i++) {
       const k = this.nt[i];
       if (k === 5 || k === 6 || k === 7) this.sign[i] = 0;
-      else this.sign[i] = (k === 2 || k === 3 || k === 4) ? -g : 1;
+      else this.sign[i] = ntSign(k, g);
     }
   }
 
@@ -299,7 +305,7 @@ export class LifEngine {
   reset() {
     this.V.fill(0); this.I.fill(0); this.refrac.fill(0); this.spikes.fill(0);
     this.adapt.fill(0); this.mDA.fill(0); this.mOA.fill(0); this.m5.fill(0);
-    this.uStd.fill(1); this.t = 0;
+    this.uFac.fill(0); this.xStd.fill(1); this.tLastStd.fill(-1e6); this.t = 0;
     for (let i = 0; i < this.DELAY; i++) this.delayRing[i] = [];
   }
 
@@ -309,91 +315,121 @@ export class LifEngine {
     const synDecay = 0.72 * Math.exp(-dt / p.tauSynFast) + 0.28 * Math.exp(-dt / p.tauSynInhib);
     const adaptDecay = Math.exp(-dt / p.tauAdapt);
     const modDecay = Math.exp(-dt / p.tauMod);
-    const stdDecay = Math.exp(-dt / p.tauStd);
     for (let i = 0; i < n; i++) {
       this.I[i] *= synDecay;
       this.adapt[i] *= adaptDecay;
       this.mDA[i] *= modDecay; this.mOA[i] *= modDecay; this.m5[i] *= modDecay;
-      this.uStd[i] += (1 - this.uStd[i]) * (1 - stdDecay);
     }
     if (this.fastW && this.fastWPlastic && this.fastWEdges && this.fastWDecay < 1) {
       const dcy = this.fastWDecay;
       for (let e = 0; e < this.fastWEdges.length; e++) this.fastW[this.fastWEdges[e]] *= dcy;
     }
+    let sumU = 0, sumX = 0, sumEff = 0, sumW = 0, nEdge = 0, nDep = 0, nPre = 0;
     for (let i = 0; i < n; i++) {
       if (!this.spikes[i]) continue;
-      const knt = this.nt[i];
-      let u = this.uStd[i];
-      this.uStd[i] = Math.max(0.05, u * (1 - p.stdUse));
+      const knt = this.nt[i] || 0;
+      const stp = NT_STP[knt] || NT_STP[0];
+      const U = stp.U, tauD = stp.tauD, tauF = stp.tauF;
+      const isi = this.t - this.tLastStd[i];
+      this.tLastStd[i] = this.t;
+      let u = this.uFac[i] * Math.exp(-Math.max(0, isi) / tauF);
+      const uOn = u + U * (1 - u);
+      this.uFac[i] = uOn;
+      const recX = Math.exp(-Math.max(0, isi) / tauD);
+      const beta = 1 - uOn;
+      sumU += uOn; nPre++;
       const gOut = this.gainOut[i];
       if (gOut <= 0) continue;
       const src = this.swapLR[i] >= 0 ? this.swapLR[i] : i;
       const a = this.indptr[src], b = this.indptr[src + 1];
       const dly = this.delaySteps[i];
+      const useFW = this.fastW && this.fastWPre && this.fastWPre[i];
       if (knt === 5) {
         const h = 0.55 + 0.9 * this.hungerMod;
+        const s = 0.012 * uOn * gOut * h;
         for (let k = a; k < b; k++) {
           if (this.edgeScale[k] <= 0) continue;
+          let x = 1 - (1 - this.xStd[k]) * recX;
           const j = this.indices[k];
-          const v = this.mDA[j] + 0.012 * Math.sqrt(this.weight[k]) * u * gOut * this.edgeScale[k] * h;
+          const v = this.mDA[j] + s * chemWeight(this.weight[k]) * x * this.edgeScale[k];
           this.mDA[j] = v > 1.5 ? 1.5 : v;
+          this.xStd[k] = Math.max(0.06, x * beta);
         }
       } else if (knt === 6) {
+        const s = 0.010 * uOn * gOut;
         for (let k = a; k < b; k++) {
           if (this.edgeScale[k] <= 0) continue;
+          let x = 1 - (1 - this.xStd[k]) * recX;
           const j = this.indices[k];
-          const v = this.m5[j] + 0.010 * Math.sqrt(this.weight[k]) * u * gOut * this.edgeScale[k];
+          const v = this.m5[j] + s * chemWeight(this.weight[k]) * x * this.edgeScale[k];
           this.m5[j] = v > 1.5 ? 1.5 : v;
+          this.xStd[k] = Math.max(0.06, x * beta);
         }
       } else if (knt === 7) {
         const h = 0.65 + 0.7 * this.hungerMod;
+        const s = 0.014 * uOn * gOut * h;
         for (let k = a; k < b; k++) {
           if (this.edgeScale[k] <= 0) continue;
+          let x = 1 - (1 - this.xStd[k]) * recX;
           const j = this.indices[k];
-          const v = this.mOA[j] + 0.014 * Math.sqrt(this.weight[k]) * u * gOut * this.edgeScale[k] * h;
+          const v = this.mOA[j] + s * chemWeight(this.weight[k]) * x * this.edgeScale[k];
           this.mOA[j] = v > 1.5 ? 1.5 : v;
+          this.xStd[k] = Math.max(0.06, x * beta);
         }
       } else if (dly > 0) {
         const slot = (this.delayPos + dly) % this.DELAY;
-        this.delayRing[slot].push({ s: this.sign[i] * p.wScale * u * gOut, a, b });
+        this.delayRing[slot].push({ s: this.sign[i] * p.wScale * uOn * gOut, a, b, recX, beta, uOn });
       } else {
-        const s = this.sign[i] * p.wScale * u * gOut;
-        const useFW = this.fastW && this.fastWPre && this.fastWPre[i];
-        if (useFW) {
-          const hebb = this.fastWPlastic;
-          const tgt = this.fastWTarget;
-          const eta = this.fastWEta;
-          const clip = this.fastWClip;
-          for (let k = a; k < b; k++) {
-            if (this.edgeScale[k] <= 0) continue;
-            const j = this.indices[k];
-            this.I[j] += s * (Math.sqrt(this.weight[k]) + this.fastW[k]) * this.edgeScale[k];
-            if (hebb) {
-              const post = tgt ? tgt[j] : (this.spikes[j] ? 1 : 0);
-              if (!post) continue;
-              let v = this.fastW[k] + eta * post;
-              if (v > clip) v = clip;
-              else if (v < -clip) v = -clip;
-              this.fastW[k] = v;
-            }
-          }
-        } else {
-          for (let k = a; k < b; k++) {
-            if (this.edgeScale[k] <= 0) continue;
-            this.I[this.indices[k]] += s * Math.sqrt(this.weight[k]) * this.edgeScale[k];
+        const s = this.sign[i] * p.wScale * gOut;
+        const hebb = useFW && this.fastWPlastic;
+        const tgt = this.fastWTarget;
+        const eta = this.fastWEta;
+        const clip = this.fastWClip;
+        for (let k = a; k < b; k++) {
+          if (this.edgeScale[k] <= 0) continue;
+          const j = this.indices[k];
+          let x = 1 - (1 - this.xStd[k]) * recX;
+          const wc = chemWeight(this.weight[k]);
+          const fw = useFW ? this.fastW[k] : 0;
+          const eff = uOn * x;
+          this.I[j] += s * (wc + fw) * eff * this.edgeScale[k];
+          this.xStd[k] = Math.max(0.06, x * beta);
+          sumX += x; sumEff += eff; sumW += wc; nEdge++;
+          if (eff < 0.18) nDep++;
+          if (hebb) {
+            const post = tgt ? tgt[j] : (this.spikes[j] ? 1 : 0);
+            if (!post) continue;
+            let v = this.fastW[k] + eta * post;
+            if (v > clip) v = clip;
+            else if (v < -clip) v = -clip;
+            this.fastW[k] = v;
           }
         }
       }
     }
     const due = this.delayRing[this.delayPos];
-    for (const { s, a, b } of due) {
+    for (const { s, a, b, recX, beta, uOn } of due) {
+      const rX = recX != null ? recX : 1;
+      const bt = beta != null ? beta : 0.6;
+      const u = uOn != null ? uOn : 0.4;
       for (let k = a; k < b; k++) {
         if (this.edgeScale[k] <= 0) continue;
-        this.I[this.indices[k]] += s * Math.sqrt(this.weight[k]) * this.edgeScale[k];
+        let x = 1 - (1 - this.xStd[k]) * rX;
+        this.I[this.indices[k]] += s * chemWeight(this.weight[k]) * u * x * this.edgeScale[k];
+        this.xStd[k] = Math.max(0.06, x * bt);
       }
     }
     this.delayRing[this.delayPos] = [];
     this.delayPos = (this.delayPos + 1) % this.DELAY;
+    this.lastSyn = {
+      meanU: nPre ? sumU / nPre : 0,
+      meanX: nEdge ? sumX / nEdge : 1,
+      meanEff: nEdge ? sumEff / nEdge : 1,
+      meanW: nEdge ? sumW / nEdge : 0,
+      nDepressed: nDep,
+      nEdges: nEdge,
+      nPre,
+    };
 
     const pScale = dt / 1000;
     for (let i = 0; i < n; i++) {
@@ -420,10 +456,17 @@ export class LifEngine {
     for (const name in this.effectorIds) {
       const ids = this.effectorIds[name];
       let h = 0;
-      for (let k = 0; k < ids.length; k++) if (this.spikes[ids[k]]) h++;
+      for (let k = 0; k < ids.length; k++) {
+        const i = ids[k];
+        if (this.spikes[i]) h += Math.min(2.2, 0.22 + Math.abs(this.I[i]) * 7);
+      }
       this.effectorHits[name] += h;
     }
     this.t += dt;
+  }
+
+  synStats() {
+    return { ...this.lastSyn, fastW: this.fastWStats() };
   }
 
   effectorHz(steps) {

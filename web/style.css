@@ -1,10 +1,10 @@
 :root {
-  --bg: #07080d;
-  --panel: rgba(10, 12, 18, 0.78);
-  --line: rgba(255, 255, 255, 0.08);
-  --text: #e8edf7;
-  --muted: #8b95a8;
-  --accent: #4de4ff;
+  --bg: #1a1612;
+  --panel: rgba(24, 20, 16, 0.82);
+  --line: rgba(255, 236, 210, 0.10);
+  --text: #f2eadc;
+  --muted: #a89880;
+  --accent: #e0b86a;
   --warn: #ff9f1c;
   --pink: #ff4fd8;
   --safe-t: env(safe-area-inset-top, 0px);
@@ -143,6 +143,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 .loader h2 { font-family: "IBM Plex Serif", serif; font-weight: 500; margin: 0; font-size: 28px; }
 .loader p { color: var(--muted); margin: 0; max-width: 420px; font-size: 13px; }
+.loader .loadhint { color: #d7c4a0; font-size: 12px; max-width: 460px; }
 .progress {
   width: 280px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden;
 }

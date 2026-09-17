@@ -5,8 +5,8 @@
  */
 import * as THREE from "three";
 
-const ARENA_R = 17.4;
-const PUFF_MAX_R2 = 2400 * 2400; // open world — don't cull at dish rim
+const ARENA_R = 12.5;
+const PUFF_MAX_R2 = 2400 * 2400; // don't cull at garden rim
 const MAX_PUFFS = 560;
 
 function makeSprite() {
@@ -27,12 +27,13 @@ function makeSprite() {
 const SPRITE = makeSprite();
 
 function windAt(x, z, t) {
-  const mx = -1.05 + 0.35 * Math.sin(t * 0.19);
-  const mz = -0.42 + 0.28 * Math.sin(t * 0.14 + 0.9);
-  const e1 = 0.55 * Math.sin(0.31 * x + 1.3 * t);
-  const e2 = 0.45 * Math.cos(0.27 * z - 1.1 * t);
-  const e3 = 0.32 * Math.sin(0.18 * (x + z) + 0.7 * t);
-  return { x: mx + e1 + 0.5 * e3, z: mz + e2 - 0.4 * e3 };
+  // Gentle garden breeze — enough for JO / plumes, never a gale.
+  const mx = -0.18 + 0.08 * Math.sin(t * 0.12);
+  const mz = -0.08 + 0.07 * Math.sin(t * 0.09 + 0.9);
+  const e1 = 0.10 * Math.sin(0.18 * x + 0.7 * t);
+  const e2 = 0.08 * Math.cos(0.16 * z - 0.6 * t);
+  const e3 = 0.06 * Math.sin(0.12 * (x + z) + 0.4 * t);
+  return { x: mx + e1 + 0.35 * e3, z: mz + e2 - 0.25 * e3 };
 }
 
 class PuffField {
@@ -178,8 +179,12 @@ export class OdorWorld {
     this.co2 = new PuffField({ color: 0x88a0c0, emitHz: 7, mass: 0.45, life: 3.6, y0: 1.2 });
     this.moist = new PuffField({ color: 0x4aa8ff, emitHz: 9, mass: 0.55, life: 5.5, y0: 0.3 });
     this.bitter = new PuffField({ color: 0x6a9a32, emitHz: 14, mass: 0.9, life: 5.8, y0: 0.35 });
+    this.flower = new PuffField({ color: 0xf0a0d0, emitHz: 8, mass: 0.42, life: 5.2, y0: 0.62 });
     this.group = new THREE.Group();
-    this.group.add(this.food.points, this.pher.points, this.co2.points, this.moist.points, this.bitter.points);
+    this.group.add(
+      this.food.points, this.pher.points, this.co2.points,
+      this.moist.points, this.bitter.points, this.flower.points,
+    );
     this.t = 0;
     this.wind = { x: -1, z: -0.4 };
     // Sensory bomb — intense optional food (and light pher) puff emitter. Default OFF.
@@ -218,7 +223,7 @@ export class OdorWorld {
 
   _syncVis() {
     const showPuffs = this._showOdor;
-    for (const f of [this.food, this.pher, this.co2, this.moist, this.bitter]) {
+    for (const f of [this.food, this.pher, this.co2, this.moist, this.bitter, this.flower]) {
       f.points.visible = showPuffs;
     }
     this.bombMesh.visible = this.bombEnabled;
@@ -233,16 +238,37 @@ export class OdorWorld {
     const flock = world.flies || [];
     this.wind = windAt(0, 0, t);
     this.food.acc += dt * this.food.emitHz;
+    const foodSources = (world.foods && world.foods.length) ? world.foods : [food];
     while (this.food.acc >= 1) {
       this.food.acc -= 1;
-      this.food.emit(food.x, 0.32, food.z, this.wind);
+      const src = foodSources[this.food.puffs.length % foodSources.length] || food;
+      this.food.emit(src.x, 0.32, src.z, this.wind);
     }
     this.moist.acc += dt * this.moist.emitHz;
+    const waters = (world.waters && world.waters.length) ? world.waters : [water];
     while (this.moist.acc >= 1) {
       this.moist.acc -= 1;
-      this.moist.emit(water.x, 0.28, water.z, this.wind);
+      const src = waters[this.moist.puffs.length % waters.length] || water;
+      this.moist.emit(src.x, 0.22, src.z, this.wind);
     }
-    if (bitter) {
+    const flowers = world.flowers || [];
+    if (flowers.length) {
+      this.flower.acc += dt * this.flower.emitHz;
+      while (this.flower.acc >= 1) {
+        this.flower.acc -= 1;
+        const src = flowers[this.flower.puffs.length % flowers.length];
+        this.flower.emit(src.x, 0.62, src.z, this.wind);
+      }
+    }
+    // Ripe fruit fermentation → CO₂ on existing ORN_V IDs (not aversive).
+    this.co2.acc += dt * this.co2.emitHz * 0.35;
+    while (this.co2.acc >= 1 && foodSources.length) {
+      this.co2.acc -= 1;
+      const src = foodSources[this.co2.puffs.length % foodSources.length] || food;
+      this.co2.emit(src.x, 0.38, src.z, this.wind);
+    }
+    const bitterOn = bitter && Math.hypot(bitter.x || 0, bitter.z || 0) < 40;
+    if (bitterOn) {
       this.bitter.acc += dt * this.bitter.emitHz;
       while (this.bitter.acc >= 1) {
         this.bitter.acc -= 1;
@@ -288,6 +314,7 @@ export class OdorWorld {
     this.co2.step(dt, t);
     this.moist.step(dt, t);
     this.bitter.step(dt, t);
+    this.flower.step(dt, t);
   }
 
   windAt(x, z) { return windAt(x, z, this.t); }
@@ -299,6 +326,7 @@ export class OdorWorld {
       co2: this.co2.sample(x, y, z),
       moist: this.moist.sample(x, y, z),
       bitter: this.bitter.sample(x, y, z),
+      flower: this.flower.sample(x, y, z),
     };
   }
 
@@ -310,6 +338,7 @@ export class OdorWorld {
       co2: this.co2.sampleProbe(x, y, z, heading, sideSign),
       moist: this.moist.sampleProbe(x, y, z, heading, sideSign),
       bitter: this.bitter.sampleProbe(x, y, z, heading, sideSign),
+      flower: this.flower.sampleProbe(x, y, z, heading, sideSign),
     };
   }
 }

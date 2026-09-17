@@ -1,16 +1,29 @@
+/**
+ * Embodied male fly: sensory encoding → LIF worker → annotated MN readout → body.
+ *
+ * Connectome (sim.worker.js) is primary. This file is gap-fill + readout:
+ * world/cameras → Hz on *existing* pools; motEma → muscle/pose; planted slip.
+ * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
+ */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=follow1";
-import { CompoundEye } from "./eye.js?v=follow1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=follow1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=follow1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=follow1";
-import { spinRotors } from "./chassis.js?v=follow1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=ogbody1";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=ogbody1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=ogbody1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=ogbody1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=ogbody1";
+import { spinRotors } from "./chassis.js?v=ogbody1";
+import {
+  LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
+  ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
+  softDrive, muscleFromEma, embodyMuscle, neckFromEma, walkDriveFromEma,
+  wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
+  residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
+  effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
+} from "./poseMap.js?v=ogbody1";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=ogbody1";
 
-const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
-const MUSCLE_NAMES = [
-  "coxaProm", "coxaRem", "coxaRotA", "coxaRotP", "coxaAdd",
-  "trFlex", "trExt", "feRed", "tiFlex", "tiExt", "taDep", "taLev",
-];
+const LEG_NAMES = POSE_LEG_NAMES;
+const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
 const JOINT_POOLS = LEG_NAMES.flatMap((leg) => MUSCLE_NAMES.map((m) => `${leg}_${m}`));
 const PROPRIO_KEYS = [
   "proprio", "chordotonal", "hairplate", "campaniform",
@@ -19,6 +32,9 @@ const PROPRIO_KEYS = [
   "propT1", "propT2", "propT3",
   "choT1L", "choT1R", "choT2L", "choT2R", "choT3L", "choT3R",
   "tactT1L", "tactT1R", "tactT2L", "tactT2R", "tactT3L", "tactT3R",
+  "hpT1L", "hpT1R", "hpT2L", "hpT2R", "hpT3L", "hpT3R",
+  "csaT1L", "csaT1R", "csaT2L", "csaT2R", "csaT3L", "csaT3R",
+  "propT1L", "propT1R", "propT2L", "propT2R", "propT3L", "propT3R",
 ];
 const LEG_NEUROMERE = { L1: "T1", R1: "T1", L2: "T2", R2: "T2", L3: "T3", R3: "T3" };
 const OPTIC_TYPES = [
@@ -34,6 +50,7 @@ export const STIM_MAP_POOLS = [
   "DNa", "DNp", "DNp01", "DNg02",
   "HS", "VS", "visionL", "visionR",
   "DLM", "DVM", "ADMN",
+  "JO", "hygro", "courtship", "neck", "abdomen",
 ];
 export const DEFAULT_STIM_HZ = 90;
 const _head = new THREE.Vector3();
@@ -62,32 +79,13 @@ function hzVis(v, gain = 70, base = 3) {
   return Math.max(0, Math.min(110, base + v * gain));
 }
 
-/** Soft-saturating map from effector EMA (0–1, already Hz-decoded) → drive.
- *  Honest: quiet pools stay near 0; mid rates become visible without hard clip.
- */
-function softDrive(v, gain = 3.25) {
-  const x = Math.max(0, v || 0);
-  return Math.tanh(x * gain);
-}
-
-/** Antagonist pair from real pool EMAs. Quiet×quiet → 0.
- *  Winner-take-more breaks co-contraction so stance-slip can translate
- *  (calm2 left both sides mid-fire → net DoF≈0 twitch). No CPG clock.
- */
-function antagPair(posEma, negEma, gain = 3.25) {
-  const p = softDrive(posEma, gain);
-  const n = softDrive(negEma, gain);
-  const mag = p + n;
-  if (mag < 1e-4) return { pos: 0, neg: 0 };
-  const raw = (p - n) / (mag + 0.045);
-  const d = Math.tanh(raw * 2.15);
-  const lose = 0.48; // suppress loser so flex/ext do not cancel
-  return {
-    pos: Math.max(0, Math.min(1, p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * 0.32)),
-    neg: Math.max(0, Math.min(1, n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * 0.32)),
-  };
-}
-
+const POSE_EMA_KEYS = new Set([
+  ...JOINT_POOLS, "neck", "neckL", "neckR",
+  "DLM", "DVM", "ADMN", "DLM_L", "DLM_R", "DVM_L", "DVM_R", "ADMN_L", "ADMN_R",
+  "MN9", "proboscis", "abdomen", "abdomen_L", "abdomen_R",
+  ...ABD_SEG_KEYS,
+  "T1L", "T1R", "T2L", "T2R", "T3L", "T3R", "DNa",
+]);
 
 function parseNeurons(buf) {
   const v = new DataView(buf);
@@ -130,6 +128,12 @@ function bearingTo(tx, tz, x, z, c, s) {
   return Math.atan2(dx * c - dz * s, dx * s + dz * c);
 }
 
+function wrapPi(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
 function phasicTonic(filt, key, c, dt = 0.032) {
   const slow = filt[key] || 0;
   // Filament onsets remain informative; ceilings stay below receptor saturation.
@@ -158,9 +162,9 @@ function gradedContact(dist, reach, peak = 100) {
   return peak * u * u;
 }
 
-const ARENA_R = 18; // small pad radius (matches world/procgen.js)
-const OPEN_WORLD = true; // soft XY clamp only — no hard cage walls
-const WORLD_SOFT_LIMIT = 15.8; // soft pad rim (~ARENA_R - 2.2)
+const ARENA_R = 12.5; // garden clearing (matches world/procgen.js)
+const OPEN_WORLD = true; // soft XY clamp only — garden hedge bounce, never punish
+const WORLD_SOFT_LIMIT = 10.8; // ~ARENA_R - 1.7
 /** Flight translation OFF by default — walking-focused. Re-enable with ?flight=1 */
 function flightEnabledFromUrl() {
   try {
@@ -174,14 +178,14 @@ export const FLIGHT_ENABLED = typeof location !== "undefined" && flightEnabledFr
 function bodyModeFromUrl() {
   try {
     const q = new URLSearchParams(location.search).get("body");
-    if (q === "fly" || q === "nmf" || q === "mujoco") return "fly";
+    if (q === "drone" || q === "quad" || q === "quadrotor") return "drone";
     if (q === "cube" || q === "box") return "cube";
-    return "drone";
+    return "fly";
   } catch (_) {
-    return "drone";
+    return "fly";
   }
 }
-export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "drone";
+export const BODY_MODE = typeof location !== "undefined" ? bodyModeFromUrl() : "fly";
 function isKinematicChassis(mode) {
   return mode === "drone" || mode === "cube";
 }
@@ -197,8 +201,10 @@ const READOUT_POOLS = [
 ];
 const POOL_KEYS = [
   "T1L", "T1R", "T2L", "T2R", "T3L", "T3R",
-  "DLM", "DVM", "ADMN", "MN9", "proboscis", "neck", "neckL", "neckR",
-  "DNa", "DNg02", "DNp01", "DNp", "aIPg", "pIP1", "fru", "abdomen",
+  "DLM", "DVM", "ADMN", "DLM_L", "DLM_R", "DVM_L", "DVM_R", "ADMN_L", "ADMN_R",
+  "MN9", "proboscis", "neck", "neckL", "neckR",
+  "DNa", "DNg02", "DNp01", "DNp", "aIPg", "pIP1", "fru", "abdomen", "abdomen_L", "abdomen_R",
+  ...ABD_SEG_KEYS,
   ...CLOCK_KEYS,
   ...JOINT_POOLS,
   ...READOUT_POOLS,
@@ -211,8 +217,8 @@ export class EmbodiedFly {
   }) {
     this.sex = "male"; // public sim: male CNS only
     this.body = body;
-    // Default drone chassis; ?body=cube keeps box; ?body=fly restores NMF / MuJoCo.
-    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "drone";
+    // Default NeuroMechFly; ?body=cube box; ?body=drone quadrotor.
+    this.bodyMode = (body && body.userData && body.userData.plantMode) || BODY_MODE || "fly";
     this.plantLabel = plantLabelFor(this.bodyMode);
     this.lastSteering = { forward: 0, yawRate: 0, v: 0, omega: 0, pitch: 0, throttle: 1.45 };
     this.onReady = onReady;
@@ -229,7 +235,9 @@ export class EmbodiedFly {
     this.lastSmellL = 0;
     this.lastSmellR = 0;
     this.life = { hunger: 0.7, crop: 0.2, energy: 1, sleep: 0.1, arousal: 0, mode: "walk" };
-    this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, abdomen: 0, muscle: {} };
+    this.cmd = { walk: 0, turn: 0, fly: 0, feed: 0, court: 0, groom: 0, escape: 0, rest: 0, head: 0, headYaw: 0, headRoll: 0, abdomen: 0, abdSegs: [], abdYaw: 0, antennaL: 0, antennaR: 0, swingN: 0, muscle: {}, wing: {}, haltere: { L: 0, R: 0 }, eyeGlow: 0 };
+    this.poseFilt = { walkTonic: 0, abdTonic: 0 };
+    this.syn = { meanU: 0, meanX: 1, meanEff: 1, meanW: 0, nDepressed: 0, nEdges: 0, nPre: 0, fastW: { meanAbs: 0, nEdges: 0 } };
     this.motEma = Object.fromEntries(POOL_KEYS.map((k) => [k, 0]));
     this.opticEma = { HS_L: 0, HS_R: 0, VS_L: 0, VS_R: 0 };
     this.poolMap = mergePoolMaps(effectors, stim);
@@ -262,6 +270,12 @@ export class EmbodiedFly {
     this.ppk = splitLR(stim.ppk23 || P.ppk23 || [], this.neu.xyz);
     this.ppk25 = splitLR(stim.ppk25 || P.ppk25 || [], this.neu.xyz);
     this.ir52b = splitLR(stim.IR52b || P.IR52b || [], this.neu.xyz);
+    this.hygroLR = splitLR(stim.hygro || P.hygrosensory || [], this.neu.xyz);
+    this.splitAbdSegments(P.abdomen || stim.abdomen || []);
+    this.splitSidePools(P);
+    this.effectorStats = effectorMapStats(effectors.counts || {});
+    this.effectorStats.emptyMuscle = EMPTY_MALE_MUSCLE_POOLS.filter((k) => !(effectors.counts || {})[k]);
+    this.lastJO = { L: 0, R: 0 };
     this.optic = {};
     for (const k of OPTIC_TYPES) {
       this.optic[k] = sectorize(stim[k] || P[k] || [], this.neu.xyz);
@@ -293,7 +307,10 @@ export class EmbodiedFly {
       window.addEventListener("ffb-physics-resume", this._onPhysicsResume);
     }
     this.lastOdor = { foodL: 0, foodR: 0, pherL: 0, pherR: 0 };
+    this.lastSense = { joL: 0, joR: 0, hygroL: 0, hygroR: 0, sweet: 0, bitter: 0, court: 0, touch: 0, smellBlendL: 0, smellBlendR: 0 };
     this.prevDistO = 99;
+    this._sensePos = null;
+    this._senseT = 0;
 
     this.cns = new THREE.Group();
     // neurons.bin / meshes are µm: X=LR, Y=brain-up/VNC-down, Z=dorsal.
@@ -357,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js");
+    this.worker = new Worker("sim.worker.js?v=ogbody1");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -381,6 +398,18 @@ export class EmbodiedFly {
           hygro: stim.hygro || P.hygrosensory || [],
         };
         for (const k of PROPRIO_KEYS) channels[k] = stim[k] || P[k] || [];
+        // Denser proprio: split existing neuromere pools by soma X into L/R
+        // channels (real IDs only — no invented cells).
+        for (const seg of ["T1", "T2", "T3"]) {
+          for (const kind of ["hp", "csa", "prop"]) {
+            const base = `${kind}${seg}`;
+            const ids = P[base] || stim[base] || [];
+            if (!ids.length) continue;
+            const lr = splitLR(ids, this.neu.xyz);
+            if (!channels[base + "L"]?.length) channels[base + "L"] = lr.L;
+            if (!channels[base + "R"]?.length) channels[base + "R"] = lr.R;
+          }
+        }
         for (const k of OPTIC_TYPES) {
           const o = this.optic[k];
           if (OPTIC_SECTOR_TYPES.includes(k)) {
@@ -400,6 +429,41 @@ export class EmbodiedFly {
         for (const k of CLOCK_KEYS) channels[k] = stim[k] || P[k] || [];
         channels.sweet = stim.sweet || P.sweet || [];
         channels.bitter = stim.bitter || P.bitter || [];
+        channels.hygroL = this.hygroLR?.L || [];
+        channels.hygroR = this.hygroLR?.R || [];
+        // Residual aggregates: untyped cells in smell/taste/touch/vision get world
+        // Hz without max-merging on top of typed ORN/GRN/proprio pools.
+        const typedOrn = (side) => [
+          this.odor.foodORN?.[side], this.odor.pherORN?.[side],
+          this.odor.co2ORN?.[side], this.odor.aversiveORN?.[side],
+        ];
+        channels.smellL = residualIds(this.smell.L, ...typedOrn("L"));
+        channels.smellR = residualIds(this.smell.R, ...typedOrn("R"));
+        channels.taste = residualIds(
+          stim.taste || [],
+          stim.sweet || P.sweet, stim.bitter || P.bitter,
+        );
+        const proprioUsed = PROPRIO_KEYS.map((k) => channels[k]);
+        channels.touch = residualIds(
+          stim.touch || [],
+          ...proprioUsed,
+          this.odor.JO?.L, this.odor.JO?.R,
+        );
+        // Untyped campaniform / proprio (not in neuromere splits) get world strain
+        // without max-merging on top of typed csaT* / propT*.
+        channels.campaniform = residualIds(
+          stim.campaniform || P.campaniform || [],
+          stim.csaT1, stim.csaT2, stim.csaT3,
+          channels.csaT1L, channels.csaT1R, channels.csaT2L, channels.csaT2R,
+          channels.csaT3L, channels.csaT3R,
+        );
+        channels.proprio = residualIds(
+          stim.proprio || P.proprio || [],
+          stim.propT1, stim.propT2, stim.propT3,
+          channels.propT1L, channels.propT1R, channels.propT2L, channels.propT2R,
+          channels.propT3L, channels.propT3R,
+        );
+        // vision aggregate is already visionL ∪ visionR — keep L/R as the drive.
         // Stim-map / causal inject: bind effector+stim pools as drive channels.
         for (const k of STIM_MAP_POOLS) {
           if (channels[k]?.length) continue;
@@ -414,6 +478,15 @@ export class EmbodiedFly {
         for (const k of POOL_KEYS) pools[k] = [...this.poolSets[k]];
         // No walkL/walkR aggregate effectors — locomotion from annotated MN pools only.
         this.worker.postMessage({ type: "bindEffectors", pools });
+        // Tiny hΔ Δw on the 45 traced cells' outgoing chemical edges only —
+        // mid-run CX adaptation, not the hΔ lab / PFL3 tank-steer demo.
+        this.worker.postMessage({
+          type: "enableFastW",
+          ids: HDELTA_PLASTIC_IDS,
+          eta: 0.012,
+          decay: 0.9985,
+          plastic: true,
+        });
         this.worker.postMessage({ type: "run", on: true });
         if (this.onReady) this.onReady();
         return;
@@ -454,6 +527,51 @@ export class EmbodiedFly {
   }
 
   setRun(on) { this.worker.postMessage({ type: "run", on }); }
+
+  /**
+   * Partition the annotated abdomen MN pool by soma Y (VNC-down) into NMF
+   * segments. Real IDs only — same cells as `abdomen`, not invented neurons.
+   */
+  splitAbdSegments(ids) {
+    const xyz = this.neu.xyz;
+    const scored = (ids || []).map((i) => [xyz[i * 3 + 1], i]);
+    scored.sort((a, b) => b[0] - a[0]); // anterior (brain-ward) first
+    const n = ABD_SEG_KEYS.length;
+    const bins = Array.from({ length: n }, () => []);
+    for (let k = 0; k < scored.length; k++) {
+      bins[Math.min(n - 1, (k * n / Math.max(1, scored.length)) | 0)].push(scored[k][1]);
+    }
+    this.abdSegIds = {};
+    for (let i = 0; i < n; i++) {
+      const k = ABD_SEG_KEYS[i];
+      this.abdSegIds[k] = bins[i];
+      this.poolSets[k] = new Set(bins[i]);
+      this.motEma[k] = 0;
+      this.poolMap[k] = bins[i];
+    }
+  }
+
+  /**
+   * Soma-X split of existing wing / abdomen MN IDs → L/R mesh (not new cells).
+   */
+  splitSidePools(P) {
+    const xyz = this.neu.xyz;
+    const add = (key, ids) => {
+      const lr = splitLR(ids || [], xyz);
+      const kL = `${key}_L`;
+      const kR = `${key}_R`;
+      this.poolSets[kL] = new Set(lr.L);
+      this.poolSets[kR] = new Set(lr.R);
+      this.poolMap[kL] = lr.L;
+      this.poolMap[kR] = lr.R;
+      this.motEma[kL] = 0;
+      this.motEma[kR] = 0;
+    };
+    add("DLM", P.DLM);
+    add("DVM", P.DVM);
+    add("ADMN", P.ADMN);
+    add("abdomen", P.abdomen);
+  }
 
   /**
    * Apply a lesion config on the LIF connectome path (not joints).
@@ -589,6 +707,7 @@ export class EmbodiedFly {
     this.body.rotation.set(0, this.heading, 0);
     this.life.hunger = 0.7;
     this.life.crop = 0.2; this.life.energy = 1; this.life.sleep = 0.1;
+    this.poseFilt = { walkTonic: 0, abdTonic: 0 };
     if (physics.ok && !isKinematicChassis(this.bodyMode)) {
       resetPhysics(this.physId, x, z, this.heading).then((pose) => {
         if (pose) this.mjPose = pose;
@@ -606,7 +725,8 @@ export class EmbodiedFly {
     const raw = m.eff || {};
     for (const name of POOL_KEYS) {
       const f = raw[name] != null ? raw[name] : 0;
-      this.motEma[name] = this.motEma[name] * 0.15 + f * 0.85;
+      const a = POSE_EMA_KEYS.has(name) ? POSE_EMA_ALPHA : 0.85;
+      this.motEma[name] = this.motEma[name] * (1 - a) + f * a;
     }
     // Portable controller optic channels — true L/R from eye write-in (Hz→0–1), not collapsed pool.
     const o = this.lastOptic || {};
@@ -620,6 +740,7 @@ export class EmbodiedFly {
       this.life.hunger = this.life.hunger * 0.85 + Math.max(0, Math.min(1.5, m.hungerMod)) * 0.15;
     }
     if (m.lesion) this.lesionMeta = m.lesion;
+    if (m.syn) this.syn = m.syn;
     if (this.xray) {
       this.actAttr.set(this.activity);
       this.points.geometry.attributes.act.needsUpdate = true;
@@ -630,7 +751,7 @@ export class EmbodiedFly {
     const other = this.world.other;
     const ox = other ? other.body.position.x : 0;
     const oz = other ? other.body.position.z : 0;
-    const distF = Math.hypot(this.world.food.x - x, this.world.food.z - z);
+    const distF = nearestXZ(x, z, this.world.foods, this.world.food).dist;
     const bitterPos = this.world.bitter;
     const distB = bitterPos ? Math.hypot(bitterPos.x - x, bitterPos.z - z) : 99;
     const distO = other ? Math.hypot(ox - x, oz - z) : 99;
@@ -641,71 +762,76 @@ export class EmbodiedFly {
     const c = Math.cos(this.heading), s = Math.sin(this.heading);
     const oView = other && Math.abs(bearingTo(ox, oz, x, z, c, s)) < 0.75 && distO < 11;
     const e = this.motEma;
-    const legs = (e.T1L + e.T1R + e.T2L + e.T2R + e.T3L + e.T3R) / 6;
     const cmd = this.cmd;
     // Body commands are ONLY annotated MN / effector readout.
     // walk/turn are UI mode labels — never free-joint thrusters or class-aggregate cheats.
-    const legL = (e.T1L + e.T2L + e.T3L) / 3;
-    const legR = (e.T1R + e.T2R + e.T3R) / 3;
-    // Temper mean-leg walk so bilateral idle does not peg forward cruise.
-    cmd.walk = THREE.MathUtils.clamp(
-      softDrive(legs * 0.82 + e.DNa * 0.5, 2.65), 0, 1
-    );
-    // Turn from bilateral leg MN pools only (no bearing-to-food thruster).
-    // Normalize L/R contrast so small connectome imbalances still yaw clearly.
-    const legSum = legL + legR + 0.045;
-    const lrTurn = ((legR - legL) / legSum) * 4.8 + (legR - legL) * 3.4;
-    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.75), -1, 1);
+    const walkDrive = walkDriveFromEma(e, this.poseFilt);
+    cmd.walk = THREE.MathUtils.clamp(walkDrive, 0, 1);
+    // Turn from bilateral walking-leg MN pools (T2/T3) plus a little T1.
+    const walkL = ((e.T2L || 0) + (e.T3L || 0)) / 2;
+    const walkR = ((e.T2R || 0) + (e.T3R || 0)) / 2;
+    const legSum = walkL + walkR + 0.045;
+    const lrTurn = ((walkR - walkL) / legSum) * 4.2 + (walkR - walkL) * 3.0
+      + ((e.T1R || 0) - (e.T1L || 0)) * 0.8;
+    cmd.turn = THREE.MathUtils.clamp(Math.tanh(lrTurn * 1.55), -1, 1);
     // Wing power MNs only (DLM / DVM / ADMN) — no cosmetic baseline flap.
-    const wingRaw = e.DLM * 1.05 + e.DVM * 0.95 + e.ADMN * 0.8;
-    cmd.fly = softDrive(wingRaw, 2.7);
+    // High gate: idle Poisson must not tap/flap the mesh (cns4).
+    const wing = wingFromEma(e);
+    cmd.fly = wing.fly;
     cmd.wing = {
-      dlm: softDrive(e.DLM, 3.1),
-      dvm: softDrive(e.DVM, 3.1),
-      admn: softDrive(e.ADMN, 2.9),
+      dlm: wing.dlm, dvm: wing.dvm, admn: wing.admn, power: wing.power,
+      dlmL: wing.dlmL, dlmR: wing.dlmR, dvmL: wing.dvmL, dvmR: wing.dvmR,
+      admnL: wing.admnL, admnR: wing.admnR,
     };
-    cmd.feed = softDrive(e.MN9 * 1.1 + e.proboscis * 0.9, 2.9);
+    cmd.feed = feedFromEma(e);
     cmd.court = softDrive(
-      e.aIPg * 0.95 + e.pIP1 * 1.0 + e.DNg02 * 0.8,
+      e.aIPg * 0.95 + e.pIP1 * 1.0 + e.DNg02 * 0.8 + Math.max(0, (e.fru || 0) - 0.18) * 0.08,
       2.7
     );
     cmd.groom = softDrive((e.T1L + e.T1R) * 0.65, 2.6);
     cmd.escape = softDrive(e.DNp01 * 2.0, 2.9);
     cmd.rest = THREE.MathUtils.clamp(1 - cmd.walk - cmd.fly * 0.8 - cmd.escape * 0.8 - cmd.court * 0.4, 0, 1);
-    const neckMag = Math.max(e.neck || 0, 0.5 * ((e.neckL || 0) + (e.neckR || 0)));
-    cmd.head = softDrive(neckMag, 2.9);
-    // Neck L/R asymmetry → yaw (annotated CvN sides); quiet → 0.
-    cmd.headYaw = THREE.MathUtils.clamp(
-      Math.tanh(((e.neckR || 0) - (e.neckL || 0)) * 2.6), -1, 1
-    );
-    cmd.abdomen = softDrive(e.abdomen * 0.9 + e.aIPg * 0.2 + cmd.court * 0.1, 2.8);
+    const neck = neckFromEma(e);
+    cmd.head = neck.head;
+    cmd.headYaw = neck.headYaw;
+    cmd.headRoll = neck.headRoll;
+    const abd = abdomenFromEma(e, cmd.court, this.poseFilt);
+    cmd.abdomen = abd.curl;
+    cmd.abdSegs = abd.segs;
+    cmd.abdYaw = abd.yaw || 0;
+    cmd.antennaL = antennaFromJo(this.lastJO?.L);
+    cmd.antennaR = antennaFromJo(this.lastJO?.R);
+    const yawRate = this._sensePos
+      ? wrapPi(this.heading - (this._lastHaltHeading != null ? this._lastHaltHeading : this.heading)) / 0.032
+      : 0;
+    this._lastHaltHeading = this.heading;
+    cmd.haltere = {
+      L: haltereFromSense({ yawRate, wingPower: wing.power }, "L"),
+      R: haltereFromSense({ yawRate, wingPower: wing.power }, "R"),
+    };
+    cmd.eyeGlow = Math.min(1, 0.15
+      + ((this.lastVisionSal?.r16L || 0) + (this.lastVisionSal?.r16R || 0)) * 0.55
+      + ((this.lastVisionSal?.L || 0) + (this.lastVisionSal?.R || 0)) / 280);
     // Honest MN→muscle: empty annotation pools stay quiet (no neuromere fill-in).
-    // Male T2/T3 coxaProm & Ta* are absent in FlyEM type labels — leave them 0.
-    // Antagonist pairs get contrast from real pool asymmetries only.
+    // Male T2/T3 coxaProm & Ta* are absent in FlyEM type labels — leave them 0
+    // in motEma. `embodyMuscle` kinematically couples those hinges when walking.
     cmd.muscle = {};
+    let swingN = 0;
     for (const name of LEG_NAMES) {
-      const ema = (muscle) => e[`${name}_${muscle}`] || 0;
-      const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), 3.35);
-      const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), 3.2);
-      const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.55, 3.3);
-      const tr = antagPair(ema("trFlex"), ema("trExt"), 3.45);
-      const ti = antagPair(ema("tiFlex"), ema("tiExt"), 3.45);
-      const ta = antagPair(ema("taDep"), ema("taLev"), 3.4);
-      cmd.muscle[name] = {
-        coxaProm: coxa.pos,
-        coxaRem: Math.max(coxa.neg, add.neg * 0.35),
-        coxaRotA: rot.pos,
-        coxaRotP: rot.neg,
-        coxaAdd: add.pos,
-        trFlex: tr.pos,
-        trExt: tr.neg,
-        feRed: softDrive(ema("feRed"), 2.9),
-        tiFlex: ti.pos,
-        tiExt: ti.neg,
-        taDep: ta.pos,
-        taLev: ta.neg,
-      };
+      const raw = muscleFromEma(name, (muscle) => e[`${name}_${muscle}`] || 0);
+      cmd.muscle[name] = embodyMuscle(name, raw, { walkDrive });
+      if (cmd.muscle[name]._swing) swingN += 1;
     }
+    cmd.swingN = swingN;
+    cmd.stanceN = LEG_NAMES.length - swingN;
+    let liveN = 0, boundN = 0;
+    for (const [k, set] of Object.entries(this.poolSets || {})) {
+      if (!set || !set.size) continue;
+      boundN += 1;
+      if ((e[k] || 0) > 0.07) liveN += 1;
+    }
+    this.liveMapped = liveN;
+    this.boundMapped = boundN;
 
     this.turnS = this.turnS * 0.25 + cmd.turn * 0.75;
 
@@ -756,17 +882,22 @@ export class EmbodiedFly {
     } else {
       // Kinematic fallback if the plant is down: MN → leg pose → stance slip.
       // No cmd.walk thruster — ground motion from foot slip only.
-      // Flight translation gated (default OFF); wing mesh still follows wing MNs in poseSoftParts.
-      const stand = this.body.userData.standZ || 1.3;
-      const ttmn = (e.L1_trExt || 0) + (e.R1_trExt || 0);
-      if (this.y < stand + 0.08 && ttmn > 0.55) this.vy = 2.6 * Math.min(1, ttmn);
+      // Thrive default: stay planted (no T1-extensor hop / vault). Flight translation
+      // stays gated off unless ?flight=1; wing mesh still follows wing MNs in poseSoftParts.
+      const stand = (this.body.userData.standZ || 1.3) + (this.body.userData.standSettle || 0);
       const flying = FLIGHT_ENABLED && cmd.fly > 0.58;
-      if (flying) {
+      if (!FLIGHT_ENABLED) {
+        this.vy = 0;
+        this.y = stand;
+      } else if (flying) {
         this.vy += (2.5 + stand - this.y) * 2.8 * dt * cmd.fly;
         this.vy *= 0.9;
-      } else this.vy -= 18 * dt;
-      this.y = Math.max(stand, this.y + this.vy * dt);
-      if (this.y === stand && !flying) this.vy = 0;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+      } else {
+        this.vy -= 18 * dt;
+        this.y = Math.max(stand, this.y + this.vy * dt);
+        if (this.y === stand) this.vy = 0;
+      }
       stepLife(this.body, dt, this.clock, cmd);
       const slip = this.body.userData.slip;
       if (flying) {
@@ -775,16 +906,35 @@ export class EmbodiedFly {
         this.body.position.z += Math.cos(this.heading) * step;
         this.heading += this.turnS * 1.3 * dt;
       } else if (slip && slip.n > 0) {
-        // Stance-slip from MN foot motion (no thruster / CPG). Scale with leg MN
-        // asymmetry so quiet co-contraction does not thrash XY.
-        const asym = Math.min(1.4, Math.abs(legR - legL) * 2.2 + softDrive(legs, 2.4));
-        const slipGain = 2.2 + 1.6 * asym;
-        const sx = (slip.x / slip.n) * slipGain;
-        const sz = (slip.z / slip.n) * slipGain;
-        this.body.position.x += sx;
-        this.body.position.z += sz;
-        this.heading += (slip.yawR - slip.yawL) * (1.2 + 0.6 * asym);
-        this.lastSlipAbs = Math.hypot(sx, sz);
+        // Stance-slip from MN foot motion (no thruster / CPG). Idle muscles are
+        // zeroed in embodyMuscle so quiet T1/abdomen cannot thrash XY.
+        // Walk: stronger coupling so T2/T3 planted feet actually translate.
+        if (walkDrive < IDLE_WALK_GATE) {
+          this.lastSlipAbs = 0;
+          if (this._slipSmooth) {
+            this._slipSmooth.sx = 0;
+            this._slipSmooth.sz = 0;
+            this._slipSmooth.yaw = 0;
+          }
+        } else {
+          const asym = Math.min(1.25, Math.abs(walkR - walkL) * 2.0 + walkDrive);
+          // No constant-push floor: saturated T2/T3 must not cruise from a 0.45 gain.
+          const slipGain = (1.85 + 1.25 * asym) * walkDrive;
+          let sx = (slip.x / slip.n) * slipGain;
+          let sz = (slip.z / slip.n) * slipGain;
+          const step = Math.hypot(sx, sz);
+          const maxStep = 0.072;
+          if (step > maxStep) {
+            const k = maxStep / step;
+            sx *= k; sz *= k;
+          }
+          const dyawRaw = (slip.yawR - slip.yawL) * (0.72 + 0.42 * asym) * walkDrive;
+          const sm = smoothSlip(this._slipSmooth || (this._slipSmooth = {}), sx, sz, dyawRaw, dt);
+          this.body.position.x += sm.sx;
+          this.body.position.z += sm.sz;
+          this.heading += sm.dyaw;
+          this.lastSlipAbs = Math.hypot(sm.sx, sm.sz);
+        }
       } else {
         this.lastSlipAbs = 0;
       }
@@ -795,7 +945,10 @@ export class EmbodiedFly {
       this.speedS = this.speedS * 0.3 + Math.min(1.4, slip && slip.n
         ? slipMag / 0.035
         : cmd.fly) * 0.7;
-      // Open world: no dish rim. Sanity clip only if somehow past WORLD_SOFT_LIMIT.
+      this.planted = !flying && this.y <= stand + 0.08;
+      this.plantNLeg = slip && slip.n ? slip.n : 0;
+      this.plantLabel = physics.ok ? "fly" : "kinematic NMF";
+      // Garden hedge: bounce/redirect past WORLD_SOFT_LIMIT, never punish.
       if (OPEN_WORLD) {
         const rad = Math.hypot(this.body.position.x, this.body.position.z);
         if (rad > WORLD_SOFT_LIMIT && rad > 1e-6) {
@@ -804,20 +957,26 @@ export class EmbodiedFly {
           this.body.position.z *= s;
         }
       }
+      // Shade is visual/sensory only while flight is off. Auto-lift onto the
+      // old pole perch vaulted the thorax (y→~2.4) whenever he walked near it.
       const perch = this.world.perch;
       this.onPerch = false;
-      if (perch) {
+      if (FLIGHT_ENABLED && perch) {
         const px = this.body.position.x, pz = this.body.position.z;
         const dp = Math.hypot(px - perch.x, pz - perch.z);
-        const cap = 0.48, top = perch.h || 2.18;
-        if (dp < cap && this.y > top - 0.55 && this.y < top + stand + 0.2 && cmd.fly < 0.28) {
+        const cap = 0.42, top = perch.h || 2.18;
+        if (dp < cap && this.y > top - 0.2 && this.y < top + 0.45 && cmd.fly < 0.28) {
           this.onPerch = true;
           this.vy = 0;
-          this.y = top + stand - 0.05;
+          this.y = top + 0.12;
         }
       }
+      if (!FLIGHT_ENABLED) {
+        this.y = stand;
+        this.vy = 0;
+      }
       this.body.position.y = this.y;
-      this.body.rotation.y = this.heading;
+      this.body.rotation.set(0, this.heading, 0);
     }
 
     let lead = "rest", leadV = cmd.rest;
@@ -1000,12 +1159,12 @@ export class EmbodiedFly {
       ? (odors.sampleAntenna
         ? odors.sampleAntenna(_antL.x, _antL.y, _antL.z, this.heading, -1)
         : odors.sample(_antL.x, _antL.y, _antL.z))
-      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0, flower: 0 };
     const sampR = odors
       ? (odors.sampleAntenna
         ? odors.sampleAntenna(_antR.x, _antR.y, _antR.z, this.heading, 1)
         : odors.sample(_antR.x, _antR.y, _antR.z))
-      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0 };
+      : { food: 0, pher: 0, co2: 0, moist: 0, bitter: 0, flower: 0 };
     const foodL = sampL.food * hungerGain;
     const foodR = sampR.food * hungerGain;
     const pherL = sampL.pher, pherR = sampR.pher;
@@ -1019,14 +1178,17 @@ export class EmbodiedFly {
     let co2HzR = phasicTonic(this.ornFilt, "co2R", co2R);
     let avL = phasicTonic(this.ornFilt, "avL", sampL.bitter || 0);
     let avR = phasicTonic(this.ornFilt, "avR", sampR.bitter || 0);
+    let flowerL = phasicTonic(this.ornFilt, "flL", sampL.flower || 0);
+    let flowerR = phasicTonic(this.ornFilt, "flR", sampR.flower || 0);
     // Mild bilateral contrast — keep L/R asymmetry without pegging receptors.
     ({ L: smellL, R: smellR } = lrKlinotaxis(smellL, smellR, 0.40));
     ({ L: pherHzL, R: pherHzR } = lrKlinotaxis(pherHzL, pherHzR, 0.34));
     ({ L: co2HzL, R: co2HzR } = lrKlinotaxis(co2HzL, co2HzR, 0.30));
     ({ L: avL, R: avR } = lrKlinotaxis(avL, avR, 0.32));
+    ({ L: flowerL, R: flowerR } = lrKlinotaxis(flowerL, flowerR, 0.30));
     this.lastSmellL = smellL;
     this.lastSmellR = smellR;
-    this.lastOdor = { foodL: smellL, foodR: smellR, pherL: pherHzL, pherR: pherHzR, co2L: co2HzL, co2R: co2HzR };
+    this.lastOdor = { foodL: smellL, foodR: smellR, pherL: pherHzL, pherR: pherHzR, co2L: co2HzL, co2R: co2HzR, flowerL, flowerR };
     const windL = odors ? odors.windAt(_antL.x, _antL.z) : { x: 0, z: 0 };
     const windR = odors ? odors.windAt(_antR.x, _antR.z) : { x: 0, z: 0 };
     // Body-frame wind: side = left+, forward along heading.
@@ -1035,16 +1197,25 @@ export class EmbodiedFly {
     const fwdL = windL.x * s + windL.z * c;
     const fwdR = windR.x * s + windR.z * c;
     const spdL = Math.hypot(windL.x, windL.z), spdR = Math.hypot(windR.x, windR.z);
-    let joL = 5 + spdL * 28 + Math.max(0, -sideL) * 24 + Math.max(0, fwdL) * 8;
-    let joR = 5 + spdR * 28 + Math.max(0, sideR) * 24 + Math.max(0, fwdR) * 8;
+    const selfWind = (this.speedS || 0) * 16 + (this.cmd.walk || 0) * 10;
+    const yawAir = (this.turnS || 0) * 22;
+    let joL = 4 + spdL * 28 + Math.max(0, -sideL) * 24 + Math.max(0, fwdL) * 8 + selfWind + Math.max(0, -yawAir) * 0.7;
+    let joR = 4 + spdR * 28 + Math.max(0, sideR) * 24 + Math.max(0, fwdR) * 8 + selfWind + Math.max(0, yawAir) * 0.7;
+    // Close the antenna loop: posed pedicel/funiculus loads JO (same IDs).
+    joL += (this.cmd.antennaL || 0) * 22;
+    joR += (this.cmd.antennaR || 0) * 22;
     ({ L: joL, R: joR } = lrKlinotaxis(joL, joR, 0.28));
+    this.lastJO = { L: joL, R: joR };
     const beacon = this.world.person || this.world.food || { x: 0, z: 0 };
-    const distF = Math.hypot(beacon.x - x, beacon.z - z);
-    const distW = Math.hypot(this.world.water.x - x, this.world.water.z - z);
+    const distF = nearestXZ(x, z, this.world.foods, beacon).dist;
+    const distW = nearestXZ(x, z, this.world.waters, this.world.water).dist;
+    const distFl = nearestXZ(x, z, this.world.flowers, null).dist;
     const other = this.world.other;
     const distQ = other ? Math.hypot(other.body.position.x - x, other.body.position.z - z) : 99;
     this.prevDistO = distQ;
-    const day = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 0.012));
+    const shade = underCanopy(x, z, this.world.perch);
+    // Stable garden daylight (no night orbit). Shade canopy dims the local catch.
+    const day = shade ? 0.58 : 0.90;
     this.day = day;
     const head = this.body.userData.head;
     if (head) head.getWorldPosition(_head);
@@ -1058,6 +1229,17 @@ export class EmbodiedFly {
         ...landmarks.filter((L) => L.kind !== "food"),
       ];
     }
+    const dtSense = Math.max(0.008, Math.min(0.08, (t - (this._senseT || t)) || 0.032));
+    if (!this._sensePos) this._sensePos = { x, y: this.y, z, heading: this.heading };
+    const ego = {
+      vx: (x - this._sensePos.x) / dtSense,
+      vy: (this.y - this._sensePos.y) / dtSense,
+      vz: (z - this._sensePos.z) / dtSense,
+      yawRate: wrapPi(this.heading - this._sensePos.heading) / dtSense,
+      dt: dtSense,
+    };
+    this._sensePos = { x, y: this.y, z, heading: this.heading };
+    this._senseT = t;
     const eye = this.eye.sample({
       origin: { x: _head.x, y: _head.y, z: _head.z },
       heading: this.heading,
@@ -1066,10 +1248,11 @@ export class EmbodiedFly {
       food: beacon,
       water: this.world.water,
       bitter: this.world.bitter,
+      assayBeacon: this.world.assayBeacon,
       perch: this.world.perch,
       bomb: bombPos,
-      // Procgen landmarks — required for vision→walk toward chunk targets.
       landmarks,
+      ego,
       other: other ? { pos: other.body.position, heading: other.heading } : null,
       otherColor: [0.23, 0.47, 0.91],
       others: (this.world.others || []).map((o) => ({
@@ -1078,38 +1261,43 @@ export class EmbodiedFly {
         color: [0.23, 0.47, 0.91],
       })),
     });
-    // Annotated clock / neuromod pools — calm world→Hz (day, hunger, arousal, sleep).
-    // Quiet life state → near-baseline rates; never invented neurons.
+    // Annotated clock / neuromod pools — calm world→Hz.
+    // l-LNv CRY from actual R7 UV (not a fake sine daylight dump).
     const night = 1 - day;
     const aro = this.life.arousal || 0;
     const hung = this.life.hunger || 0;
     const slp = this.life.sleep || 0;
     const esc = this.cmd.escape || 0;
+    const skyUv = 0.5 * ((eye.L?.r7 || 0) + (eye.R?.r7 || 0));
     const clockRates = {
-      lLNv: 3 + day * 22,
-      sLNv: 3 + day * 18 + Math.max(0, Math.sin(t * 0.012)) * 5,
+      lLNv: 3 + skyUv * 85,
+      sLNv: 3 + day * 16 + skyUv * 14,
       LNd: 2 + day * 11 + night * 7,
       DN1a: 2 + night * 14,
       DN1p: 2 + night * 16 + slp * 10,
-      DAN: 2 + aro * 8 + (1 - hung) * 3,
-      OA: 2 + aro * 12 + esc * 8,
+      DAN: 2 + aro * 6 + (1 - hung) * 3,
+      OA: 2 + aro * 10 + esc * 8,
       HT: 2 + slp * 10 + night * 5,
       pep: 2 + hung * 10,
     };
     const extraV = (this.extra && this.extra.vision) || 0;
     const opticRates = this.opticRates(eye, extraV);
-    // Broad visionL/R pools were bound but never eye-driven (only UI `vision` button).
-    // Fill them from compound-eye salience so connectome sees L/R visual asymmetry.
+    // Broad visionL/R: photoreceptor + lamina + motion from this eye — not food blobs.
     const visFromEye = (side) => {
       const e = eye[side] || {};
-      // Food/beacon salience dominates so L/R asymmetry reaches visionL/R pools hard.
-      const sal = (e.sal || 0) + (e.salFood || 0) * 2.55 + (e.salFly || 0) * 0.95 + (e.salWater || 0) * 0.65;
-      const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
-      return hzVis((e.lum || 0) * 0.40 + sal * 1.55 + mot * 0.65 + (e.on || 0) * 1.35, 115, 3);
+      const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0) + (e.loom || 0) * 0.45;
+      return hzVis(
+        (e.r16 || e.lum || 0) * 0.90
+        + (e.r7 || 0) * 0.28
+        + (e.r8 || 0) * 0.32
+        + (e.on || 0) * 0.85
+        + mot * 0.40,
+        100, 4
+      );
     };
     let visionL = visFromEye("L") + extraV;
     let visionR = visFromEye("R") + extraV;
-    ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.78));
+    ({ L: visionL, R: visionR } = lrKlinotaxis(visionL, visionR, 0.28));
     const camMerged = this.mergeCamBoost(visionL, visionR, opticRates);
     visionL = camMerged.visionL;
     visionR = camMerged.visionR;
@@ -1120,36 +1308,69 @@ export class EmbodiedFly {
       salFoodR: eye.R?.salFood || 0,
       salTarget: 0.5 * ((eye.L?.salFood || 0) + (eye.R?.salFood || 0)),
       asymFood: (eye.R?.salFood || 0) - (eye.L?.salFood || 0),
+      loomL: eye.L?.loom || 0,
+      loomR: eye.R?.loom || 0,
+      r16L: eye.L?.r16 || 0,
+      r16R: eye.R?.r16 || 0,
+      hsL: opticRates.HSL || 0,
+      hsR: opticRates.HSR || 0,
     };
     const stand = this.body.userData.standZ || 1.3;
     const nearFloor = this.y < stand + 0.36;
     // Graded GRN / ppk contact — not binary on/off.
     const sweetHz = nearFloor ? gradedContact(distF, 1.35, 70) : gradedContact(distF, 0.7, 16);
-    const distB = this.world.bitter
+    const bitterOnMap = this.world.bitter && Math.hypot(this.world.bitter.x, this.world.bitter.z) < 40;
+    const distB = bitterOnMap
       ? Math.hypot(this.world.bitter.x - x, this.world.bitter.z - z) : 99;
-    const bitterHz = nearFloor ? gradedContact(distB, 1.35, 65) : 0;
+    const bitterHz = bitterOnMap && nearFloor ? gradedContact(distB, 1.35, 65) : 0;
     const taste = Math.max(sweetHz, bitterHz * 0.85);
-    const hygroL = 4 + moistL * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
-    const hygroR = 4 + moistR * 40 + (distW < 1.2 && nearFloor ? gradedContact(distW, 1.2, 35) : 0);
+    clockRates.DAN = Math.min(40, (clockRates.DAN || 0) + sweetHz * 0.12);
+    const shadeMoist = shade ? 7 : 0;
+    const hygroL = 4 + moistL * 40 + (distW < 1.4 && nearFloor ? gradedContact(distW, 1.4, 38) : 0) + shadeMoist;
+    const hygroR = 4 + moistR * 40 + (distW < 1.4 && nearFloor ? gradedContact(distW, 1.4, 38) : 0) + shadeMoist;
     const hygro = 0.5 * (hygroL + hygroR);
     // ppk courtship / contact — graded by proximity + slight L/R from bearing.
     const bOth = other ? bearingTo(other.body.position.x, other.body.position.z, x, z, c, s) : 0;
+    const oView = other && Math.abs(bOth) < 0.75 && distQ < 11;
     const ppkBase = gradedContact(distQ, 1.55, 75);
     const ppkL = Math.min(120, ppkBase * (1 + Math.max(0, -bOth) * 0.28));
     const ppkR = Math.min(120, ppkBase * (1 + Math.max(0, bOth) * 0.28));
     // ppk25: contact pheromone; IR52b: food/leg contact — annotated receptor pools.
     const foodContact = nearFloor ? gradedContact(distF, 1.4, 55) : 0;
+    const nearestFood = nearestXZ(x, z, this.world.foods, this.world.food).pt || this.world.food;
+    const bFood = bearingTo(nearestFood.x, nearestFood.z, x, z, c, s);
     const ppk25L = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, -bOth) * 0.22));
     const ppk25R = Math.min(110, ppkBase * 0.85 * (1 + Math.max(0, bOth) * 0.22));
-    const irL = Math.min(110, foodContact * (1 + Math.max(0, -bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
-    const irR = Math.min(110, foodContact * (1 + Math.max(0, bearingTo(this.world.food.x, this.world.food.z, x, z, c, s)) * 0.2) + ppkBase * 0.15);
+    const irL = Math.min(110, foodContact * (1 + Math.max(0, -bFood) * 0.2) + ppkBase * 0.15);
+    const irR = Math.min(110, foodContact * (1 + Math.max(0, bFood) * 0.2) + ppkBase * 0.15);
     const grounded = this.y < stand + 0.18 || this.onPerch;
-    // Open world: no cage wall mechanosensation.
+    // Garden home: no cage-wall mechanosensation (hedge is visual + bounce only).
     const wall = 0;
     const touch = wall + (grounded ? 8 + this.speedS * 24 : 3) + ppkBase * 0.12;
-
-    const proprio = this.readProprio(wall, grounded);
     const extra = this.extra || {};
+    // Courtship aggregate (male-specific + fru_high): other-fly proximity, not UI-only.
+    const courtHz = extra.courtship
+      || (other ? gradedContact(distQ, 3.2, 55) * (oView ? 1.15 : 0.50) : 0);
+    // Residual smell (untyped ORNs) gets a multi-plume blend; typed ORNs keep their channels.
+    // Floral volatiles go here only — not dumped into foodORN (those are fruit esters).
+    const flowerNear = distFl < 1.8 ? gradedContact(distFl, 1.8, 16) : 0;
+    const smellBlendL = 0.36 * smellL + 0.24 * pherHzL + 0.14 * co2HzL + 0.08 * avL + 0.18 * flowerL + 0.10 * flowerNear;
+    const smellBlendR = 0.36 * smellR + 0.24 * pherHzR + 0.14 * co2HzR + 0.08 * avR + 0.18 * flowerR + 0.10 * flowerNear;
+
+    let proprio = this.readProprio(wall, grounded);
+    proprio = closeLoopProprio(proprio, {
+      yawRate: ego.yawRate,
+      neckMag: Math.abs(this.cmd.head || 0) + Math.abs(this.cmd.headYaw || 0) * 0.6,
+      headYaw: this.cmd.headYaw || 0,
+      abd: this.cmd.abdomen || 0,
+      antL: this.cmd.antennaL || 0,
+      antR: this.cmd.antennaR || 0,
+      wingP: this.cmd.wing?.power || 0,
+    });
+    this.lastSense = {
+      joL, joR, hygroL, hygroR, sweet: sweetHz, bitter: bitterHz,
+      court: courtHz, touch, smellBlendL, smellBlendR,
+    };
     const inj = { ...(this.stimInject || {}) };
     // visionL/R teaching (follow hΔ overlay) adds; other stim-map keys still override.
     const teachL = inj.visionL; delete inj.visionL;
@@ -1163,10 +1384,10 @@ export class EmbodiedFly {
         vision: extraV,
         visionL,
         visionR,
-        smellL: Math.max(smellL, extra.smellL || 0),
-        smellR: Math.max(smellR, extra.smellR || 0),
-        foodORNL: smellL,
-        foodORNR: smellR,
+        smellL: Math.max(smellBlendL, extra.smellL || 0),
+        smellR: Math.max(smellBlendR, extra.smellR || 0),
+        foodORNL: Math.max(smellL, extra.smellL || 0),
+        foodORNR: Math.max(smellR, extra.smellR || 0),
         pherORNL: pherHzL,
         pherORNR: pherHzR,
         co2ORNL: co2HzL,
@@ -1180,11 +1401,13 @@ export class EmbodiedFly {
         bitter: bitterHz,
         touch: Math.max(touch, extra.touch || 0),
         hygro,
+        hygroL,
+        hygroR,
         ppkL, ppkR,
         ppk25L, ppk25R,
         IR52bL: irL,
         IR52bR: irR,
-        courtship: extra.courtship || 0,
+        courtship: courtHz,
         escape: extra.escape || 0,
         ...clockRates,
         ...proprio,
@@ -1196,68 +1419,7 @@ export class EmbodiedFly {
   }
 
   opticRates(eye, extraV) {
-    const r = {};
-    for (const side of ["L", "R"]) {
-      const e = eye[side];
-      // Sector photoreceptors: R1–R6 = luminance, R7 = UV, R8 = mixed.
-      // Object/salience gain raised so static landmarks still write into lamina/LP.
-      const meanL = e.lum || 0.001;
-      const meanU = e.uv || 0.001;
-      const sFood = e.sectorsFood || [0, 0, 0, 0];
-      const sWater = e.sectorsWater || [0, 0, 0, 0];
-      const sFly = e.sectorsFly || [0, 0, 0, 0];
-      for (let s = 0; s < 4; s++) {
-        const cL = (e.sectors[s] - meanL) / (meanL + 0.06);
-        const cU = (e.sectorsUV[s] - meanU) / (meanU + 0.06);
-        const contrast = Math.max(0, Math.abs(cL));
-        const uvContrast = Math.max(0, Math.abs(cU));
-        // Front-ish sectors (1–2) get a touch more object weight for approach.
-        const frontBias = (s === 1 || s === 2) ? 1.15 : 1.0;
-        const obj = ((sFood[s] || 0) * 1.65 + (sWater[s] || 0) * 0.7 + (sFly[s] || 0) * 0.95) * frontBias;
-        r["R16" + side + s] = hzVis(e.sectors[s] + contrast * 0.45 + obj * 0.85, 120, 3) + extraV * 0.6;
-        r["R7" + side + s] = hzVis(
-          e.sectorsUV[s] + uvContrast * 0.4 + (sWater[s] || 0) * 0.45, 110, 3
-        ) + extraV * 0.35;
-        r["R8" + side + s] = hzVis(
-          e.sectors[s] * 0.4 + e.sectorsUV[s] * 0.55 + contrast * 0.2 + obj * 0.35, 105, 3
-        ) + extraV * 0.3;
-      }
-      // L1 ON / L2 OFF / L3 — temporal contrast + object salience (static targets matter).
-      const on = e.on || 0, off = e.off || 0;
-      const mot = Math.abs(e.hs || 0) + Math.abs(e.vs || 0);
-      const sal = (e.sal || 0) + (e.salFood || 0) * 1.85 + (e.salFly || 0) * 0.95;
-      const salObj = sal + (e.salWater || 0) * 0.55;
-      const t4 = (e.t4a || 0) + (e.t4b || 0) + (e.t4c || 0) + (e.t4d || 0);
-      const t5 = (e.t5a || 0) + (e.t5b || 0) + (e.t5c || 0) + (e.t5d || 0);
-      r["L1" + side] = hzVis(on * 2.45 + t4 * 1.35 + mot * 0.6 + salObj * 1.15, 130, 2);
-      r["L2" + side] = hzVis(off * 2.45 + t5 * 1.35 + mot * 0.55 + salObj * 0.95, 130, 2);
-      r["L3" + side] = hzVis(e.uv * 1.0 + on * 0.9 + (e.salWater || 0) * 1.05 + sal * 0.35, 110, 2);
-      // Direction-selective T4/T5 — HR arms + salience so static beacon edges couple.
-      const salT = salObj * 0.55;
-      r["T4a" + side] = hzVis((e.t4a || 0) + salT * 0.4, 130, 2);
-      r["T4b" + side] = hzVis((e.t4b || 0) + salT * 0.4, 130, 2);
-      r["T4c" + side] = hzVis((e.t4c || 0) + salT * 0.32, 130, 2);
-      r["T4d" + side] = hzVis((e.t4d || 0) + salT * 0.32, 130, 2);
-      r["T5a" + side] = hzVis((e.t5a || 0) + salT * 0.4, 130, 2);
-      r["T5b" + side] = hzVis((e.t5b || 0) + salT * 0.4, 130, 2);
-      r["T5c" + side] = hzVis((e.t5c || 0) + salT * 0.32, 130, 2);
-      r["T5d" + side] = hzVis((e.t5d || 0) + salT * 0.32, 130, 2);
-      // Wide-field HS/VS — motion + beacon presence → descending→leg via connectome.
-      r["HS" + side] = hzVis(Math.abs(e.hs || 0) * 1.45 + salObj * 1.45 + (e.salFly || 0) * 0.4, 140, 2);
-      r["VS" + side] = hzVis(Math.abs(e.vs || 0) * 1.25 + on * 0.4 + salObj * 0.9, 135, 2);
-    }
-    // Sensory L/R contrast (same idea as odor klinotaxis) — not a body thruster.
-    // Stronger gain so beacon L/R asymmetry survives LIF → descending → leg MNs.
-    const pairKeys = [
-      "L1", "L2", "L3", "HS", "VS",
-      "T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d",
-    ];
-    for (const base of pairKeys) {
-      const pair = lrKlinotaxis(r[base + "L"] || 0, r[base + "R"] || 0, 0.72);
-      r[base + "L"] = pair.L;
-      r[base + "R"] = pair.R;
-    }
-    return r;
+    return encodeOpticRates(eye, extraV);
   }
 
   readProprio(wall, grounded) {
@@ -1267,6 +1429,10 @@ export class EmbodiedFly {
     const filt = this.propFilt;
     const ang = (leg) => {
       if (!leg) return 0;
+      if (leg.angles) {
+        return (leg.angles.coxa || 0) + (leg.angles.femur || 0)
+          + (leg.angles.tibia || 0) + (leg.angles.tarsus || 0);
+      }
       let s = 0;
       for (const h of Object.values(leg.hinges || {})) {
         s += Math.abs((h.userData.angle ?? h.userData.rest) - (h.userData.rest || 0));
@@ -1275,6 +1441,12 @@ export class EmbodiedFly {
     };
     const jointFlex = (leg, keys) => {
       if (!leg) return 0;
+      if (leg.angles) {
+        if (keys[0] && keys[0].startsWith("coxa")) return leg.angles.coxa || 0;
+        if (keys[0] && keys[0].startsWith("trochanter")) return leg.angles.femur || 0;
+        if (keys[0] === "tibia-pitch") return leg.angles.tibia || 0;
+        if (keys[0] === "tarsus1-pitch") return leg.angles.tarsus || 0;
+      }
       let s = 0, n = 0;
       for (const k of keys) {
         const h = leg.hinges?.[k];
@@ -1300,27 +1472,34 @@ export class EmbodiedFly {
         const fem = jointFlex(leg, ["trochanterfemur-pitch", "trochanterfemur-roll"]);
         const tib = jointFlex(leg, ["tibia-pitch"]);
         const tar = jointFlex(leg, ["tarsus1-pitch"]);
-        const flex = 0.35 * cox + 0.35 * fem + 0.2 * tib + 0.1 * tar;
+        const flex = 0.30 * cox + 0.32 * fem + 0.22 * tib + 0.16 * tar;
         const ld = ss * (0.4 + Math.min(1.2, vv * 0.08));
         a += flex; v += vv; st += ss; load += ld; slipV += ss ? vv : 0;
         const lr = leg.name[0];
-        // Phasic onset on stance/load so the connectome sees step edges.
-        const stHz = phasicTonic(filt, `st${seg}${lr}`, ss, 0.032);
-        const ldHz = phasicTonic(filt, `ld${seg}${lr}`, ld, 0.032);
-        const flexHz = phasicTonic(filt, `fx${seg}${lr}`, flex, 0.032);
-        const choL = Math.min(120, 6 + flex * 38 + flexHz * 0.16 + vv * 5);
-        const tactL = Math.min(110, stHz * 0.4 + ss * 40 + wall * 0.4 + (grounded ? 6 : 1));
+        // OG mapping: hp ← coxa, cho ← FeTi + tibia-tarsus, csa ← stance load.
+        const stHz = proprioJointHz(filt, `st${seg}${lr}`, ss, 0.032);
+        const ldHz = proprioJointHz(filt, `ld${seg}${lr}`, ld, 0.032);
+        const coxHz = proprioJointHz(filt, `cx${seg}${lr}`, cox, 0.032);
+        const feTiHz = proprioJointHz(filt, `ft${seg}${lr}`, fem + tib, 0.032);
+        const choL = Math.min(85, 4 + (fem + tib) * 36 + tar * 18 + feTiHz * 0.20 + vv * 3.5);
+        const hpL = Math.min(70, 3 + cox * 28 + coxHz * 0.14);
+        const csaL = Math.min(85, 3 + ss * 32 + ldHz * 0.22 + tar * 12 + (ss ? vv * 2.2 : 0) + (grounded ? this.speedS * 8 : 0));
+        const tactL = Math.min(90, stHz * 0.35 + ss * 32 + wall * 0.3 + (grounded ? 5 : 1));
+        const propL = choL * 0.5 + hpL * 0.22 + csaL * 0.28;
         rates[`cho${seg}${lr}`] = choL;
         rates[`tact${seg}${lr}`] = tactL;
+        rates[`hp${seg}${lr}`] = hpL;
+        rates[`csa${seg}${lr}`] = csaL;
+        rates[`prop${seg}${lr}`] = propL;
       }
       const nLeg = Math.max(1, pairLegs.length);
       a /= nLeg; v /= nLeg; st /= nLeg; load /= nLeg; slipV /= nLeg;
-      const stP = phasicTonic(filt, `st${seg}`, st, 0.032);
-      const ldP = phasicTonic(filt, `ld${seg}`, load, 0.032);
-      const cho = Math.min(120, 6 + a * 38 + v * 5 + (stP - 6) * 0.1);
-      const hp = Math.min(90, 5 + a * 22 + (stP - 6) * 0.05);
-      const csa = Math.min(120, 5 + st * 38 + ldP * 0.28 + slipV * 3.2 + (grounded ? this.speedS * 12 : 0));
-      const tact = Math.min(110, st * 42 + wall * 0.4 + (grounded ? 6 : 1) + (stP - 6) * 0.22);
+      const stP = proprioJointHz(filt, `st${seg}`, st, 0.032);
+      const ldP = proprioJointHz(filt, `ld${seg}`, load, 0.032);
+      const cho = Math.min(85, 4 + a * 28 + v * 3.5 + (stP - 3) * 0.08);
+      const hp = Math.min(70, 3 + a * 16 + (stP - 3) * 0.04);
+      const csa = Math.min(85, 3 + st * 28 + ldP * 0.22 + slipV * 2.4 + (grounded ? this.speedS * 8 : 0));
+      const tact = Math.min(90, st * 32 + wall * 0.3 + (grounded ? 5 : 1) + (stP - 3) * 0.16);
       const prop = cho * 0.5 + hp * 0.22 + csa * 0.28;
       rates[`cho${seg}`] = cho;
       rates[`hp${seg}`] = hp;
@@ -1353,20 +1532,27 @@ export class EmbodiedFly {
         const sv = ss ? Math.min(8, spd * 0.6 + ff * 0.02) : 0;
         flex += fl; st += ss; fz += ff; slipV += sv;
         const lr = name[0];
-        const stHz = phasicTonic(filt, `mjst${seg}${lr}`, ss, 0.032);
-        const ldHz = phasicTonic(filt, `mjld${seg}${lr}`, Math.min(1.5, ff * 0.04 + ss * 0.5), 0.032);
-        const fxHz = phasicTonic(filt, `mjfx${seg}${lr}`, fl, 0.032);
-        rates[`cho${seg}${lr}`] = Math.min(120, 6 + fl * 28 + fxHz * 0.14 + spd * 3);
-        rates[`tact${seg}${lr}`] = Math.min(110, stHz * 0.4 + ss * 40 + wall * 0.4 + (grounded ? 6 : 1));
+        const stHz = proprioJointHz(filt, `mjst${seg}${lr}`, ss, 0.032);
+        const ldHz = proprioJointHz(filt, `mjld${seg}${lr}`, Math.min(1.5, ff * 0.04 + ss * 0.5), 0.032);
+        const fxHz = proprioJointHz(filt, `mjfx${seg}${lr}`, fl, 0.032);
+        const choL = Math.min(85, 4 + fl * 20 + fxHz * 0.12 + spd * 2.2);
+        const hpL = Math.min(70, 3 + fl * 12 + fxHz * 0.08);
+        const csaL = Math.min(85, 3 + ss * 28 + ldHz * 0.22 + ff * 0.8 + (ss ? spd * 2 : 0));
+        const tactL = Math.min(90, stHz * 0.35 + ss * 32 + wall * 0.3 + (grounded ? 5 : 1));
+        rates[`cho${seg}${lr}`] = choL;
+        rates[`tact${seg}${lr}`] = tactL;
+        rates[`hp${seg}${lr}`] = hpL;
+        rates[`csa${seg}${lr}`] = csaL;
+        rates[`prop${seg}${lr}`] = choL * 0.5 + hpL * 0.22 + csaL * 0.28;
       }
       const nLeg = Math.max(1, names.length);
       flex /= nLeg; st /= nLeg; fz /= nLeg; slipV /= nLeg;
-      const stP = phasicTonic(filt, `mjst${seg}`, st, 0.032);
-      const ldP = phasicTonic(filt, `mjld${seg}`, Math.min(1.5, fz * 0.03 + st * 0.5), 0.032);
-      const cho = Math.min(120, 6 + flex * 28 + spd * 3 + (stP - 6) * 0.1);
-      const hp = Math.min(90, 5 + flex * 14 + (stP - 6) * 0.05);
-      const csa = Math.min(120, 5 + st * 38 + ldP * 0.3 + fz * 1.1 + slipV * 3.5 + (grounded ? this.speedS * 12 : 0));
-      const tact = Math.min(110, st * 42 + wall * 0.4 + (grounded ? 6 : 1) + (stP - 6) * 0.22);
+      const stP = proprioJointHz(filt, `mjst${seg}`, st, 0.032);
+      const ldP = proprioJointHz(filt, `mjld${seg}`, Math.min(1.5, fz * 0.03 + st * 0.5), 0.032);
+      const cho = Math.min(85, 4 + flex * 20 + spd * 2.2 + (stP - 3) * 0.08);
+      const hp = Math.min(70, 3 + flex * 10 + (stP - 3) * 0.04);
+      const csa = Math.min(85, 3 + st * 28 + ldP * 0.22 + fz * 0.8 + slipV * 2.4 + (grounded ? this.speedS * 8 : 0));
+      const tact = Math.min(90, st * 32 + wall * 0.3 + (grounded ? 5 : 1) + (stP - 3) * 0.16);
       const prop = cho * 0.5 + hp * 0.22 + csa * 0.28;
       rates[`cho${seg}`] = cho;
       rates[`hp${seg}`] = hp;

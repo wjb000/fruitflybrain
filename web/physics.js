@@ -1,6 +1,6 @@
 /** Client for the Python MuJoCo plant. Brain fires MNs; this is the flesh. */
 
-import { plantUrl, plantBase, DEFAULT_PLANT } from "./plantConfig.js?v=drone1";
+import { plantUrl, plantProbeOrigins, plantHealthUrl } from "./plantConfig.js?v=ogbody1";
 
 export const physics = {
   ok: false,
@@ -13,33 +13,41 @@ export const physics = {
 
 let busy = false;
 let reconnectAt = 0;
+const PLANT_HEALTH_MS = 2200;
 
-async function probe(url) {
-  const r = await fetch(url + "/physics/health", { mode: "cors" });
-  if (!r.ok) throw new Error("health " + r.status);
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || "plant not ok");
-  return j;
+async function fetchTimed(url, ms = PLANT_HEALTH_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { mode: "cors", signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function plantEndpoint(path) {
+  if (!physics.ok) return "";
+  return plantUrl(path);
 }
 
 export async function connectPhysics() {
   const tried = [];
-  const candidates = [];
-  const base = plantBase();
-  if (base) candidates.push(base);
-  if (DEFAULT_PLANT) {
-    const d = DEFAULT_PLANT.replace(/\/$/, "");
-    if (!candidates.includes(d)) candidates.push(d);
+  const candidates = plantProbeOrigins();
+  // Static host / no plant configured: kinematic fallback, no /physics/health fetch.
+  if (candidates.length === 0) {
+    physics.ok = false;
+    physics.err = "";
+    physics.plantOrigin = "";
+    return false;
   }
-  // same-origin last (Pages has no /physics)
-  candidates.push("");
 
   for (const c of candidates) {
     const origin = c || "(same-origin)";
     tried.push(origin);
     try {
-      const healthUrl = c ? (c + "/physics/health") : "/physics/health";
-      const r = await fetch(healthUrl, { mode: "cors" });
+      const healthUrl = plantHealthUrl(c);
+      const r = await fetchTimed(healthUrl);
+      if (!r.ok) continue;
       const j = await r.json();
       if (!j.ok) continue;
       physics.ok = true;
@@ -62,18 +70,21 @@ export async function connectPhysics() {
   return false;
 }
 
-/** If plant dropped (tunnel blip), retry without reloading the page. */
+/** If plant dropped (tunnel blip), retry without reloading the page.
+ *  No plant configured (github.io kinematic default): never fetch /physics. */
 export function maybeReconnectPhysics() {
   if (physics.ok) return;
+  if (plantProbeOrigins().length === 0) return;
   if (performance.now() < reconnectAt) return;
   reconnectAt = performance.now() + 8000;
   connectPhysics().catch(() => {});
 }
 
 export async function spawnPhysics(id, x, z, yaw) {
-  if (!physics.ok) return null;
+  const url = plantEndpoint("/physics/spawn");
+  if (!url) return null;
   try {
-    const r = await fetch(plantUrl("/physics/spawn"), {
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, x, z, yaw }),
@@ -97,8 +108,9 @@ export async function spawnPhysics(id, x, z, yaw) {
 export function despawnPhysics(id) {
   physics.pending.delete(id);
   physics.poses.delete(id);
-  if (!physics.ok) return;
-  fetch(plantUrl("/physics/despawn"), {
+  const url = plantEndpoint("/physics/despawn");
+  if (!url) return;
+  fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
@@ -110,9 +122,10 @@ export function despawnPhysics(id) {
 export async function clearPhysics() {
   physics.pending.clear();
   physics.poses.clear();
-  if (!physics.ok) return null;
+  const url = plantEndpoint("/physics/clear");
+  if (!url) return null;
   try {
-    const r = await fetch(plantUrl("/physics/clear"), {
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
@@ -127,9 +140,10 @@ export async function clearPhysics() {
 }
 
 export async function resetPhysics(id, x, z, yaw) {
-  if (!physics.ok) return null;
+  const url = plantEndpoint("/physics/reset");
+  if (!url) return null;
   try {
-    const r = await fetch(plantUrl("/physics/reset"), {
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, x, z, yaw }),
@@ -158,11 +172,13 @@ export function heartbeatPhysics() {
   if (!physics.ok || busy) return;
   if (document.visibilityState === "hidden") return;
   if (physics.poses.size === 0 && physics.pending.size === 0) return;
+  const url = plantEndpoint("/physics/step");
+  if (!url) return;
   busy = true;
   const flies = {};
   for (const id of physics.poses.keys()) flies[id] = physics.pending.get(id) || {};
   for (const [id, cmd] of physics.pending) flies[id] = cmd;
-  fetch(plantUrl("/physics/step"), {
+  fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dt: 0.016, flies }),
@@ -205,12 +221,14 @@ export function flushPhysics(dt) {
   maybeReconnectPhysics();
   if (busy || !physics.ok) return;
   if (physics.pending.size === 0 && physics.poses.size === 0) return;
+  const url = plantEndpoint("/physics/step");
+  if (!url) return;
   busy = true;
   const flies = {};
   for (const id of physics.poses.keys()) flies[id] = physics.pending.get(id) || {};
   for (const [id, cmd] of physics.pending) flies[id] = cmd;
   physics.pending.clear();
-  fetch(plantUrl("/physics/step"), {
+  fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dt, flies }),

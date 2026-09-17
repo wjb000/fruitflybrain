@@ -155,7 +155,7 @@ def main():
     httpd = ThreadingHTTPServer((args.host, args.port), handler)
     # Prefer a clickable loopback URL even when bound to 0.0.0.0
     browse_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
-    url = f"http://{browse_host}:{args.port}/"
+    url = f"http://{browse_host}:{args.port}/?v=ogbody1"
     print(f"Male CNS simulation  {url}  (bind {args.host})", flush=True)
     print("MuJoCo plant          /physics/health  (CORS *)", flush=True)
     if not args.no_open:

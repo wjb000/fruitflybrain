@@ -1,0 +1,632 @@
+/**
+ * MN EMA → muscle / neck / walk-drive mapping (gap-fill readout).
+ *
+ * Connectome LIF stays primary. This file only turns *existing* annotated
+ * pool EMAs into antagonist DoFs. Empty pools stay 0 — no invented MN IDs,
+ * no CPG gait, no walk thruster.
+ *
+ * dynw1: synapses are time-varying (connectome weights × TM STD). Tonic
+ * T2/T3 is not a constant slip push; abdomen is phasic (no butt-lift loop).
+ * fullfly1: idle MN noise was tarsus-tap + abdomen twitch while stance-slip
+ * stayed gated. Quiet T2/T3/DNa → planted rest (all six legs). Walk MNs →
+ * stance/swing from those flex/ext pools; empty T2/T3 Ta* / coxaProm are
+ * kinematically coupled in `embodyMuscle` (mesh/plant), not filled with fake
+ * cell IDs. Abdomen is dead-zoned and split by soma-Y into NMF segments.
+ */
+
+export const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
+export const MUSCLE_NAMES = [
+  "coxaProm", "coxaRem", "coxaRotA", "coxaRotP", "coxaAdd",
+  "trFlex", "trExt", "feRed", "tiFlex", "tiExt", "taDep", "taLev",
+];
+export const FORELEGS = new Set(["L1", "R1"]);
+
+/** Per-leg readout. T1 is densely annotated (coxaProm + Ta*) vs T2/T3. */
+export const LEG_SCALE = {
+  L1: 0.40, R1: 0.40,
+  L2: 0.88, R2: 0.88,
+  L3: 1.00, R3: 1.00,
+};
+
+/** Extra T1 attenuation on the hinges that threw the "arms" up. */
+export const T1_MUSCLE_SCALE = {
+  coxaProm: 0.40, coxaRem: 0.48, coxaRotA: 0.58, coxaRotP: 0.58, coxaAdd: 0.50,
+  trFlex: 0.46, trExt: 0.34, feRed: 0.36, tiFlex: 0.56, tiExt: 0.46,
+  taDep: 0.40, taLev: 0.40,
+};
+
+/**
+ * Hinge spans (rad) around NMF anatomical rest.
+ * Pairing is Azevedo/Soler muscle → NeuroMechFly DoF (same as physics.py).
+ * Half-ranges are NMF-like (T1 smaller than T3); not cartoon puppet slams.
+ */
+export const MUSCLE_SPAN = {
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.52],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.36],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.30],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.58],
+  "trochanterfemur-roll": ["feRed", null, 0.24],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.56],
+  "tarsus1-pitch": ["taLev", "taDep", 0.18],
+};
+
+/** World-floor Y in the Three.js garden (moss). Stance tarsi plant here. */
+export const GROUND_Y = 0.05;
+
+export const LEG_NEUROMERE = {
+  L1: "T1", R1: "T1", L2: "T2", R2: "T2", L3: "T3", R3: "T3",
+};
+
+/**
+ * Per-neuromere NMF-like joint half-ranges (rad). T1 reach/groom stays
+ * smaller than T2/T3 stance legs — same real MN IDs, anatomical limits.
+ */
+export const NMF_JOINT_LIMIT = {
+  T1: {
+    "coxa-pitch": 0.40, "coxa-yaw": 0.30, "coxa-roll": 0.26,
+    "trochanterfemur-pitch": 0.48, "trochanterfemur-roll": 0.20,
+    "tibia-pitch": 0.50, "tarsus1-pitch": 0.16,
+  },
+  T2: {
+    "coxa-pitch": 0.50, "coxa-yaw": 0.36, "coxa-roll": 0.30,
+    "trochanterfemur-pitch": 0.56, "trochanterfemur-roll": 0.24,
+    "tibia-pitch": 0.56, "tarsus1-pitch": 0.18,
+  },
+  T3: {
+    "coxa-pitch": 0.54, "coxa-yaw": 0.40, "coxa-roll": 0.32,
+    "trochanterfemur-pitch": 0.60, "trochanterfemur-roll": 0.24,
+    "tibia-pitch": 0.58, "tarsus1-pitch": 0.18,
+  },
+};
+
+export function nmfJointLimit(legName, hingeKey) {
+  const neu = LEG_NEUROMERE[legName] || "T2";
+  const table = NMF_JOINT_LIMIT[neu] || NMF_JOINT_LIMIT.T2;
+  if (table[hingeKey] != null) return table[hingeKey];
+  const span = MUSCLE_SPAN[hingeKey];
+  return span ? span[2] : 0.4;
+}
+
+export function clampJointDelta(legName, hingeKey, delta) {
+  const lim = nmfJointLimit(legName, hingeKey);
+  return Math.max(-lim, Math.min(lim, delta || 0));
+}
+
+function v3sub(a, b) {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+function v3cross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+function v3norm(a) {
+  const n = Math.hypot(a[0], a[1], a[2]);
+  if (n < 1e-8) return [0, 0, 0];
+  return [a[0] / n, a[1] / n, a[2] / n];
+}
+
+/**
+ * Anatomical hinge axes from NMF rest segment positions (thorax frame).
+ * Pitch lives in each leg's plane (not world X) so mid/hind legs flex like
+ * a fly, not a bilateral puppet. Yaw/roll are ipsilateral (L/R mirrored).
+ *
+ * `side` is -1 for left, +1 for right. Positions are [x,y,z] restPos.
+ */
+export function anatomicalLegAxes(side, p) {
+  const s = side < 0 ? -1 : 1;
+  const up = [0, 1, 0];
+  const coxaBone = v3norm(v3sub(p.femur, p.coxa));
+  let lat = v3norm(v3cross(up, coxaBone));
+  if (Math.hypot(lat[0], lat[1], lat[2]) < 0.25) lat = [s, 0, 0];
+  if (lat[0] * s < 0) lat = [-lat[0], -lat[1], -lat[2]];
+  const coxaUp = v3norm(v3cross(coxaBone, lat));
+  const femBone = v3norm(v3sub(p.tibia, p.femur));
+  let femLat = v3norm(v3cross(up, femBone));
+  if (Math.hypot(femLat[0], femLat[1], femLat[2]) < 0.25) femLat = lat;
+  if (femLat[0] * s < 0) femLat = [-femLat[0], -femLat[1], -femLat[2]];
+  const tibBone = v3norm(v3sub(p.tarsus, p.tibia));
+  let tibLat = v3norm(v3cross(up, tibBone));
+  if (Math.hypot(tibLat[0], tibLat[1], tibLat[2]) < 0.25) tibLat = femLat;
+  if (tibLat[0] * s < 0) tibLat = [-tibLat[0], -tibLat[1], -tibLat[2]];
+  return {
+    "coxa-yaw": coxaUp[1] < 0 ? [-coxaUp[0], -coxaUp[1], -coxaUp[2]] : coxaUp,
+    "coxa-pitch": lat,
+    "coxa-roll": coxaBone,
+    "trochanterfemur-pitch": femLat,
+    "trochanterfemur-roll": femBone,
+    "tibia-pitch": tibLat,
+    "tarsus1-pitch": tibLat,
+  };
+}
+
+/** Distal claw offset from tarsus5 origin along tarsus4→5. */
+export function tarsusTipOffset(tarsus4, tarsus5) {
+  const d = v3sub(tarsus5, tarsus4);
+  const n = Math.hypot(d[0], d[1], d[2]);
+  if (n < 1e-6) return [0, -0.04, 0];
+  return [d[0], d[1], d[2]];
+}
+
+/** Male FlyEM muscle pools that are empty (do not invent IDs). */
+export const EMPTY_MALE_MUSCLE_POOLS = [
+  "L2_coxaProm", "R2_coxaProm", "L3_coxaProm", "R3_coxaProm",
+  "L2_taDep", "L2_taLev", "R2_taDep", "R2_taLev",
+  "L3_taDep", "L3_taLev", "R3_taDep", "R3_taLev",
+];
+
+/** Abdomen MN pool split by soma Y → NMF segments (real IDs, not new cells). */
+export const ABD_SEG_KEYS = ["abdomen12", "abdomen3", "abdomen4", "abdomen5", "abdomen6"];
+export const ABD_SEG_WEIGHTS = [0.28, 0.48, 0.68, 0.86, 1.00];
+export const ABD_POSE_GATE = 0.30;
+export const ABD_YAW_SPAN = 0.14;
+export const IDLE_WALK_GATE = 0.05;
+export const ANTENNA_JO_BASE = 8;
+export const ANTENNA_SPAN = 0.16;
+/** Funiculus is the JO joint (pedicel–funiculus). Pedicel/arista follow smaller. */
+export const ANTENNA_PARTS = { pedicel: 0.38, funiculus: 0.82, arista: 0.22 };
+
+/** Visual neck spans (rad). Plant has no neck joint. */
+export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
+
+export const POSE_EMA_ALPHA = 0.38; // slower muscle/neck EMA (was 0.85)
+export const MUSCLE_TAU = 0.18;     // hinge follow — calmer whole-body (was 0.14)
+export const NECK_TAU = 0.22;
+export const WING_TAU = 0.16;
+export const FEED_TAU = 0.18;
+/** Stance-slip body integration (not a CPG) — low-pass MN foot jitter. */
+export const BODY_SLIP_TAU = 0.10;
+export const BODY_YAW_TAU = 0.14;
+export const BODY_YAW_CLAMP = 0.042;
+
+/** Visual wing flap. cns3 0.12 + 10 Hz sine read as tapping from idle MN noise. */
+export const WING_FLAP_GATE = 0.48;
+export const WING_FLAP_AMP = 0.22;
+/** Mouth/proboscis. MN9 is 2 cells — a single spike was constant mouthing. */
+export const FEED_POSE_GATE = 0.26;
+
+const DEAD = 0.045;
+
+/** Soft-saturating map from effector EMA (0–1) → drive. Quiet stays near 0. */
+export function softDrive(v, gain = 2.15) {
+  const x = Math.max(0, v || 0);
+  return Math.tanh(x * gain);
+}
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+/**
+ * Antagonist pair from real pool EMAs.
+ * - Quiet×quiet → 0 (rest).
+ * - Winner-take-more so co-contraction does not cancel the DoF.
+ * - Unipolar (one pool empty, e.g. male T2/T3 coxaProm) stays a modest
+ *   offset from rest — not a full-span slam on the remaining remotor.
+ */
+export function antagPair(posEma, negEma, gain = 2.15) {
+  const p0 = Math.max(0, posEma || 0);
+  const n0 = Math.max(0, negEma || 0);
+  if (p0 + n0 < DEAD) return { pos: 0, neg: 0 };
+  const p = softDrive(p0, gain);
+  const n = softDrive(n0, gain);
+  const mag = p + n;
+  if (mag < 1e-4) return { pos: 0, neg: 0 };
+  const unipolar = (p0 < DEAD) !== (n0 < DEAD);
+  const raw = (p - n) / (mag + 0.06);
+  const d = Math.tanh(raw * 1.75);
+  const lose = unipolar ? 0.90 : 0.74;
+  const boost = unipolar ? 0.06 : 0.10;
+  const uni = unipolar ? 0.52 : 1;
+  return {
+    pos: clamp01(uni * (p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * boost)),
+    neg: clamp01(uni * (n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * boost)),
+  };
+}
+
+/** Signed antagonist for hinge targeting. Quiet → 0 (anatomical rest). */
+export function antagonist(pos, neg) {
+  const p = pos || 0, n = neg || 0;
+  const mag = p + n;
+  if (mag < 0.02) return 0;
+  const raw = (p - n) / (mag + 0.05);
+  return Math.tanh(raw * 1.55);
+}
+
+export function isForeleg(name) {
+  return FORELEGS.has(name);
+}
+
+/**
+ * Honest MN→muscle for one leg. Empty annotation pools stay 0.
+ * T1 (foreleg) scales down so dense coxaProm/Ta* do not flail vs planted slip.
+ */
+export function muscleFromEma(legName, emaFn) {
+  const ema = (m) => Math.max(0, emaFn(m) || 0);
+  const gain = isForeleg(legName) ? 1.85 : 2.20;
+  const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), gain);
+  const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), gain);
+  const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.50, gain);
+  const tr = antagPair(ema("trFlex"), ema("trExt"), gain);
+  const ti = antagPair(ema("tiFlex"), ema("tiExt"), gain);
+  const ta = antagPair(ema("taDep"), ema("taLev"), gain);
+  const out = {
+    coxaProm: coxa.pos,
+    coxaRem: Math.max(coxa.neg, add.neg * 0.30),
+    coxaRotA: rot.pos,
+    coxaRotP: rot.neg,
+    coxaAdd: add.pos,
+    trFlex: tr.pos,
+    trExt: tr.neg,
+    feRed: softDrive(ema("feRed"), isForeleg(legName) ? 1.7 : 2.4),
+    tiFlex: ti.pos,
+    tiExt: ti.neg,
+    taDep: ta.pos,
+    taLev: ta.neg,
+  };
+  const legK = LEG_SCALE[legName] ?? 1;
+  const t1 = isForeleg(legName) ? T1_MUSCLE_SCALE : null;
+  for (const k of MUSCLE_NAMES) {
+    const extra = t1 ? (t1[k] ?? 1) : 1;
+    out[k] = (out[k] || 0) * legK * extra;
+  }
+  return out;
+}
+
+/**
+ * Neck: CvN pool magnitude → pitch; annotated neckL/neckR → yaw/roll.
+ * Dead-zone + modest gain so Poisson on 25 cells is not a head-thrash.
+ */
+export function neckFromEma(e) {
+  const dead = 0.06;
+  const nL = Math.max(0, (e.neckL || 0) - dead);
+  const nR = Math.max(0, (e.neckR || 0) - dead);
+  const n0 = Math.max(0, (e.neck || 0) - dead);
+  const mag = Math.max(n0, 0.5 * (nL + nR));
+  const pair = antagPair(nR, nL, 1.45);
+  const yaw = (pair.pos - pair.neg) * 0.55;
+  return {
+    head: softDrive(mag, 1.25),
+    headYaw: Math.max(-1, Math.min(1, yaw)),
+    headRoll: Math.max(-1, Math.min(1, yaw * 0.35)),
+  };
+}
+
+/**
+ * Wing power from DLM/DVM/ADMN. Idle Poisson on these small pools must not
+ * flap or tap the mesh. Flight translation is gated separately (?flight=1).
+ * No cosmetic idle CPG — below WING_FLAP_GATE the mesh stays at rest.
+ */
+function wingSide(e, side) {
+  const dead = 0.12;
+  const pick = (base) => {
+    const k = `${base}_${side}`;
+    const v = e[k];
+    return v != null && v > 0 ? v : (e[base] || 0);
+  };
+  const dlm = softDrive(Math.max(0, pick("DLM") - dead), 1.45);
+  const dvm = softDrive(Math.max(0, pick("DVM") - dead), 1.45);
+  const admn = softDrive(Math.max(0, pick("ADMN") - dead), 1.30);
+  return { dlm, dvm, admn, power: 0.42 * dlm + 0.38 * dvm + 0.22 * admn };
+}
+
+export function wingFromEma(e) {
+  const dead = 0.12;
+  const dlm = softDrive(Math.max(0, (e.DLM || 0) - dead), 1.45);
+  const dvm = softDrive(Math.max(0, (e.DVM || 0) - dead), 1.45);
+  const admn = softDrive(Math.max(0, (e.ADMN || 0) - dead), 1.30);
+  const power = 0.42 * dlm + 0.38 * dvm + 0.22 * admn;
+  const L = wingSide(e, "L");
+  const R = wingSide(e, "R");
+  if (power < WING_FLAP_GATE) {
+    return {
+      dlm: 0, dvm: 0, admn: 0, power: 0, fly: 0,
+      dlmL: 0, dlmR: 0, dvmL: 0, dvmR: 0, admnL: 0, admnR: 0,
+    };
+  }
+  return {
+    dlm, dvm, admn, power, fly: power,
+    dlmL: L.dlm, dlmR: R.dlm, dvmL: L.dvm, dvmR: R.dvm, admnL: L.admn, admnR: R.admn,
+  };
+}
+
+/**
+ * Proboscis / MN9. MN9 n=2 saturates from one spike (cns3 softDrive×2.4).
+ * Dead-zone + low gain; quiet pools → 0 mouth pose.
+ */
+export function feedFromEma(e) {
+  const mn9 = Math.max(0, (e.MN9 || 0) - 0.28);
+  const pr = Math.max(0, (e.proboscis || 0) - 0.16);
+  const v = softDrive(mn9 * 0.65 + pr * 0.75, 1.20);
+  return v < FEED_POSE_GATE ? 0 : v;
+}
+
+/**
+ * Walk drive from walking-leg neuromeres (T2/T3) + DNa.
+ * T1 twitch alone must not gate stance-slip (that froze or thrashed XY).
+ *
+ * Saturated tonic T2/T3 (constant push) is not a gait: optional `state`
+ * high-passes against a slow tonic so repeated identical drive fades.
+ * Bursting / changing MN rates still walk.
+ */
+export function walkDriveFromEma(e, state = null, dt = 0.032) {
+  const t23 = ((e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 4;
+  const t1 = ((e.T1L || 0) + (e.T1R || 0)) / 2;
+  const dna = e.DNa || 0;
+  if (t23 + dna * 0.6 < 0.10) {
+    if (state) state.walkTonic = (state.walkTonic || 0) * 0.92;
+    return 0;
+  }
+  const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
+  if (!state) return softDrive(raw, 2.15);
+  const a = 1 - Math.exp(-dt / 0.70);
+  state.walkTonic = (state.walkTonic || 0) + (raw - (state.walkTonic || 0)) * a;
+  const tonic = state.walkTonic;
+  const phasic = Math.max(0, raw - 0.98 * tonic);
+  // Pegged T2/T3 (same circuit every frame) → no constant slip push.
+  if (phasic < 0.05 && tonic > 0.16) return 0;
+  return softDrive(phasic * 0.90 + raw * 0.10, 2.15);
+}
+
+export function legsMean(e) {
+  return ((e.T1L || 0) + (e.T1R || 0) + (e.T2L || 0) + (e.T2R || 0)
+    + (e.T3L || 0) + (e.T3R || 0)) / 6;
+}
+
+/** Calmer proprio Hz — joint motion into existing cho/hp/csa pools, not a seizure. */
+export function proprioJointHz(filt, key, c, dt = 0.032) {
+  const slow = filt[key] || 0;
+  const a = 1 - Math.exp(-dt / 0.20);
+  filt[key] = slow + (c - slow) * a;
+  const onset = Math.max(0, c - filt[key]);
+  const tonic = Math.log1p(Math.max(0, c) * 3.0) * 16;
+  return Math.min(85, 3 + onset * 70 + tonic + c * 9);
+}
+
+export function follow(cur, target, dt, tau = MUSCLE_TAU) {
+  const a = 1 - Math.exp(-dt / Math.max(1e-4, tau));
+  return cur + (target - cur) * a;
+}
+
+/** Slip weight: T2/T3 planted feet drive walk; T1 is reach/groom. */
+export function slipWeight(legName) {
+  return isForeleg(legName) ? 0.28 : 1.0;
+}
+
+/**
+ * Abdomen posture from the 207-cell pool (and optional soma-Y segments).
+ * Large-pool Poisson was a constant butt twitch — dead-zone + gate.
+ * Optional `state` high-passes tonic drive so the same circuit hit every
+ * frame does not curl the abdomen over and over.
+ */
+export function abdomenFromEma(e, court = 0, state = null, dt = 0.032) {
+  const dead = 0.22;
+  const segs = ABD_SEG_KEYS.map((k) => Math.max(0, (e[k] || 0) - dead));
+  const whole = Math.max(0, (e.abdomen || 0) - dead);
+  const courtV = court > 0.30 ? (court - 0.30) * 0.36 : 0;
+  const mag = Math.max(whole, segs.reduce((a, b) => Math.max(a, b), 0));
+  let driveMag = mag;
+  if (state) {
+    const a = 1 - Math.exp(-dt / 0.85);
+    state.abdTonic = (state.abdTonic || 0) + (mag - (state.abdTonic || 0)) * a;
+    const phasic = Math.max(0, mag - 0.92 * state.abdTonic);
+    if (phasic < 0.06 && courtV < 0.10) {
+      return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0, yaw: 0 };
+    }
+    driveMag = phasic;
+  }
+  const drive = softDrive(driveMag, 1.22);
+  if (drive < ABD_POSE_GATE && courtV < 0.10) {
+    return { curl: 0, segs: ABD_SEG_KEYS.map(() => 0), court: 0, yaw: 0 };
+  }
+  const curl = Math.min(1, drive * 0.42 + courtV);
+  const sum = segs.reduce((a, b) => a + b, 0);
+  const outSegs = segs.map((s, i) => {
+    const base = sum > 0.02 ? softDrive(s, 1.25) : curl * ABD_SEG_WEIGHTS[i];
+    return Math.min(1, base);
+  });
+  // Lateral bend from soma-X split of the *same* 207 abdomen MN IDs.
+  const latDead = 0.18;
+  const aL = Math.max(0, (e.abdomen_L || e.abdomenL || 0) - latDead);
+  const aR = Math.max(0, (e.abdomen_R || e.abdomenR || 0) - latDead);
+  let yaw = 0;
+  if (aL + aR > 0.10 && (drive > ABD_POSE_GATE * 0.4 || courtV > 0.08)) {
+    yaw = Math.tanh((aR - aL) * 2.1) * 0.42;
+  }
+  return { curl, segs: outSegs, court: courtV, yaw };
+}
+
+/**
+ * Antenna deflection from Johnston's organ Hz (sensory reflex, not fake MNs).
+ * Quiet wind → 0. Calm — never thrash.
+ */
+export function antennaFromJo(hz) {
+  const x = Math.max(0, (hz || 0) - ANTENNA_JO_BASE);
+  const v = Math.tanh(x / 95);
+  return v < 0.05 ? 0 : v;
+}
+
+/** Pedicel / funiculus / arista shares of a JO Hz (same IDs, denser mesh). */
+export function antennaPartsFromJo(hz) {
+  const mag = antennaFromJo(hz);
+  return {
+    mag,
+    pedicel: mag * ANTENNA_PARTS.pedicel,
+    funiculus: mag * ANTENNA_PARTS.funiculus,
+    arista: mag * ANTENNA_PARTS.arista,
+  };
+}
+
+/**
+ * Haltere pose from body yaw-rate (gyro) + wing MN power.
+ * No dedicated haltere MN pool in FlyEM export — not invented. Quiet at rest
+ * (no beat CPG). Turn → small deflection; wing gate → beat with DLM/DVM/ADMN.
+ */
+export function haltereFromSense({ yawRate = 0, wingPower = 0 } = {}, side = "L") {
+  const yaw = yawRate || 0;
+  const ipsi = side === "L" ? Math.max(0, -yaw) : Math.max(0, yaw);
+  const gyro = Math.tanh(Math.abs(yaw) * 0.42) * 0.50 + Math.tanh(ipsi * 0.55) * 0.20;
+  const beat = (wingPower || 0) > 0 ? wingPower : 0;
+  const mag = Math.min(1, beat * 0.90 + gyro * 0.55);
+  return mag < 0.035 ? 0 : mag;
+}
+
+/**
+ * IDs in `all` that are not in any `used` list. Worker drive is max-merge, so
+ * residual bind lets untyped aggregate cells see the world without overwriting
+ * typed ORN / GRN / proprio channels.
+ */
+export function residualIds(all, ...used) {
+  const skip = new Set();
+  for (const list of used) {
+    if (!list) continue;
+    for (const i of list) skip.add(i);
+  }
+  const out = [];
+  for (const i of all || []) if (!skip.has(i)) out.push(i);
+  return out;
+}
+
+/** Nearest {x,z} among points. Used so every fruit/dew is tasteable, not just spawn food. */
+export function nearestXZ(px, pz, pts, fallback = null) {
+  let best = fallback;
+  let bestD = Infinity;
+  for (const p of pts || []) {
+    if (!p) continue;
+    const x = p.x != null ? p.x : p[0];
+    const z = p.z != null ? p.z : p[1];
+    if (x == null || z == null) continue;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  if (!best && fallback) {
+    return { pt: fallback, dist: Math.hypot((fallback.x ?? 0) - px, (fallback.z ?? 0) - pz) };
+  }
+  return { pt: best, dist: bestD === Infinity ? 99 : bestD };
+}
+
+/** Shade canopy: existing perch radius, no invented sensors. */
+export function underCanopy(px, pz, perch) {
+  if (!perch) return false;
+  const r = perch.r || 0.7;
+  return Math.hypot((perch.x || 0) - px, (perch.z || 0) - pz) < r;
+}
+
+/**
+ * Low-pass stance-slip so MN Poisson does not fidget the thorax.
+ * Same MN foot vectors — no thruster, no CPG.
+ */
+export function smoothSlip(state, sx, sz, dyaw, dt = 0.032) {
+  const st = state || {};
+  const a = 1 - Math.exp(-Math.max(0, dt) / BODY_SLIP_TAU);
+  const yawA = 1 - Math.exp(-Math.max(0, dt) / BODY_YAW_TAU);
+  st.sx = (st.sx || 0) + (sx - (st.sx || 0)) * a;
+  st.sz = (st.sz || 0) + (sz - (st.sz || 0)) * a;
+  const yawT = Math.max(-BODY_YAW_CLAMP, Math.min(BODY_YAW_CLAMP, dyaw || 0));
+  st.yaw = (st.yaw || 0) + (yawT - (st.yaw || 0)) * yawA;
+  return { sx: st.sx, sz: st.sz, dyaw: st.yaw, state: st };
+}
+
+/**
+ * Close proprio: neck / abdomen / yaw / wing load into *existing* cho/hp/csa
+ * pools. Haltere gyro → metathoracic campaniform (`csaT3`). Neck hair plates
+ * → `hpT1`. Abdomen curl → hind `propT3`/`choT3`.
+ */
+export function closeLoopProprio(rates, extra = {}) {
+  const out = { ...(rates || {}) };
+  const add = (k, v) => {
+    if (!(v > 0)) return;
+    out[k] = Math.min(95, (out[k] || 0) + v);
+  };
+  const yaw = extra.yawRate || 0;
+  const absYaw = Math.abs(yaw);
+  const neck = extra.neckMag || 0;
+  const headYaw = extra.headYaw || 0;
+  const abd = extra.abd || 0;
+  const wingP = extra.wingP || 0;
+  const antL = extra.antL || 0;
+  const antR = extra.antR || 0;
+  // Haltere / gyro: metathorax campaniform (csaT3 n=199).
+  add("csaT3", absYaw * 16 + wingP * 10);
+  add("csaT3L", Math.max(0, -yaw) * 20 + wingP * 8);
+  add("csaT3R", Math.max(0, yaw) * 20 + wingP * 8);
+  add("campaniform", absYaw * 7 + wingP * 5);
+  // Neck hair plates sit in the prothorax.
+  add("hpT1", neck * 22);
+  add("hpT1L", neck * 10 + Math.max(0, -headYaw) * 16);
+  add("hpT1R", neck * 10 + Math.max(0, headYaw) * 16);
+  add("hairplate", neck * 8);
+  // Abdomen posture → hind proprio / chordotonal.
+  add("propT3", abd * 20);
+  add("choT3", abd * 12);
+  add("proprio", abd * 5 + neck * 4 + absYaw * 3);
+  // Antenna joint load (JO already carries wind; this is pose feedback).
+  add("choT1L", antL * 10);
+  add("choT1R", antR * 10);
+  return out;
+}
+
+/**
+ * Gap-fill body mechanics on top of honest `muscleFromEma`.
+ * - Idle (quiet T2/T3/DNa): all zeros → planted anatomical rest (no toe-tap).
+ * - Walk: empty Ta* / coxaProm couple from tibia/trochanter (kinematic, not IDs).
+ * - Stance vs swing from that leg's flex/ext contrast — no CPG clock.
+ */
+export function embodyMuscle(legName, muscle, { walkDrive = 0 } = {}) {
+  const src = muscle || {};
+  const out = {};
+  for (const k of MUSCLE_NAMES) out[k] = src[k] || 0;
+  const walking = (walkDrive || 0) >= IDLE_WALK_GATE;
+  if (!walking) {
+    for (const k of MUSCLE_NAMES) out[k] = 0;
+    out._lift = 0;
+    out._swing = false;
+    out._stance = true;
+    out._coupled = false;
+    return out;
+  }
+  const emptyTa = (src.taDep || 0) + (src.taLev || 0) < 1e-4;
+  const emptyProm = (src.coxaProm || 0) < 1e-4;
+  if (emptyTa) {
+    out.taDep = (src.tiExt || 0) * 0.40;
+    out.taLev = (src.tiFlex || 0) * 0.40;
+  }
+  if (emptyProm) {
+    out.coxaProm = (src.trFlex || 0) * 0.22;
+  }
+  const lift = (out.trFlex + out.tiFlex + out.taLev)
+    - (out.trExt + out.tiExt + out.taDep);
+  out._lift = lift;
+  out._swing = lift > 0.10;
+  out._stance = !out._swing;
+  out._coupled = emptyTa || emptyProm;
+  return out;
+}
+
+/** HUD: how many effector pools are mapped vs annotation-empty. */
+export function effectorMapStats(counts = {}) {
+  const entries = Object.entries(counts || {});
+  const mapped = entries.filter(([, n]) => n > 0);
+  const empty = entries.filter(([, n]) => n === 0).map(([k]) => k);
+  const muscleKeys = LEG_NAMES.flatMap((leg) => MUSCLE_NAMES.map((m) => `${leg}_${m}`));
+  const muscleMapped = muscleKeys.filter((k) => (counts[k] || 0) > 0).length;
+  const muscleEmpty = muscleKeys.filter((k) => !(counts[k] > 0));
+  return {
+    mappedN: mapped.length,
+    emptyN: empty.length,
+    empty,
+    muscleMapped,
+    muscleEmpty,
+    muscleTotal: muscleKeys.length,
+    abdomen: counts.abdomen || 0,
+    neck: counts.neck || 0,
+    wings: (counts.DLM || 0) + (counts.DVM || 0) + (counts.ADMN || 0),
+    mn9: counts.MN9 || 0,
+    proboscis: counts.proboscis || 0,
+  };
+}
