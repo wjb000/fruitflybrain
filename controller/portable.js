@@ -238,7 +238,7 @@ Hardware:
 
 Sanity: silence:HS or silence optic pools should weaken beacon-directed yaw.
 Default embodiment: fly body (NeuroMechFly mesh + MN drive). Optional ?body=cube|drone.
-Cache-bust ?v=realfly1. Follow-me (optional): follow.html?v=follow1. hΔ lab: hdelta.html?v=lab1. Default home: fly utopia garden. Synaptic efficacy varies over time (STD + connectome weights).
+Cache-bust ?v=realfly2. Follow-me (optional): follow.html?v=follow1. hΔ lab: hdelta.html?v=lab1. Default home: fly utopia garden. Synaptic efficacy varies over time (STD + connectome weights).
 `.trim();
 
 function num(a, b) {
