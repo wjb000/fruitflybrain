@@ -15,7 +15,7 @@ import {
   LEG_NAMES, nmfJointLimit,
   anatomicalLegAxes, NECK_SPAN, ABD_SEG_KEYS, ABD_YAW_SPAN,
   WING_FLAP_GATE, WING_FLAP_AMP, GROUND_Y,
-} from "./poseMap.js?v=browseranimal1";
+} from "./poseMap.js?v=realfly1";
 
 export const MUJOCO_CDN = "https://cdn.jsdelivr.net/npm/@mujoco/mujoco@3.11.0";
 export const TIMESTEP = 0.0008;
@@ -123,13 +123,14 @@ export function mnTarget(act, cmd) {
     const flyA = Number(cmd.fly || 0);
     if (flyA > 0.4) return 0;
     const m = (cmd.muscle && cmd.muscle[act.leg]) || {};
-    const lifting = (m.trFlex || 0) > (m.trExt || 0) + 0.22;
+    const lifting = (m.trFlex || 0) > (m.trExt || 0) + 0.18;
     const swinging = !!m._swing || (
       Math.abs((m.coxaProm || 0) - (m.coxaRem || 0)) > 0.28
       && ((m.coxaProm || 0) + (m.coxaRem || 0)) > 0.35
     );
-    if (lifting) return 0.45;
-    if (swinging) return 0.72;
+    // Peel swing/lift feet — sticky swing was a vault + twitch-in-place source.
+    if (swinging) return 0.10;
+    if (lifting) return 0.28;
     return 1;
   }
   if (act.kind === "neck") {
@@ -145,16 +146,24 @@ export function mnTarget(act, cmd) {
     const yaw = Number(cmd.abdomenYaw || 0);
     if (act.axis === "yaw") return ABD_YAW_SPAN * Math.max(-1, Math.min(1, yaw));
     const w = act.weight || 1;
-    return -0.22 * w * Math.max(0, Math.min(1, curl));
+    // Prefer soma-Y segment EMAs when agent sent abdSegs (same 207 IDs).
+    const segs = cmd.abdSegs;
+    let drive = curl;
+    if (Array.isArray(segs) && act.segIndex != null && segs[act.segIndex] != null) {
+      drive = Number(segs[act.segIndex]) || 0;
+    }
+    return -0.22 * w * Math.max(0, Math.min(1, drive));
   }
   if (act.kind === "wing") {
-    const dlm = Number(cmd.dlm || cmd.wing?.dlm || 0);
-    const dvm = Number(cmd.dvm || cmd.wing?.dvm || 0);
-    const admn = Number(cmd.admn || cmd.wing?.admn || 0);
+    const side = act.side || 1;
+    const sk = side < 0 ? "L" : "R";
+    const wing = cmd.wing || {};
+    const dlm = Number(wing[`dlm${sk}`] ?? cmd.dlm ?? wing.dlm ?? 0);
+    const dvm = Number(wing[`dvm${sk}`] ?? cmd.dvm ?? wing.dvm ?? 0);
+    const admn = Number(wing[`admn${sk}`] ?? cmd.admn ?? wing.admn ?? 0);
     const power = Math.max(0, Math.min(1, 0.42 * dlm + 0.38 * dvm + 0.22 * admn));
     if (power < WING_FLAP_GATE) return 0;
     const t = Number(cmd.t || 0);
-    const side = act.side || 1;
     return side * WING_FLAP_AMP * (power - WING_FLAP_GATE) * Math.sin(t * (10 + power * 140));
   }
   const m = (cmd.muscle && cmd.muscle[act.leg]) || {};
@@ -238,7 +247,7 @@ export function buildNmfMjcf(nmf) {
     });
     actuators.push({
       kind: "abdomen", name: `pos_${name}_pitch`, joint: `${name}_pitch`,
-      axis: "pitch", weight: [0.28, 0.48, 0.68, 0.86, 1][i],
+      axis: "pitch", weight: [0.28, 0.48, 0.68, 0.86, 1][i], segIndex: i,
     });
   });
   (jointsOn.c_abdomen12 = jointsOn.c_abdomen12 || []).push({

@@ -8,10 +8,10 @@
  */
 import {
   buildNmfMjcf, mnTarget, MUJOCO_CDN, TIMESTEP, qmul, qrot, qinv, qaxis, qnormalize,
-} from "./nmfMjcf.js?v=browseranimal1";
+} from "./nmfMjcf.js?v=realfly1";
 import {
-  LEG_NAMES, GROUND_Y, anatomicalLegAxes,
-} from "./poseMap.js?v=browseranimal1";
+  LEG_NAMES, GROUND_Y, anatomicalLegAxes, slipWeight, IDLE_WALK_GATE,
+} from "./poseMap.js?v=realfly1";
 
 const BODY_TTL = 25;
 const MAX_BODIES = 8;
@@ -264,6 +264,18 @@ class ContactPlant {
     const spec = this.spec;
     const n = Math.max(1, Math.min(48, Math.round(dt / 0.002)));
     const h = dt / n;
+    const walkDrive = Number(cmd.walk != null ? cmd.walk : 0);
+    const walking = walkDrive >= IDLE_WALK_GATE;
+    const codes = this.nmf.legs || {};
+    const th0 = { x: b.x, y: b.y, z: b.z, q: b.q };
+    const posed0 = fkPosed(this.nmf, b.hinges);
+    const tip0 = {};
+    for (const our of LEG_NAMES) {
+      const code = codes[our];
+      const tip = posed0[`${code}_tarsus5`];
+      if (!tip) continue;
+      tip0[our] = worldOf(th0, tip.p);
+    }
     for (const a of spec.actuators) {
       if (!a.joint) continue;
       const key = a.kind === "leg" && a.leg && a.key
@@ -271,10 +283,11 @@ class ContactPlant {
         : a.joint;
       const tgt = mnTarget(a, { ...cmd, t: cmd.t || 0 });
       const cur = b.hinges[key] || 0;
-      const blend = 1 - Math.exp(-h * n / 0.05);
+      const blend = 1 - Math.exp(-h * n / 0.055);
       b.hinges[key] = cur + (tgt - cur) * blend;
     }
-    const g = -55; // explicit-Euler stable; WASM uses 9810 mm/s²
+    // Reduced g keeps explicit Euler planted (WASM uses 9810 mm/s²).
+    const g = -55;
     const k = 140;
     const dmp = 8;
     const mass = 1.0;
@@ -283,8 +296,10 @@ class ContactPlant {
     const force = {};
     let posed = fkPosed(this.nmf, b.hinges);
     const th = { x: b.x, y: b.y, z: b.z, q: b.q };
-    let fy = 0, fx = 0, fz = 0, tyaw = 0;
-    const codes = this.nmf.legs || {};
+    let fy = 0, fx = 0, fz = 0;
+    let slipX = 0, slipZ = 0, slipN = 0, yawL = 0, yawR = 0;
+    const yaw = yawFromQuat(b.q);
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
     for (const our of LEG_NAMES) {
       const code = codes[our];
       const tip = posed[`${code}_tarsus5`];
@@ -292,7 +307,8 @@ class ContactPlant {
       const w = worldOf(th, tip.p);
       const m = (cmd.muscle && cmd.muscle[our]) || {};
       const swing = !!m._swing;
-      const adh = swing ? 0.4 : 1;
+      // Peel almost fully in swing — sticky swing feet caused vault/twitch.
+      const adh = swing ? 0.06 : 1;
       let c = false;
       let f = 0;
       if (w[1] < GROUND_Y + 0.06) {
@@ -302,19 +318,61 @@ class ContactPlant {
         const ny = k * Math.max(0, pen) - dmp * b.vy;
         fy += ny * adh;
         f = Math.abs(ny);
-        if (adh > 0.6) {
-          fx += -b.vx * 12;
-          fz += -b.vz * 12;
+        if (adh > 0.55) {
+          fx += -b.vx * 14;
+          fz += -b.vz * 14;
         }
       }
       contact[our] = c;
       force[our] = f;
+      // Stance-slip: planted feet that moved from hinge change push the thorax.
+      // Same MN foot vectors as kinematic fallback — no walk thruster / CPG.
+      if (walking && !swing && c && tip0[our]) {
+        const dx = w[0] - tip0[our][0];
+        const dz = w[2] - tip0[our][2];
+        const ww = slipWeight(our);
+        slipX -= dx * ww;
+        slipZ -= dz * ww;
+        slipN += ww;
+        const back = -(dx * sy + dz * cy) * ww;
+        if (our.startsWith("L")) yawL += back * 0.85;
+        else yawR += back * 0.85;
+      }
+    }
+    if (walking && slipN > 0.15) {
+      let sx = slipX / slipN;
+      let sz = slipZ / slipN;
+      const step = Math.hypot(sx, sz);
+      const maxStep = 0.068;
+      if (step > maxStep) {
+        const kk = maxStep / step;
+        sx *= kk; sz *= kk;
+      }
+      // Gain scales with walkDrive (phasic T2/T3+DNa) — quiet idle stays put.
+      const gain = 0.92 + 0.55 * Math.min(1, walkDrive);
+      sx *= gain; sz *= gain;
+      const a = 1 - Math.exp(-dt / 0.09);
+      b._sx = (b._sx || 0) + (sx - (b._sx || 0)) * a;
+      b._sz = (b._sz || 0) + (sz - (b._sz || 0)) * a;
+      const dyawT = Math.max(-0.038, Math.min(0.038, (yawR - yawL) * 0.55 * walkDrive));
+      b._dyaw = (b._dyaw || 0) + (dyawT - (b._dyaw || 0)) * a;
+      b.x += b._sx;
+      b.z += b._sz;
+      // Bleed integrated velocity so adhesion damping does not fight the slip.
+      b.vx *= 0.55;
+      b.vz *= 0.55;
+    } else {
+      b._sx = (b._sx || 0) * 0.72;
+      b._sz = (b._sz || 0) * 0.72;
+      b._dyaw = (b._dyaw || 0) * 0.72;
+      b.vx *= 0.78;
+      b.vz *= 0.78;
     }
     b.vy += (g + fy / mass) * dt;
     b.vx += (fx / mass) * dt;
     b.vz += (fz / mass) * dt;
-    b.vx *= 0.86;
-    b.vz *= 0.86;
+    b.vx *= walking ? 0.88 : 0.72;
+    b.vz *= walking ? 0.88 : 0.72;
     b.vy *= 0.92;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
@@ -325,11 +383,17 @@ class ContactPlant {
       b.vy = 0;
     }
     if (!cmd.allow_flight && b.y > this.standZ + 0.18) {
-      b.y += 0.4 * (this.standZ - b.y);
-      if (b.vy > 0) b.vy *= 0.2;
+      b.y += 0.45 * (this.standZ - b.y);
+      if (b.vy > 0) b.vy *= 0.15;
     }
-    const yaw = yawFromQuat(b.q);
-    b.q = qaxis([0, 1, 0], yaw + tyaw);
+    // Idle settle: kill residual XY fidget from Poisson hinge noise.
+    if (!walking) {
+      b.vx *= 0.5;
+      b.vz *= 0.5;
+      if (Math.hypot(b.vx, b.vz) < 0.02) { b.vx = 0; b.vz = 0; }
+    }
+    const yawOut = yaw + (b._dyaw || 0);
+    b.q = qaxis([0, 1, 0], yawOut);
     return this._snapshot(b, cmd, { contact, force, nLeg, posed });
   }
 
@@ -358,7 +422,7 @@ class ContactPlant {
       ncon: n_leg,
       n_leg,
       planted: n_leg >= 2 && b.y <= this.standZ + 0.22,
-      speed: Math.hypot(b.vx, b.vz),
+      speed: Math.hypot(b.vx, b.vz) + Math.hypot(b._sx || 0, b._sz || 0),
       fallen: Math.abs(pitchFromQuat(q)) > 1.05 || b.y < 0.2,
       mass: 1,
       engine: this.engine,

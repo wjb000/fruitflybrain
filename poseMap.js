@@ -190,7 +190,7 @@ export const FEED_POSE_GATE = 0.26;
 const DEAD = 0.045;
 
 /** Soft-saturating map from effector EMA (0–1) → drive. Quiet stays near 0. */
-export function softDrive(v, gain = 2.15) {
+export function softDrive(v, gain = 1.95) {
   const x = Math.max(0, v || 0);
   return Math.tanh(x * gain);
 }
@@ -206,7 +206,7 @@ function clamp01(x) {
  * - Unipolar (one pool empty, e.g. male T2/T3 coxaProm) stays a modest
  *   offset from rest — not a full-span slam on the remaining remotor.
  */
-export function antagPair(posEma, negEma, gain = 2.15) {
+export function antagPair(posEma, negEma, gain = 1.95) {
   const p0 = Math.max(0, posEma || 0);
   const n0 = Math.max(0, negEma || 0);
   if (p0 + n0 < DEAD) return { pos: 0, neg: 0 };
@@ -215,11 +215,11 @@ export function antagPair(posEma, negEma, gain = 2.15) {
   const mag = p + n;
   if (mag < 1e-4) return { pos: 0, neg: 0 };
   const unipolar = (p0 < DEAD) !== (n0 < DEAD);
-  const raw = (p - n) / (mag + 0.06);
-  const d = Math.tanh(raw * 1.75);
-  const lose = unipolar ? 0.90 : 0.74;
-  const boost = unipolar ? 0.06 : 0.10;
-  const uni = unipolar ? 0.52 : 1;
+  const raw = (p - n) / (mag + 0.07);
+  const d = Math.tanh(raw * 1.65);
+  const lose = unipolar ? 0.92 : 0.78;
+  const boost = unipolar ? 0.04 : 0.08;
+  const uni = unipolar ? 0.48 : 1;
   return {
     pos: clamp01(uni * (p * (1 - lose * Math.max(0, -d)) + Math.max(0, d) * boost)),
     neg: clamp01(uni * (n * (1 - lose * Math.max(0, d)) + Math.max(0, -d) * boost)),
@@ -245,7 +245,7 @@ export function isForeleg(name) {
  */
 export function muscleFromEma(legName, emaFn) {
   const ema = (m) => Math.max(0, emaFn(m) || 0);
-  const gain = isForeleg(legName) ? 1.85 : 2.20;
+  const gain = isForeleg(legName) ? 1.70 : 2.00;
   const coxa = antagPair(ema("coxaProm"), ema("coxaRem"), gain);
   const rot = antagPair(ema("coxaRotA"), ema("coxaRotP"), gain);
   const add = antagPair(ema("coxaAdd"), ema("coxaRem") * 0.50, gain);
@@ -360,14 +360,14 @@ export function walkDriveFromEma(e, state = null, dt = 0.032) {
     return 0;
   }
   const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
-  if (!state) return softDrive(raw, 2.15);
+  if (!state) return softDrive(raw, 1.95);
   const a = 1 - Math.exp(-dt / 0.70);
   state.walkTonic = (state.walkTonic || 0) + (raw - (state.walkTonic || 0)) * a;
   const tonic = state.walkTonic;
   const phasic = Math.max(0, raw - 0.98 * tonic);
   // Pegged T2/T3 (same circuit every frame) → no constant slip push.
   if (phasic < 0.05 && tonic > 0.16) return 0;
-  return softDrive(phasic * 0.90 + raw * 0.10, 2.15);
+  return softDrive(phasic * 0.90 + raw * 0.10, 1.95);
 }
 
 export function legsMean(e) {
@@ -602,7 +602,7 @@ export function embodyMuscle(legName, muscle, { walkDrive = 0 } = {}) {
   const lift = (out.trFlex + out.tiFlex + out.taLev)
     - (out.trExt + out.tiExt + out.taDep);
   out._lift = lift;
-  out._swing = lift > 0.10;
+  out._swing = lift > 0.14;
   out._stance = !out._swing;
   out._coupled = emptyTa || emptyProm;
   return out;
