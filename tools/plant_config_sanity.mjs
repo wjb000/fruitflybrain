@@ -84,8 +84,10 @@ check("health url remote", plantHealthUrl("https://x.example"), "https://x.examp
 check("health url same-origin only when origin empty", plantHealthUrl(""), "/physics/health");
 
 const loadutil = await import(pathToFileURL(path.join(ROOT, "web/loadutil.js")).href);
-const { CONNECTOME_BYTES, connectomeWaitMsg } = loadutil;
-check("connectome size constant", CONNECTOME_BYTES, 38074596);
+const { CONNECTOME_BYTES, connectomeWaitMsg, progressTotal } = loadutil;
+check("gzip uses uncompressed known size", progressTotal(19149778, 38074596, "gzip"), 38074596);
+check("identity uses content-length", progressTotal(38074596, 38074596, "identity"), 38074596);
+check("missing length uses known", progressTotal(0, 38074596, ""), 38074596);
 if (!connectomeWaitMsg(0).includes("38MB")) {
   console.error("FAIL wait msg missing 38MB", connectomeWaitMsg(0));
   failed++;

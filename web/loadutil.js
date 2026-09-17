@@ -8,6 +8,22 @@ export function formatMb(n) {
 }
 
 /**
+ * Uncompressed byte total for the progress bar.
+ * GitHub Pages gzip-encodes connectome.bin (~19MB on the wire, ~38MB decoded);
+ * Fetch gives decompressed chunks but Content-Length is still compressed.
+ */
+export function progressTotal(headerLen, knownBytes = 0, contentEncoding = "") {
+  const header = Number(headerLen) || 0;
+  const known = Number(knownBytes) || 0;
+  const enc = String(contentEncoding || "").toLowerCase();
+  const compressed = enc && enc !== "identity";
+  if (compressed || (known > 0 && header > 0 && header < known * 0.9)) {
+    return known || header;
+  }
+  return header || known || 0;
+}
+
+/**
  * Fetch an ArrayBuffer, reporting byte progress when possible.
  * Prefers Content-Length; falls back to `knownBytes` (connectome ~38MB).
  *
@@ -19,7 +35,7 @@ export async function fetchBufProgress(url, onProgress, knownBytes = 0) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(url + " " + res.status);
   const headerLen = Number(res.headers.get("Content-Length")) || 0;
-  const totalHint = headerLen || knownBytes || 0;
+  const totalHint = progressTotal(headerLen, knownBytes, res.headers.get("Content-Encoding"));
   if (!res.body || typeof res.body.getReader !== "function") {
     const buf = await res.arrayBuffer();
     if (onProgress) onProgress(buf.byteLength, totalHint || buf.byteLength);
