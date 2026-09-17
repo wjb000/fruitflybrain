@@ -15,16 +15,32 @@ Dish (light, odor, contact, proprio)
     → LIF worker (sim.worker.js): Poisson drive + connectome synapses
       → MN / effector pool rates (Hz → soft 0–1)
         → agent.js cmd.walk/turn (+ muscle/wing/…) from bilateral leg + descending EMAs
-          → DEFAULT: portable.js steering.forward/yawRate → droneSetpoints (quadrotor axes)
+          → DEFAULT (Pages): NeuroMechFly mesh (fly.js) → planted stance-slip
+               or MuJoCo plant (physics.py) when a live plant is opted in
           → ?body=cube: portable.js → cube chassis (kinematic box)
-          → ?body=fly: MuJoCo plant (physics.py) OR kinematic NMF (fly.js)
+          → ?body=drone: portable.js steering.forward/yawRate → droneSetpoints (quadrotor)
 ```
 
-## Robot controller — drone chassis (Pages default)
+## Fly body — NeuroMechFly (Pages default)
 
-Embodiment is a visual quadrotor on the small pad (`web/chassis.js` `createDroneChassis`).
+Public site: [https://wjb000.github.io/fruitflybrain/](https://wjb000.github.io/fruitflybrain/).
+Embodiment is the **male NeuroMechFly mesh**: MN drive, anatomical hinges, planted
+stance-slip. Flight translation is off unless `?flight=1`. Pages does **not**
+auto-dial a remote MuJoCo tunnel (dead tunnels vaulted/seized the thorax);
+kinematic NMF is the always-on public path. Opt in with `?plant=https://…` —
+then the visual root tracks plant thorax XYZ. Cube (`?body=cube`) and drone
+(`?body=drone`) remain fallbacks.
+
+**This `main` docs tree:** keep the language aligned with the **shipped** Pages
+default (fly). The older drone-default robot-controller snapshot still lives in
+`main`’s `web/`; live Pages is `gh-pages` **ogbody1**. Do not treat drone as the
+public default.
+
+## Robot controller — optional drone / cube
+
+`?body=drone` is a visual quadrotor (`web/chassis.js` `createDroneChassis`).
 The male connectome, compound eye, stim-map, and optional odor still run. Cube
-(`?body=cube`) and fly (`?body=fly`) remain fallbacks.
+(`?body=cube`) is the kinematic box.
 
 **Control law (connectome-only; stim-map → drone axes — no beacon-chase gain tweaks):**
 
@@ -55,13 +71,13 @@ eye L/R salience (beacon)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore fly body: `?body=fly`. Cache-bust: `?v=drone1`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Live Pages cache-bust: `?v=ogbody1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick; silence
 optic pools (`?lesion=silence:HS`) should weaken beacon-directed yaw.
 
-Plant URL: `web/plantConfig.js` (Pages → Mac tunnel by default).
+Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=`). The example Mac Cloudflare tunnel is not an always-on public host.
 Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load; soft rim bounce
 preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 **off by default**.
@@ -69,7 +85,7 @@ preserved in both plant and kinematic paths. Scent bomb is ORN-only and
 
 ## Stim-map mode (causal motor mapping)
 
-Open the sim (drone default) or `?stim=1` / `?map=1` (HUD link always). Hold or toggle a named pool button (e.g. **T1L**, **T1R**, **DNa**, **HS**, **visionL/R**). That **Hz-injects** those neuron IDs on the LIF worker (optional lesion **boost** gain), so they spike → synapses / effector readout → `cmd.walk`/`cmd.turn` → portable `forward`/`yawRate` → **drone axes** (pitch/yaw/throttle). Live HUD shows throttle, yaw, pitch; **pulse all** fills a small table of peak fwd vs yaw. This is causal stim mapping — not closed-loop beacon-chase gain tweaks. Do not bypass with direct chassis velocity from the button.
+Off on the fly-body homepage. Open `?stim=1` / `?map=1` (HUD link always). Hold or toggle a named pool button (e.g. **T1L**, **T1R**, **DNa**, **HS**, **visionL/R**). That **Hz-injects** those neuron IDs on the LIF worker, so they spike → synapses / effector readout → MN pose (fly default) or portable `forward`/`yawRate` (drone/cube). Live HUD shows forward/yaw (and drone axes when `?body=drone`). **Pulse all** fills a small table of peak fwd vs yaw. This is causal stim mapping — not closed-loop beacon-chase gain tweaks. Do not bypass with direct chassis velocity from the button.
 
 ## Sensory channels → neuron pools
 

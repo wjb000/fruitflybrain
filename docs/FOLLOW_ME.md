@@ -1,6 +1,6 @@
 # Follow-me demo (follow1)
 
-Simulation: the **male CNS** steers the default quadrotor toward a webcam (or synthetic) blob. This is **not** a real FPV quad in the room, and Pages has no hardware bridge.
+Simulation: the **male CNS** steers the **follow-me demo quadrotor** (`follow.html`) toward a webcam (or synthetic) blob. This is **not** a real FPV quad in the room, and Pages has no hardware bridge. The homepage default remains the NeuroMechFly fly body (`?body=fly` omitted).
 
 ## Control law (honest)
 
