@@ -46,6 +46,7 @@
     <div class="kicker">Follow-me · simulation</div>
     <h2>Male CNS → drone</h2>
     <p>Webcam or drag-the-blob → vision pools → LIF → MNs → quadrotor. Not a real FPV quad in the room.</p>
+    <p class="loadhint">Large connectome ~38MB — please wait. Use desktop Chrome (this tab is memory-hungry).</p>
     <div class="progress"><i id="bar"></i></div>
     <p id="loadmsg">fetching male CNS…</p>
   </div>
@@ -59,7 +60,7 @@
         <div class="sub">
           Thin encoding only: blob centroid + area → virtual person beacon + <code>sensoryBoost</code> Hz.
           Steering is <b>compound eye → optic/visionL/R → LIF → MN → portable drone axes</b> — not PID-to-pixel.
-          Cache <code>?v=follow1</code> · <a href="index.html?v=follow1" style="color:#4de4ff">main sim</a>
+          Cache <code>?v=follow1</code> · <a href="index.html?v=linked2" style="color:#4de4ff">main sim (fly utopia)</a>
           · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ lab</a>
         </div>
         <div class="stats">
@@ -88,7 +89,7 @@
           <div class="barline"><div class="name">strafe</div><div class="track"><i id="st-str" style="background:#b07cff"></i></div></div>
           <div class="barline"><div class="name">climb</div><div class="track"><i id="st-clb" style="background:#ffd166"></i></div></div>
         </div>
-        <p class="honesty">Simulation following a cam blob on the pad. No props, no hardware bridge.</p>
+        <p class="honesty">Simulation following a cam blob in the garden home. No props, no hardware bridge.</p>
       </div>
     </div>
     <div class="cam-mode">
@@ -97,6 +98,6 @@
       <button type="button" id="camOrbit">orbit</button>
     </div>
   </div>
-  <script type="module" src="follow.js?v=follow1"></script>
+  <script type="module" src="follow.js?v=linked2"></script>
 </body>
 </html>

@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Robot controller — Male CNS → drone</title>
+  <title>Home — Male CNS in a fly utopia</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=linked2" />
   <style>.assay-panel{position:fixed;left:12px;bottom:88px;max-width:320px;z-index:6}.assay-panel.collapsed .panel-body{display:none}.stim-map-panel{position:fixed;right:12px;bottom:88px;max-width:360px;z-index:6;max-height:min(70vh,560px);overflow:auto}.stim-map-panel.collapsed .panel-body{display:none}</style>
   <script type="importmap">
   {
@@ -21,26 +21,27 @@
 <body>
   <canvas id="c"></canvas>
   <div class="loader" id="loader">
-    <div class="kicker">FlyEM · Janelia · Princeton</div>
+    <div class="kicker">FlyEM · Janelia · Cambridge · Google</div>
     <h2>Male fruit fly CNS</h2>
-    <p>Loading male CNS robot controller — vision→LIF→MNs→quadrotor chassis on a small pad (default). Add ?body=cube or ?body=fly for fallbacks.</p>
+    <p>Full adult male Drosophila: Male CNS LIF drives NeuroMechFly — six legs, head, antennae, abdomen, wings, mouth. Gap-fill is encoding + plant only — no CPG, no thrusters. Cube or drone via ?body=cube / ?body=drone.</p>
+    <p class="loadhint">Large connectome ~38MB — please wait. Use desktop Chrome (this tab is memory-hungry).</p>
     <div class="progress"><i id="bar"></i></div>
     <p id="loadmsg">fetching maps…</p>
   </div>
   <div class="hud">
     <div class="panel top-left" id="panelL">
       <button class="collapse" type="button" title="collapse">–</button>
-      <div class="kicker">Flock · live</div>
+      <div class="kicker">Thrive · home</div>
       <div class="panel-body">
-        <h1>They run themselves</h1>
-                <div class="sub"><b>Robot controller</b> (drone default): world → eye → optic/visionL/R → LIF → leg/descending MNs → portable <code>forward</code>/<code>yawRate</code> → quadrotor <code>pitch</code>/<code>yaw</code>/<code>strafe</code>/<code>throttle</code> (hover ~1.45). Soft pad rim. <code>?body=cube</code> box · <code>?body=fly</code> NeuroMechFly/MuJoCo. Cache <code>?v=follow1</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="?stim=1&amp;v=follow1" style="color:#4de4ff">stim map</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ fast weights</a>.</div>
+        <h1>He lives in a fly utopia</h1>
+                <div class="sub"><b>Connectome first</b> (full fly body): garden → compound eye (R1–R6/R7/R8 → L1/L2 → T4/T5 → HS/VS) + ORN/JO/proprio → <b>full Male CNS LIF</b> with <b>time-varying synaptic weights</b> (connectome edge counts × NT-aware Tsodyks–Markram STD/STF) → annotated MNs → NeuroMechFly. Antennae, halteres, abdomen segments, and neck are linked from existing IDs. Empty T2/T3 coxaProm/Ta* stay empty. No CPG, no thrusters. Cache <code>?v=linked2</code> · <a href="follow.html?v=follow1" style="color:#4de4ff">follow me</a> · <a href="hdelta.html?v=lab1" style="color:#4de4ff">hΔ learning</a> · <a href="?stim=1&amp;v=linked2" style="color:#4de4ff">stim map</a>.</div>
         <div class="stats">
           <div><b id="nNeurons">—</b><span>♂ map</span></div>
           <div><b id="nFlock">1</b><span>living flies</span></div>
           <div><b id="gait">♂ …</b><span>mode</span></div>
           <div><b id="hunger">—</b><span>selected hunger</span></div>
           <div><b id="flesh">…</b><span>body plant</span></div>
-          <div><b id="steerHint">—</b><span>robot controller</span></div>
+          <div><b id="steerHint">—</b><span>MN steering</span></div>
         </div>
         <div class="kicker">living</div>
         <div class="row" id="flock"></div>
@@ -57,8 +58,8 @@
           <label class="tog"><input type="checkbox" id="showOdor" /> show odor</label>
           <label class="tog"><input type="checkbox" id="sensoryBomb" /> scent bomb</label>
         </div>
-        <div class="hint hidden" id="bombHint">drag the scent orb — flies smell it via ORNs only</div>
-        <div id="info">Photoreceptors see the dish; L1/L2 sit on tonic and get histaminergic inhibition. Clock cells are not force-fed daylight (only l-LNv CRY). Body motion is MN-driven only — limp when pools are quiet. Perch is landing. Wall bounce is reflection.</div>
+        <div class="hint hidden" id="bombHint">drag the scent orb — he smells it via ORNs only</div>
+        <div id="info">Compound eyes sample the garden as ommatidia (R1–R6 / R7 UV / R8); L1/L2 are ON/OFF; T4/T5 see motion parallax and loom; HS/VS are wide-field. Photoreceptors are not force-fed RGB frames. Clock cells are not force-fed daylight (only l-LNv CRY). Body motion is MN-driven only — limp when pools are quiet. Shade is a perch. The hedge bounce redirects — never punishes.</div>
       </div>
     </div>
     <div class="panel top-right" id="panelR">
@@ -67,7 +68,7 @@
       <div class="panel-body">
         <div class="kicker">commands</div>
         <div id="acts"></div>
-        <div class="kicker" style="margin-top:10px">joints (flex − ext)</div>
+        <div class="kicker" style="margin-top:10px">joints (S stance · W swing)</div>
         <div id="joints"></div>
         <div class="kicker" style="margin-top:10px">motor neurons (live)</div>
         <div id="mnBars">
@@ -78,7 +79,14 @@
           <div class="barline"><div class="name">neck</div><div class="track"><i id="mn-neck" style="background:#f5d76e"></i></div></div>
           <div class="barline"><div class="name">abd</div><div class="track"><i id="mn-abd" style="background:#ff9f1c"></i></div></div>
           <div class="barline"><div class="name">MN9</div><div class="track"><i id="mn-mn9" style="background:#ff4fd8"></i></div></div>
+          <div class="barline"><div class="name">ant</div><div class="track"><i id="mn-ant" style="background:#9ad8ff"></i></div></div>
+          <div class="barline"><div class="name">halt</div><div class="track"><i id="mn-halt" style="background:#c9b8ff"></i></div></div>
+          <div class="barline"><div class="name">syn u</div><div class="track"><i id="syn-u" style="background:#4de4ff"></i></div></div>
+          <div class="barline"><div class="name">syn x</div><div class="track"><i id="syn-x" style="background:#3dff9a"></i></div></div>
+          <div class="barline"><div class="name">syn eff</div><div class="track"><i id="syn-eff" style="background:#ffd166"></i></div></div>
         </div>
+        <div class="hint" id="mapHint">mapped …</div>
+        <div class="hint" id="synHint">synapses: waiting…</div>
         <div class="kicker" style="margin-top:10px">compound eyes</div>
         <div class="eyes"><canvas id="eyeL" width="150" height="128"></canvas><canvas id="eyeR" width="150" height="128"></canvas></div>
         <div class="kicker" style="margin-top:10px">slow physics</div>
@@ -94,6 +102,9 @@
           <div class="barline"><div class="name">food R</div><div class="track"><i id="odorFR" style="background:#f0c040"></i></div></div>
           <div class="barline"><div class="name">pher L</div><div class="track"><i id="odorPL" style="background:#ff4fd8"></i></div></div>
           <div class="barline"><div class="name">pher R</div><div class="track"><i id="odorPR" style="background:#ff4fd8"></i></div></div>
+          <div class="barline"><div class="name">JO L</div><div class="track"><i id="odorJL" style="background:#9ad8ff"></i></div></div>
+          <div class="barline"><div class="name">JO R</div><div class="track"><i id="odorJR" style="background:#9ad8ff"></i></div></div>
+          <div class="barline"><div class="name">hygro</div><div class="track"><i id="odorHY" style="background:#7ecbff"></i></div></div>
         </div>
         <div class="hint" id="stimHint">every fly closed-loop</div>
         <div class="hint" id="lifeHint">loading</div>
@@ -102,9 +113,9 @@
     <div class="bottom">
       <div class="panel rates" id="panelB">
         <button class="collapse" type="button" title="collapse">–</button>
-        <div class="kicker">Shared world</div>
+        <div class="kicker">His home</div>
         <div class="panel-body">
-          <div class="hint">Robot controller closed loop: world → sensory → connectome LIF → MNs → portable → drone axes (Pages default). Optional ?body=cube or ?body=fly. Buttons are optogenetics, not puppet strings.</div>
+          <div class="hint">Thrive in a fly utopia: full connectome LIF is primary. Coverage of parts/senses is in <code>docs/LINKAGE.md</code>. Chemical synapse strength varies over time (connectome weights × STD). Six-leg planted gait from T1–T3 MN pools; antennae/halteres/abdomen/neck from existing IDs. Empty pools stay empty.</div>
         </div>
       </div>
     </div>
@@ -115,6 +126,6 @@
     </div>
     <div class="cam-hint" id="camHint" role="status">drag to look · pinch to zoom</div>
   </div>
-  <script type="module" src="app.js?v=follow1"></script>
+  <script type="module" src="app.js?v=linked2"></script>
 </body>
 </html>
