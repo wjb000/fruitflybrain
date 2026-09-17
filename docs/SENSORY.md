@@ -63,4 +63,4 @@ with Tsodyks–Markram `u` (facilitation, per pre cell) and `x` (depression, per
 
 ## Cache
 
-Pages: [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2). Coverage table: [`LINKAGE.md`](LINKAGE.md).
+Pages: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Coverage table: [`LINKAGE.md`](LINKAGE.md).

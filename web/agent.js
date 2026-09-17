@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=utopia2";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=utopia2";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=utopia2";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=utopia2";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=utopia2";
-import { spinRotors } from "./chassis.js?v=utopia2";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=ogbody1";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=ogbody1";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=ogbody1";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=ogbody1";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=ogbody1";
+import { spinRotors } from "./chassis.js?v=ogbody1";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=utopia2";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=utopia2";
+} from "./poseMap.js?v=ogbody1";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=ogbody1";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=utopia2");
+    this.worker = new Worker("sim.worker.js?v=ogbody1");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -884,7 +884,7 @@ export class EmbodiedFly {
       // No cmd.walk thruster — ground motion from foot slip only.
       // Thrive default: stay planted (no T1-extensor hop / vault). Flight translation
       // stays gated off unless ?flight=1; wing mesh still follows wing MNs in poseSoftParts.
-      const stand = this.body.userData.standZ || 1.3;
+      const stand = (this.body.userData.standZ || 1.3) + (this.body.userData.standSettle || 0);
       const flying = FLIGHT_ENABLED && cmd.fly > 0.58;
       if (!FLIGHT_ENABLED) {
         this.vy = 0;
@@ -1429,6 +1429,10 @@ export class EmbodiedFly {
     const filt = this.propFilt;
     const ang = (leg) => {
       if (!leg) return 0;
+      if (leg.angles) {
+        return (leg.angles.coxa || 0) + (leg.angles.femur || 0)
+          + (leg.angles.tibia || 0) + (leg.angles.tarsus || 0);
+      }
       let s = 0;
       for (const h of Object.values(leg.hinges || {})) {
         s += Math.abs((h.userData.angle ?? h.userData.rest) - (h.userData.rest || 0));
@@ -1437,6 +1441,12 @@ export class EmbodiedFly {
     };
     const jointFlex = (leg, keys) => {
       if (!leg) return 0;
+      if (leg.angles) {
+        if (keys[0] && keys[0].startsWith("coxa")) return leg.angles.coxa || 0;
+        if (keys[0] && keys[0].startsWith("trochanter")) return leg.angles.femur || 0;
+        if (keys[0] === "tibia-pitch") return leg.angles.tibia || 0;
+        if (keys[0] === "tarsus1-pitch") return leg.angles.tarsus || 0;
+      }
       let s = 0, n = 0;
       for (const k of keys) {
         const h = leg.hinges?.[k];
@@ -1466,13 +1476,14 @@ export class EmbodiedFly {
         const ld = ss * (0.4 + Math.min(1.2, vv * 0.08));
         a += flex; v += vv; st += ss; load += ld; slipV += ss ? vv : 0;
         const lr = leg.name[0];
-        // Phasic onset on stance/load so the connectome sees step edges.
+        // OG mapping: hp ← coxa, cho ← FeTi + tibia-tarsus, csa ← stance load.
         const stHz = proprioJointHz(filt, `st${seg}${lr}`, ss, 0.032);
         const ldHz = proprioJointHz(filt, `ld${seg}${lr}`, ld, 0.032);
-        const flexHz = proprioJointHz(filt, `fx${seg}${lr}`, flex, 0.032);
-        const choL = Math.min(85, 4 + flex * 28 + flexHz * 0.18 + vv * 3.5);
-        const hpL = Math.min(70, 3 + flex * 16 + flexHz * 0.10);
-        const csaL = Math.min(85, 3 + ss * 28 + ldHz * 0.22 + (ss ? vv * 2.2 : 0) + (grounded ? this.speedS * 8 : 0));
+        const coxHz = proprioJointHz(filt, `cx${seg}${lr}`, cox, 0.032);
+        const feTiHz = proprioJointHz(filt, `ft${seg}${lr}`, fem + tib, 0.032);
+        const choL = Math.min(85, 4 + (fem + tib) * 36 + tar * 18 + feTiHz * 0.20 + vv * 3.5);
+        const hpL = Math.min(70, 3 + cox * 28 + coxHz * 0.14);
+        const csaL = Math.min(85, 3 + ss * 32 + ldHz * 0.22 + tar * 12 + (ss ? vv * 2.2 : 0) + (grounded ? this.speedS * 8 : 0));
         const tactL = Math.min(90, stHz * 0.35 + ss * 32 + wall * 0.3 + (grounded ? 5 : 1));
         const propL = choL * 0.5 + hpL * 0.22 + csaL * 0.28;
         rates[`cho${seg}${lr}`] = choL;

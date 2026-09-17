@@ -35,16 +35,120 @@ export const T1_MUSCLE_SCALE = {
   taDep: 0.40, taLev: 0.40,
 };
 
-/** Hinge spans (rad). Shared by kinematic NMF and documented for the plant. */
+/**
+ * Hinge spans (rad) around NMF anatomical rest.
+ * Pairing is Azevedo/Soler muscle → NeuroMechFly DoF (same as physics.py).
+ * Half-ranges are NMF-like (T1 smaller than T3); not cartoon puppet slams.
+ */
 export const MUSCLE_SPAN = {
-  "coxa-pitch": ["coxaProm", "coxaRem", 0.58],
-  "coxa-yaw": ["coxaAdd", "coxaRem", 0.40],
-  "coxa-roll": ["coxaRotA", "coxaRotP", 0.34],
-  "trochanterfemur-pitch": ["trExt", "trFlex", 0.62],
-  "trochanterfemur-roll": ["feRed", null, 0.26],
-  "tibia-pitch": ["tiExt", "tiFlex", 0.60],
-  "tarsus1-pitch": ["taLev", "taDep", 0.16],
+  "coxa-pitch": ["coxaProm", "coxaRem", 0.52],
+  "coxa-yaw": ["coxaAdd", "coxaRem", 0.36],
+  "coxa-roll": ["coxaRotA", "coxaRotP", 0.30],
+  "trochanterfemur-pitch": ["trExt", "trFlex", 0.58],
+  "trochanterfemur-roll": ["feRed", null, 0.24],
+  "tibia-pitch": ["tiExt", "tiFlex", 0.56],
+  "tarsus1-pitch": ["taLev", "taDep", 0.18],
 };
+
+/** World-floor Y in the Three.js garden (moss). Stance tarsi plant here. */
+export const GROUND_Y = 0.05;
+
+export const LEG_NEUROMERE = {
+  L1: "T1", R1: "T1", L2: "T2", R2: "T2", L3: "T3", R3: "T3",
+};
+
+/**
+ * Per-neuromere NMF-like joint half-ranges (rad). T1 reach/groom stays
+ * smaller than T2/T3 stance legs — same real MN IDs, anatomical limits.
+ */
+export const NMF_JOINT_LIMIT = {
+  T1: {
+    "coxa-pitch": 0.40, "coxa-yaw": 0.30, "coxa-roll": 0.26,
+    "trochanterfemur-pitch": 0.48, "trochanterfemur-roll": 0.20,
+    "tibia-pitch": 0.50, "tarsus1-pitch": 0.16,
+  },
+  T2: {
+    "coxa-pitch": 0.50, "coxa-yaw": 0.36, "coxa-roll": 0.30,
+    "trochanterfemur-pitch": 0.56, "trochanterfemur-roll": 0.24,
+    "tibia-pitch": 0.56, "tarsus1-pitch": 0.18,
+  },
+  T3: {
+    "coxa-pitch": 0.54, "coxa-yaw": 0.40, "coxa-roll": 0.32,
+    "trochanterfemur-pitch": 0.60, "trochanterfemur-roll": 0.24,
+    "tibia-pitch": 0.58, "tarsus1-pitch": 0.18,
+  },
+};
+
+export function nmfJointLimit(legName, hingeKey) {
+  const neu = LEG_NEUROMERE[legName] || "T2";
+  const table = NMF_JOINT_LIMIT[neu] || NMF_JOINT_LIMIT.T2;
+  if (table[hingeKey] != null) return table[hingeKey];
+  const span = MUSCLE_SPAN[hingeKey];
+  return span ? span[2] : 0.4;
+}
+
+export function clampJointDelta(legName, hingeKey, delta) {
+  const lim = nmfJointLimit(legName, hingeKey);
+  return Math.max(-lim, Math.min(lim, delta || 0));
+}
+
+function v3sub(a, b) {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+function v3cross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+function v3norm(a) {
+  const n = Math.hypot(a[0], a[1], a[2]);
+  if (n < 1e-8) return [0, 0, 0];
+  return [a[0] / n, a[1] / n, a[2] / n];
+}
+
+/**
+ * Anatomical hinge axes from NMF rest segment positions (thorax frame).
+ * Pitch lives in each leg's plane (not world X) so mid/hind legs flex like
+ * a fly, not a bilateral puppet. Yaw/roll are ipsilateral (L/R mirrored).
+ *
+ * `side` is -1 for left, +1 for right. Positions are [x,y,z] restPos.
+ */
+export function anatomicalLegAxes(side, p) {
+  const s = side < 0 ? -1 : 1;
+  const up = [0, 1, 0];
+  const coxaBone = v3norm(v3sub(p.femur, p.coxa));
+  let lat = v3norm(v3cross(up, coxaBone));
+  if (Math.hypot(lat[0], lat[1], lat[2]) < 0.25) lat = [s, 0, 0];
+  if (lat[0] * s < 0) lat = [-lat[0], -lat[1], -lat[2]];
+  const coxaUp = v3norm(v3cross(coxaBone, lat));
+  const femBone = v3norm(v3sub(p.tibia, p.femur));
+  let femLat = v3norm(v3cross(up, femBone));
+  if (Math.hypot(femLat[0], femLat[1], femLat[2]) < 0.25) femLat = lat;
+  if (femLat[0] * s < 0) femLat = [-femLat[0], -femLat[1], -femLat[2]];
+  const tibBone = v3norm(v3sub(p.tarsus, p.tibia));
+  let tibLat = v3norm(v3cross(up, tibBone));
+  if (Math.hypot(tibLat[0], tibLat[1], tibLat[2]) < 0.25) tibLat = femLat;
+  if (tibLat[0] * s < 0) tibLat = [-tibLat[0], -tibLat[1], -tibLat[2]];
+  return {
+    "coxa-yaw": coxaUp[1] < 0 ? [-coxaUp[0], -coxaUp[1], -coxaUp[2]] : coxaUp,
+    "coxa-pitch": lat,
+    "coxa-roll": coxaBone,
+    "trochanterfemur-pitch": femLat,
+    "trochanterfemur-roll": femBone,
+    "tibia-pitch": tibLat,
+    "tarsus1-pitch": tibLat,
+  };
+}
+
+/** Distal claw offset from tarsus5 origin along tarsus4→5. */
+export function tarsusTipOffset(tarsus4, tarsus5) {
+  const d = v3sub(tarsus5, tarsus4);
+  const n = Math.hypot(d[0], d[1], d[2]);
+  if (n < 1e-6) return [0, -0.04, 0];
+  return [d[0], d[1], d[2]];
+}
 
 /** Male FlyEM muscle pools that are empty (do not invent IDs). */
 export const EMPTY_MALE_MUSCLE_POOLS = [

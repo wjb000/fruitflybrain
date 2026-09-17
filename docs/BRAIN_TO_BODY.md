@@ -68,7 +68,10 @@ Coded logic is allowed **only** to bridge missing annotations or missing physics
 | Abdomen L/R yaw | 207-cell pool was curl-only | Soma-X split of **those** abdomen MN IDs → NMF lateral bend |
 | Wing L/R | One ADMN/DLM/DVM blob posed both wings | Soma-X split of **those** wing MN IDs → per-wing stroke |
 | Neck `poseSoftParts` | Plant has no neck joint; 25 CvN cells were a head-thrash | Pitch from `neck` magnitude, yaw/roll from `neckL`/`neckR`; smoothed, dead-zoned |
-| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` |
+| Planted stance-slip (`fly.js`) | Pages has no MuJoCo contact | Body XY from MN-posed feet; T2/T3 carry walk, T1 weighted low; `y` held at `standZ` + `standSettle` |
+| Anatomical NMF hinges | World-XYZ puppet axes flexed mid/hind legs wrong | Bone-frame pitch/yaw/roll from `nmf.json` rest; L/R mirrored; `NMF_JOINT_LIMIT` |
+| Stance plant IK | Rest tarsi floated/clipped vs moss | Tibia/tarsus contact on `GROUND_Y` when MN stance; no CPG |
+| Organ-split proprio | One flex blend into cho/hp/csa | hp ← coxa; cho ← FeTi; csa ← stance/load. Existing IDs |
 | Walk gate from T2/T3 + `DNa` | T1 twitch was gating slip as if he were walking | Quiet T1 → quiet idle; T2/T3/DNa walk EMAs still translate; **tonic saturated T2/T3 is high-passed** so crawl is not a constant push |
 | Wing mesh gate (`wingFromEma`) | DLM/DVM/ADMN idle Poisson + 10 Hz sine read as tapping | Visual flap only above `WING_FLAP_GATE` (~0.48); low amp; rest quat below. No cosmetic CPG. Flight translation still `?flight=1` only |
 | Mouth / MN9 (`feedFromEma`) | MN9 is 2 cells — one spike saturates `softDrive` into constant mouthing | Dead-zone + low gain; proboscis/haustellum stay at rest unless sustained MN9/proboscis |
@@ -103,7 +106,7 @@ Garden utopia (light, odor, contact, proprio)
 
 ## Fly body — NeuroMechFly (Pages default)
 
-Embodiment is the **male NeuroMechFly mesh** with MN→hinge pose and **planted stance-slip** (`web/fly.js`). Flight translation is off unless `?flight=1`. Pages does **not** auto-dial a remote MuJoCo tunnel (that vaulted/seized the thorax); kinematic NMF is the thrive path. Opt in with `?plant=https://…` — then visual root tracks plant thorax XYZ (`applyMujoco`).
+Embodiment is the **male NeuroMechFly mesh as his OG body**: MN → antagonist muscles → anatomical NMF hinges (not world-XYZ puppet axes), NMF-like joint limits, stance tarsi on the moss, proprio from those joints. Flight translation is off unless `?flight=1`. Pages does **not** auto-dial a remote MuJoCo tunnel (that vaulted/seized the thorax); kinematic NMF is the thrive path. Opt in with `?plant=https://…` — then visual root tracks plant thorax XYZ (`applyMujoco`). See [`OG_BODY.md`](OG_BODY.md).
 
 **Control law (connectome-only; no beacon-chase gain tweaks):**
 
@@ -116,7 +119,7 @@ Compound eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS; parallax + loom)
           → pose legs → stance-slip XY / yaw
 ```
 
-Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=utopia2`.
+Cube: `?body=cube`. Drone: `?body=drone`. Cache-bust: `?v=ogbody1`.
 
 Plant URL: `web/plantConfig.js` (Pages → kinematic unless `?plant=` / `localStorage.ffbPlant`). Ghost hygiene: plant `BODY_TTL` + `/physics/clear` on load when a plant is live. Garden hedge bounce/redirect (never punish) in both plant and kinematic paths. Scent bomb is ORN-only and **off by default**. Bitter / assay pole stay off unless `?bitter=1` / `?assay=1`.
 
@@ -153,7 +156,7 @@ eye (R1–R6 / R7 / R8 → L1/L2 → T4/T5 → HS/VS)
 4. `EmbodiedFly.stepDroneChassis`: integrate heading, XY, hover altitude,
    visual pitch/roll; **no** MuJoCo, **no** nmf mesh FK.
 
-Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=utopia2`.
+Restore cube: `?body=cube`. Restore drone: `?body=drone`. Cache-bust: `?v=ogbody1`.
 
 **Hardware how-to:** see `ROBOT_HOWTO` in `web/controller/portable.js`, or
 `ffbPortable.howto` in the browser. Publish `v` / `omega` each tick.

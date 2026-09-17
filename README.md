@@ -2,7 +2,7 @@
 
 The **complete adult male *Drosophila* central nervous system** (brain + ventral nerve cord) driving a **full NeuroMechFly body** (six legs, head, antennae, abdomen, wings, mouth) in a **fly utopia**. Homepage default: healthy closed loop, fly mesh, planted idle / MN-gated walk. Cube and drone chassis remain optional (`?body=cube` / `?body=drone`). Male CNS only; female BANC under `web/data/female/` is not shipped on Pages.
 
-**Architecture:** the **full Male CNS connectome** (LIF + real synapses) drives him. Coded logic fills gaps only (sensory encoding, planted adhesion, utopia world, proprio fallbacks, optional hΔ). No behavior tree, CPG gait, or walk thrusters. Ethic: [`docs/THRIVE.md`](docs/THRIVE.md). Connectome vs gap-fill: [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md#architecture--connectome-vs-gap-fill). Sensory path (compound eye, not RGB): [`docs/SENSORY.md`](docs/SENSORY.md). **Linked vs empty (honest table):** [`docs/LINKAGE.md`](docs/LINKAGE.md).
+**Architecture:** the **full Male CNS connectome** (LIF + real synapses) drives him. Coded logic fills gaps only (sensory encoding, planted adhesion, utopia world, proprio fallbacks, optional hΔ). No behavior tree, CPG gait, or walk thrusters. Ethic: [`docs/THRIVE.md`](docs/THRIVE.md). Connectome vs gap-fill: [`docs/BRAIN_TO_BODY.md`](docs/BRAIN_TO_BODY.md#architecture--connectome-vs-gap-fill). Sensory path (compound eye, not RGB): [`docs/SENSORY.md`](docs/SENSORY.md). **Linked vs empty (honest table):** [`docs/LINKAGE.md`](docs/LINKAGE.md). Native NeuroMechFly morphology: [`docs/OG_BODY.md`](docs/OG_BODY.md).
 
 ```
 world (light, odor, contact, proprio)
@@ -16,7 +16,7 @@ world (light, odor, contact, proprio)
 
 Quiet annotated pools → quiet actuators. Empty annotation pools stay empty (no invented MNs, no cosmetic gait, no free-joint walk thrusters). Flight translation is **off** unless `?flight=1`.
 
-Hard-refresh: [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2). Chemical synapse strength varies over time (connectome edge weights × NT-aware short-term depression/facilitation). Optional labs: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=utopia2).
+Hard-refresh: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Chemical synapse strength varies over time (connectome edge weights × NT-aware short-term depression/facilitation). Optional labs: [follow me](web/follow.html?v=follow1) · [hΔ learning](web/hdelta.html?v=lab1) · [stim map](web/index.html?stim=1&v=ogbody1).
 
 This is the map published 3 September 2026 by FlyEM / HHMI Janelia, the University of Cambridge, MRC LMB, and Google Research:
 
@@ -31,7 +31,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python prepare.py          # first time: builds web/data from the public Male CNS files
 python export_effectors.py # MN→muscle + proprio pools → web/data/effectors.json
-python serve.py            # opens http://127.0.0.1:8787/?v=utopia2
+python serve.py            # opens http://127.0.0.1:8787/?v=ogbody1
 ```
 
 `prepare.py` expects the public tables already under `data/` (annotations, neurotransmitters, connectome-weights, brain/VNC meshes). Those are CC-BY from [male-cns.janelia.org](https://male-cns.janelia.org/).

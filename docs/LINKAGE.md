@@ -2,9 +2,9 @@
 
 Honest coverage of **sensory world → encoder → annotated pools → LIF (weighted + STD) → MN/effector pools → poseMap / soft parts / plant → visible DoFs**.
 
-Public runtime: **male CNS**, NeuroMechFly body, utopia garden, Earth-fly vision path, **dynw1** time-varying synapses. No invented MNs, no CPG, no thrusters.
+Public runtime: **male CNS**, NeuroMechFly **OG body**, utopia garden, Earth-fly vision path, **dynw1** time-varying synapses. No invented MNs, no CPG, no thrusters.
 
-Cache: [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md).
+Cache: [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). Architecture: [`BRAIN_TO_BODY.md`](BRAIN_TO_BODY.md). Senses: [`SENSORY.md`](SENSORY.md). Native morphology: [`OG_BODY.md`](OG_BODY.md).
 
 ## Pipeline
 
@@ -29,6 +29,16 @@ Worker drive is **max-merge** across overlapping channels. Typed pools (foodORN,
 | **HALF-LINKED** | Path exists but is kinematic fill, aggregate-only, or readout without a dedicated mesh joint |
 | **EMPTY-BY-ANNOTATION** | FlyEM type strings have **zero** cells; we do not invent IDs |
 | **STRUCTURAL** | Mesh/plant has no joint; documented limit, not a missing label |
+
+## Newly linked in `ogbody1`
+
+| Gap | What changed | IDs used |
+|---|---|---|
+| World-XYZ puppet hinges | Per-leg NMF bone-frame axes; L/R pitch mirrored | same muscle MN IDs |
+| Cartoon hinge slams | Per-neuromere `NMF_JOINT_LIMIT` (T1 < T3) | same |
+| Floating / clipping tarsi | Stance contact IK on tibia/tarsus + thorax `standSettle` | same; no CPG |
+| Tarsus5 origin as “foot” | Distal claw along tarsus4→5 | same |
+| Mixed proprio | hp ← coxa; cho ← FeTi; csa ← stance/load | existing `hpT*` `choT*` `csaT*` `propT*` |
 
 ## Newly linked in `utopia2`
 
@@ -130,13 +140,14 @@ Walking may **kinematically couple** those hinges from tibia/trochanter (`embody
 
 ## Pages (github.io)
 
-Kinematic default on static hosts: **no** `/physics/health` fetch unless `?plant=` (`plantConfig.plantProbeOrigins` from linked2). Connectome loader reports ~38MB progress (`loadutil.js`). Female BANC is not shipped. Cache [`?v=utopia2`](https://wjb000.github.io/fruitflybrain/?v=utopia2).
+Kinematic default on static hosts: **no** `/physics/health` fetch unless `?plant=` (`plantConfig.plantProbeOrigins` from linked2). Connectome loader reports ~38MB progress (`loadutil.js`). Female BANC is not shipped. Cache [`?v=ogbody1`](https://wjb000.github.io/fruitflybrain/?v=ogbody1). OG morphology: [`OG_BODY.md`](OG_BODY.md).
 
 ## Plant vs kinematic
 
-| DoF | Kinematic Pages | MuJoCo plant |
+| DoF | Kinematic Pages (OG mesh) | MuJoCo plant |
 |---|---|---|
-| 42 leg hinges | MN → `poseLegFromMuscle` | Position-actuated |
+| 42 leg hinges | Anatomical NMF axes + `NMF_JOINT_LIMIT` + stance plant IK | Position-actuated MJCF ranges |
+| Ground contact | Tarsus claw on moss; thorax `standSettle` | Contacts + adhesion |
 | Head / neck | Visual FK (`poseSoftParts`) | **STRUCTURAL** — no neck joint |
 | Abdomen 3–6 | Visual FK | Visual (plant does not curl segments) |
 | Wings / halteres / mouth / antennae | Visual | Visual; flight force only if `?flight=1` |
@@ -155,4 +166,5 @@ Kinematic default on static hosts: **no** `/physics/health` fetch unless `?plant
 python export_effectors.py   # web/data/{effectors,stim}.json
 node tools/linked1_linkage_sanity.mjs
 node tools/utopia2_linkage_sanity.mjs
+node tools/ogbody1_pose_sanity.mjs
 ```
