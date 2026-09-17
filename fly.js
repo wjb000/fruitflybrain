@@ -4,7 +4,7 @@ import {
   WING_FLAP_GATE, WING_FLAP_AMP, ABD_SEG_WEIGHTS, ABD_YAW_SPAN,
   ANTENNA_SPAN, ANTENNA_PARTS,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=linked2";
+} from "./poseMap.js?v=utopia2";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const GROUND_Y = 0.05;

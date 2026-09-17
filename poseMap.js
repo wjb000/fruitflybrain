@@ -68,10 +68,14 @@ export const ANTENNA_PARTS = { pedicel: 0.38, funiculus: 0.82, arista: 0.22 };
 export const NECK_SPAN = { yaw: 0.26, pitch: 0.20, roll: 0.09 };
 
 export const POSE_EMA_ALPHA = 0.38; // slower muscle/neck EMA (was 0.85)
-export const MUSCLE_TAU = 0.14;     // hinge follow (was 0.05 — twitchy)
-export const NECK_TAU = 0.18;
+export const MUSCLE_TAU = 0.18;     // hinge follow — calmer whole-body (was 0.14)
+export const NECK_TAU = 0.22;
 export const WING_TAU = 0.16;
 export const FEED_TAU = 0.18;
+/** Stance-slip body integration (not a CPG) — low-pass MN foot jitter. */
+export const BODY_SLIP_TAU = 0.10;
+export const BODY_YAW_TAU = 0.14;
+export const BODY_YAW_CLAMP = 0.042;
 
 /** Visual wing flap. cns3 0.12 + 10 Hz sine read as tapping from idle MN noise. */
 export const WING_FLAP_GATE = 0.48;
@@ -379,6 +383,49 @@ export function residualIds(all, ...used) {
   const out = [];
   for (const i of all || []) if (!skip.has(i)) out.push(i);
   return out;
+}
+
+/** Nearest {x,z} among points. Used so every fruit/dew is tasteable, not just spawn food. */
+export function nearestXZ(px, pz, pts, fallback = null) {
+  let best = fallback;
+  let bestD = Infinity;
+  for (const p of pts || []) {
+    if (!p) continue;
+    const x = p.x != null ? p.x : p[0];
+    const z = p.z != null ? p.z : p[1];
+    if (x == null || z == null) continue;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  if (!best && fallback) {
+    return { pt: fallback, dist: Math.hypot((fallback.x ?? 0) - px, (fallback.z ?? 0) - pz) };
+  }
+  return { pt: best, dist: bestD === Infinity ? 99 : bestD };
+}
+
+/** Shade canopy: existing perch radius, no invented sensors. */
+export function underCanopy(px, pz, perch) {
+  if (!perch) return false;
+  const r = perch.r || 0.7;
+  return Math.hypot((perch.x || 0) - px, (perch.z || 0) - pz) < r;
+}
+
+/**
+ * Low-pass stance-slip so MN Poisson does not fidget the thorax.
+ * Same MN foot vectors — no thruster, no CPG.
+ */
+export function smoothSlip(state, sx, sz, dyaw, dt = 0.032) {
+  const st = state || {};
+  const a = 1 - Math.exp(-Math.max(0, dt) / BODY_SLIP_TAU);
+  const yawA = 1 - Math.exp(-Math.max(0, dt) / BODY_YAW_TAU);
+  st.sx = (st.sx || 0) + (sx - (st.sx || 0)) * a;
+  st.sz = (st.sz || 0) + (sz - (st.sz || 0)) * a;
+  const yawT = Math.max(-BODY_YAW_CLAMP, Math.min(BODY_YAW_CLAMP, dyaw || 0));
+  st.yaw = (st.yaw || 0) + (yawT - (st.yaw || 0)) * yawA;
+  return { sx: st.sx, sz: st.sz, dyaw: st.yaw, state: st };
 }
 
 /**

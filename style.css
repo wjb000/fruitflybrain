@@ -142,7 +142,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   flex-direction: column; gap: 14px; text-align: center;
 }
 .loader h2 { font-family: "IBM Plex Serif", serif; font-weight: 500; margin: 0; font-size: 28px; }
-.loader p { color: var(--muted); margin: 0; max-width: 460px; font-size: 13px; }
+.loader p { color: var(--muted); margin: 0; max-width: 420px; font-size: 13px; }
 .loader .loadhint { color: #d7c4a0; font-size: 12px; max-width: 460px; }
 .progress {
   width: 280px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden;
