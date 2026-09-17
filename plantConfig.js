@@ -1,7 +1,7 @@
 /** Remote MuJoCo plant origin — OPTIONAL lab override.
  *
- * The public full animal runs **in the browser** (MuJoCo WASM or JS contact
- * plant). GitHub Pages does not host Python/flygym. Do not require a Mac,
+ * The public full animal runs **in the browser** (JS contact plant by default;
+ * MuJoCo WASM via ?wasm=1). GitHub Pages does not host Python/flygym. Do not require a Mac,
  * Fly.io, or any user-owned compute.
  *
  * Remote `/physics` is opt-in only:

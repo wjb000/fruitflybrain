@@ -1,18 +1,19 @@
 /**
  * In-browser NeuroMechFly plant. No Mac, no paid host.
  *
- * 1. MuJoCo WASM (@mujoco/mujoco from jsDelivr) + NMF-compatible MJCF
- *    + MN stance-slip on the freejoint (WASM contacts alone stick in place)
- * 2. If WASM fails: contact/adhesion/gravity JS plant (same MN map + limits)
+ * 1. Default (Pages / thrive): JS contact/adhesion/gravity plant — MN stance-slip
+ *    translates reliably (WASM adhesion + world tip deltas cancel locomotion).
+ * 2. Opt-in MuJoCo WASM via ?wasm=1 (+ FK-based stance-slip on freejoint).
+ * 3. If WASM load fails when requested: same JS contact plant.
  *
  * Snapshot shape matches physics.py so applyPhysicsPose / applyMujoco work.
  */
 import {
   buildNmfMjcf, mnTarget, MUJOCO_CDN, TIMESTEP, qmul, qrot, qinv, qaxis, qnormalize,
-} from "./nmfMjcf.js?v=realfly2";
+} from "./nmfMjcf.js?v=realfly3";
 import {
   LEG_NAMES, GROUND_Y, anatomicalLegAxes, slipWeight, IDLE_WALK_GATE,
-} from "./poseMap.js?v=realfly2";
+} from "./poseMap.js?v=realfly3";
 
 const BODY_TTL = 25;
 const MAX_BODIES = 8;
@@ -80,7 +81,7 @@ function applyCtrlTargets(spec, cmd) {
   return out;
 }
 
-/* ---------- JS contact plant (WASM fallback) ---------- */
+/* ---------- JS contact plant (Pages default / WASM fallback) ---------- */
 
 function descendants(nmf, rootName) {
   const kids = {};
@@ -570,7 +571,25 @@ class WasmPlant {
     return out;
   }
 
-  _applyStanceSlip(cmd, tip0, contact) {
+  /** Thorax-frame tarsus tips from NMF FK (ignores WASM adhesion stick). */
+  _fkTipsLocal(hinges) {
+    const posed = fkPosed(this.nmf, hinges || {});
+    const codes = this.nmf.legs || {};
+    const out = {};
+    for (const our of LEG_NAMES) {
+      const tip = posed[`${codes[our]}_tarsus5`];
+      if (tip) out[our] = tip.p.slice();
+    }
+    return out;
+  }
+
+  _readHinges() {
+    const hinges = { ...(this._hinges || {}) };
+    // Prefer actuator targets we just wrote — MuJoCo qpos under adhesion may stall.
+    return hinges;
+  }
+
+  _applyStanceSlip(cmd, tip0Local, contact) {
     const walkDrive = Number(cmd.walk != null ? cmd.walk : 0);
     if (walkDrive < IDLE_WALK_GATE) {
       this._sx = (this._sx || 0) * 0.72;
@@ -578,7 +597,9 @@ class WasmPlant {
       this._dyaw = (this._dyaw || 0) * 0.72;
       return;
     }
-    const tip1 = this._tipWorld();
+    // FK tip deltas at fixed thorax — same basis as ContactPlant. World tip
+    // deltas under adhesion≈0 (feet glued) so WASM locomotion never opened.
+    const tip1Local = this._fkTipsLocal(this._hinges || {});
     const snap = this._snapshot();
     const yaw = snap.yaw;
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -586,9 +607,17 @@ class WasmPlant {
     for (const our of LEG_NAMES) {
       const m = (cmd.muscle && cmd.muscle[our]) || {};
       const swing = !!m._swing;
-      if (swing || !contact[our] || !tip0[our] || !tip1[our]) continue;
-      const dx = tip1[our][0] - tip0[our][0];
-      const dz = tip1[our][2] - tip0[our][2];
+      // Contact optional: if adhesion reports no contact but MN stance, still slip.
+      const planted = contact[our] || (!swing && walkDrive >= IDLE_WALK_GATE);
+      if (swing || !planted || !tip0Local[our] || !tip1Local[our]) continue;
+      const dLocal = [
+        tip1Local[our][0] - tip0Local[our][0],
+        tip1Local[our][1] - tip0Local[our][1],
+        tip1Local[our][2] - tip0Local[our][2],
+      ];
+      // Local → world (yaw only; plant Y-up).
+      const dx = dLocal[0] * cy + dLocal[2] * sy;
+      const dz = -dLocal[0] * sy + dLocal[2] * cy;
       const ww = slipWeight(our);
       slipX -= dx * ww;
       slipZ -= dz * ww;
@@ -630,23 +659,36 @@ class WasmPlant {
     d.qpos[adr + 6] = 0;
     // Bleed freejoint XY vel so adhesion does not fight the slip.
     if (d.qvel) {
-      d.qvel[0] *= 0.45;
-      d.qvel[2] *= 0.45;
+      d.qvel[0] *= 0.35;
+      d.qvel[2] *= 0.35;
     }
     this.mj.mj_forward(this.model, d);
   }
 
   _stepOne(dt, cmd) {
-    const tip0 = this._tipWorld();
+    // Track MN hinge targets for FK slip (adhesion freezes world tip deltas).
+    if (!this._hinges) this._hinges = {};
+    const tip0Local = this._fkTipsLocal(this._hinges);
     const ctrl = this.data.ctrl;
     const tgts = applyCtrlTargets(this.spec, cmd);
     for (let i = 0; i < tgts.length && i < ctrl.length; i++) ctrl[i] = tgts[i];
+    // Blend hinge bookkeeping toward MN targets (leg/neck/abd position acts).
+    for (let i = 0; i < this.spec.actuators.length; i++) {
+      const a = this.spec.actuators[i];
+      if (!a.joint || a.kind === "adhesion") continue;
+      const key = a.kind === "leg" && a.leg && a.key
+        ? `${(this.nmf.legs || {})[a.leg]}_${a.key}`
+        : a.joint;
+      const tgt = tgts[i];
+      const cur = this._hinges[key] || 0;
+      const blend = 1 - Math.exp(-Math.max(0.008, dt) / 0.055);
+      this._hinges[key] = cur + (tgt - cur) * blend;
+    }
     const n = Math.max(1, Math.min(80, Math.round(dt / TIMESTEP)));
     for (let i = 0; i < n; i++) this.mj.mj_step(this.model, this.data);
     let snap = this._snapshot();
-    // Stance-slip: same MN foot vectors as contact plant — WASM adhesion alone
-    // sticks the freejoint in place while hinges twitch.
-    this._applyStanceSlip({ ...cmd, dt }, tip0, snap.contact || {});
+    // Stance-slip: FK MN foot vectors (ContactPlant parity) — not world tips.
+    this._applyStanceSlip({ ...cmd, dt }, tip0Local, snap.contact || {});
     snap = this._snapshot();
     const flyA = Number(cmd.fly || 0);
     const vaulted = !cmd.allow_flight && snap.y > this.standZ + 0.45;
@@ -784,12 +826,38 @@ async function tryWasm(spec, nmf) {
   return new WasmPlant(mj, model, data, spec, nmf);
 }
 
+function wantWasm(opts = {}) {
+  if (opts.preferWasm === true) return true;
+  if (opts.preferWasm === false) return false;
+  try {
+    if (typeof location === "undefined") return false;
+    const q = new URLSearchParams(location.search || "");
+    // Thrive default: JS contact plant (locomotion). Opt-in WASM with ?wasm=1.
+    if (q.get("wasm") === "1" || q.get("wasm") === "true") return true;
+    if (q.get("plant") === "wasm" || q.get("engine") === "wasm") return true;
+    if (q.get("wasm") === "0" || q.get("contact") === "1") return false;
+  } catch (_) {}
+  return false;
+}
+
 /**
- * Start the in-browser plant. Prefers MuJoCo WASM; falls back to JS contact.
+ * Start the in-browser plant.
+ * Default (Pages): JS contact plant — MN stance-slip translates (thrive).
+ * Opt-in: ?wasm=1 tries MuJoCo WASM first (FK stance-slip); contact on failure.
  */
-export async function startBrowserPlant(nmf) {
+export async function startBrowserPlant(nmf, opts = {}) {
   const spec = buildNmfMjcf(nmf);
   browserPlant.spec = spec;
+  const tryW = wantWasm(opts);
+  if (!tryW) {
+    const impl = new ContactPlant(nmf, spec);
+    browserPlant.impl = impl;
+    browserPlant.ok = true;
+    browserPlant.kind = impl.kind;
+    browserPlant.engine = impl.engine;
+    browserPlant.err = "";
+    return browserPlant;
+  }
   try {
     const impl = await withTimeout(tryWasm(spec, nmf), 10000, "mujoco wasm timeout");
     browserPlant.impl = impl;
@@ -820,4 +888,4 @@ export function browserHealth() {
   return { ok: false, error: browserPlant.err || "no browser plant" };
 }
 
-export { ContactPlant, silentMuscle, fkPosed };
+export { ContactPlant, silentMuscle, fkPosed, wantWasm };

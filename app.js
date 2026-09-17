@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=realfly2";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=realfly2";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=realfly2";
-import { EmbodiedFly } from "./agent.js?v=realfly2";
-import { drawOmmatidia } from "./eye.js?v=realfly2";
-import { OdorWorld } from "./plume.js?v=realfly2";
-import { physics, connectPhysics, clearPhysics, flushPhysics, connectRemotePlant, useBrowserPlant, plantHudLabel } from "./physics.js?v=realfly2";
-import { parseLesionFlag } from "./lesion.js?v=realfly2";
-import { mountAssayPanel } from "./assay/panel.js?v=realfly2";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=realfly2";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=realfly2";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=realfly2";
-import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=realfly2";
+import { loadNmf, createMaleFly } from "./fly.js?v=realfly3";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=realfly3";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=realfly3";
+import { EmbodiedFly } from "./agent.js?v=realfly3";
+import { drawOmmatidia } from "./eye.js?v=realfly3";
+import { OdorWorld } from "./plume.js?v=realfly3";
+import { physics, connectPhysics, clearPhysics, flushPhysics, connectRemotePlant, useBrowserPlant, plantHudLabel } from "./physics.js?v=realfly3";
+import { parseLesionFlag } from "./lesion.js?v=realfly3";
+import { mountAssayPanel } from "./assay/panel.js?v=realfly3";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=realfly3";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=realfly3";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=realfly3";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=realfly3";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 
@@ -307,8 +307,8 @@ if ($("flesh")) {
       $("plantStatus").textContent = physics.ok
         ? (physics.source === "browser"
           ? (physics.kind === "mujoco-wasm"
-            ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
-            : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+            ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF (?wasm=1)"
+            : "in-browser contact plant · gravity · adhesion · MN stance-slip")
           : ("remote " + origin))
         : "kinematic NMF (full animal plant failed)";
     }
@@ -440,8 +440,8 @@ function onAny() {
     $("plantStatus").textContent = physics.ok
       ? (physics.source === "browser"
         ? (physics.kind === "mujoco-wasm"
-          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
-          : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF (?wasm=1)"
+          : "in-browser contact plant · gravity · adhesion · MN stance-slip")
         : ("remote " + (physics.plantOrigin || "")))
       : "kinematic NMF (full animal plant failed)";
   }
@@ -465,11 +465,16 @@ function onAny() {
         "  loom " + Number(loom).toFixed(2) +
         " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     } else {
+      const plantSpd = steer.plantSpeed != null ? steer.plantSpeed
+        : (focus.slipMeanAbs != null ? focus.slipMeanAbs : 0);
+      const walkD = steer.walkDrive != null ? steer.walkDrive : (focus.cmd?.walk || 0);
       $("steerHint").textContent =
         "fwd " + (steer.forward ?? 0).toFixed(2) +
         "  yaw " + (steer.yawRate ?? 0).toFixed(2) +
         "  | v=" + (steer.v ?? 0).toFixed(2) +
         " ω=" + (steer.omega ?? 0).toFixed(2) +
+        "  plant " + Number(plantSpd).toFixed(3) +
+        " walk " + Number(walkD).toFixed(2) +
         "  loom " + Number(loom).toFixed(2) +
         " HS " + Number(hsL).toFixed(0) + "/" + Number(hsR).toFixed(0);
     }
@@ -484,7 +489,7 @@ function onAny() {
       const nLeg = focus.plantNLeg != null ? focus.plantNLeg : "–";
       const slip = (focus.slipMeanAbs != null ? focus.slipMeanAbs : (focus.body?.userData?.slipMeanAbs || 0));
       plantBit = physics.ok
-        ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling"))
+        ? ("legs↓" + nLeg + (focus.planted ? " planted" : " settling") + " |slip|=" + Number(slip).toFixed(3))
         : ("planted " + (focus.planted ? "yes" : "…") + " S/W " + (focus.cmd?.stanceN ?? 6) + "/" + (focus.cmd?.swingN ?? 0) + " |slip|=" + Number(slip).toFixed(3));
     }
     $("lifeHint").textContent = flesh + " · " + plantBit + " · home · MN DLM " + dlm + " legs " + legs +
@@ -569,8 +574,8 @@ function refreshPlantUi() {
     $("plantStatus").textContent = physics.ok
       ? (physics.source === "browser"
         ? (physics.kind === "mujoco-wasm"
-          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF"
-          : "in-browser contact plant · gravity · adhesion (WASM fallback)")
+          ? "in-browser MuJoCo WASM · gravity · adhesion · 42 leg DoF (?wasm=1)"
+          : "in-browser contact plant · gravity · adhesion · MN stance-slip")
         : ("remote " + (physics.plantOrigin || "")))
       : "kinematic NMF (full animal plant failed)";
   }

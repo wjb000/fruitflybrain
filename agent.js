@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly2";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly2";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly2";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly2";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly2";
-import { spinRotors } from "./chassis.js?v=realfly2";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly3";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly3";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly3";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly3";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly3";
+import { spinRotors } from "./chassis.js?v=realfly3";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=realfly2";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly2";
+} from "./poseMap.js?v=realfly3";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly3";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=realfly2");
+    this.worker = new Worker("sim.worker.js?v=realfly3");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -1152,13 +1152,31 @@ export class EmbodiedFly {
       : (physics.kind === "browser-contact" ? "full animal (browser plant)" : "full MuJoCo animal");
     {
       const spd = pose.speed || 0;
-      // Contact plant reports m/frame-ish slip; WASM qvel is larger.
-      const denom = physics.kind === "browser-contact" ? 0.055 : 8;
+      // Contact plant reports m/frame-ish slip; WASM qvel/FK slip is larger.
+      const denom = physics.kind === "browser-contact" ? 0.055 : 0.055;
       this.speedS = this.speedS * 0.3 + Math.min(1.4, spd / denom) * 0.7;
       this.slipMeanAbs = (this.slipMeanAbs || 0) * 0.85 + Math.min(0.25, spd) * 0.15;
     }
     this.plantNLeg = pose.n_leg != null ? pose.n_leg : 0;
     this.planted = !!pose.planted;
+    // HUD: lastSteering was stuck at zeros on the plant path (object always
+    // truthy → app never fell through to chassisSetpoints). Wire plant speed
+    // + portable MN steer so fwd/v reflect locomotion, not stale init.
+    {
+      const snap = portableControls(this);
+      const drive = chassisSetpoints(snap);
+      const plantV = Math.min(2.5, (this.speedS || 0) * 1.6);
+      const walk = Number(cmd?.walk || 0);
+      this.lastSteering = {
+        forward: drive.forward || 0,
+        yawRate: drive.yawRate || 0,
+        v: plantV || drive.v || 0,
+        omega: drive.omega || 0,
+        plantSpeed: pose.speed || 0,
+        walkDrive: walk,
+        slip: this.slipMeanAbs || 0,
+      };
+    }
     const perch = this.world.perch;
     this.onPerch = false;
     if (perch) {

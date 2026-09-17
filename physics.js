@@ -1,14 +1,15 @@
 /** Client for the body plant. Brain fires MNs; this is the flesh.
  *
- * Default: in-browser MuJoCo WASM / contact plant (GitHub Pages, no host).
+ * Default: in-browser JS contact plant (GitHub Pages, no host).
+ * Opt-in: ?wasm=1 for MuJoCo WASM.
  * Optional: remote `?plant=` Python flygym plant (lab Mac).
  */
 
 import {
   plantUrl, plantProbeOrigins, plantHealthUrl, plantHudLabel, persistPlant,
-} from "./plantConfig.js?v=realfly2";
-import { startBrowserPlant, browserPlant, stopBrowserPlant } from "./browserPlant.js?v=realfly2";
-import { loadNmf } from "./fly.js?v=realfly2";
+} from "./plantConfig.js?v=realfly3";
+import { startBrowserPlant, browserPlant, stopBrowserPlant } from "./browserPlant.js?v=realfly3";
+import { loadNmf } from "./fly.js?v=realfly3";
 
 export const physics = {
   ok: false,
