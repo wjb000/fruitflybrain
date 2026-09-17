@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly3";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly3";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly3";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly3";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly3";
-import { spinRotors } from "./chassis.js?v=realfly3";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly4";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly4";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly4";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly4";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly4";
+import { spinRotors } from "./chassis.js?v=realfly4";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=realfly3";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly3";
+} from "./poseMap.js?v=realfly4";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly4";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=realfly3");
+    this.worker = new Worker("sim.worker.js?v=realfly4");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -768,7 +768,7 @@ export class EmbodiedFly {
     const cmd = this.cmd;
     // Body commands are ONLY annotated MN / effector readout.
     // walk/turn are UI mode labels — never free-joint thrusters or class-aggregate cheats.
-    const walkDrive = walkDriveFromEma(e, this.poseFilt);
+    const walkDrive = walkDriveFromEma(e, this.poseFilt, dt);
     cmd.walk = THREE.MathUtils.clamp(walkDrive, 0, 1);
     // Turn from bilateral walking-leg MN pools (T2/T3) plus a little T1.
     const walkL = ((e.T2L || 0) + (e.T3L || 0)) / 2;

@@ -357,11 +357,21 @@ export function walkDriveFromEma(e, state = null, dt = 0.032) {
   const t23 = ((e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 4;
   const t1 = ((e.T1L || 0) + (e.T1R || 0)) / 2;
   const dna = e.DNa || 0;
-  if (t23 + dna * 0.6 < 0.08) {
-    if (state) state.walkTonic = (state.walkTonic || 0) * 0.90;
+  const neuromere = t23 + dna * 0.6;
+  const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
+  // realfly4: never cliff-zero on a single quiet frame — that froze live
+  // locomotion (muscles zeroed via embodyMuscle, slip EMA bled to rest).
+  // Gate on T2/T3+DNa only — T1 twitch must not open walk (realfly2).
+  if (neuromere < 0.055) {
+    if (!state) return 0;
+    state.walkTonic = (state.walkTonic || 0) * 0.94;
+    if (state.walkOpen) {
+      state.walkHold = Math.max(0, (state.walkHold || 0) - dt);
+      if (state.walkHold > 0) return Math.max(IDLE_WALK_GATE * 1.2, (state.walkTonic || 0) * 0.55);
+      state.walkOpen = false;
+    }
     return 0;
   }
-  const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
   if (!state) return softDrive(raw, 2.05);
   // Faster tonic track: intermittent plume filaments stay phasic longer.
   const a = 1 - Math.exp(-dt / 0.48);
@@ -369,9 +379,19 @@ export function walkDriveFromEma(e, state = null, dt = 0.032) {
   const tonic = state.walkTonic;
   const phasic = Math.max(0, raw - 0.82 * tonic);
   const burst = softDrive(phasic * 0.88 + raw * 0.22, 2.05);
-  // Thrive floor: quiet garden sensory→MN rates still open the walk gate.
-  const sustained = softDrive(raw, 1.70) * 0.48;
-  return Math.max(burst, sustained);
+  // Thrive floor: garden sensory→MN must stay clearly above IDLE_WALK_GATE.
+  const sustained = softDrive(raw, 1.85) * 0.62;
+  let drive = Math.max(burst, sustained);
+  // Hysteresis: once walking, keep gate open through Poisson dips (~0.7s).
+  if (drive >= IDLE_WALK_GATE) {
+    state.walkOpen = true;
+    state.walkHold = 0.70;
+  } else if (state.walkOpen && (state.walkHold || 0) > 0) {
+    state.walkHold -= dt;
+    drive = Math.max(drive, IDLE_WALK_GATE * 1.25);
+    if (state.walkHold <= 0) state.walkOpen = false;
+  }
+  return drive;
 }
 
 export function legsMean(e) {
@@ -606,7 +626,9 @@ export function embodyMuscle(legName, muscle, { walkDrive = 0 } = {}) {
   const lift = (out.trFlex + out.tiFlex + out.taLev)
     - (out.trExt + out.tiExt + out.taDep);
   out._lift = lift;
-  out._swing = lift > 0.14;
+  // realfly4: slightly lower lift gate so flex-biased MNs unload a foot
+  // (still contrast-from-pools, not a CPG clock).
+  out._swing = lift > 0.10;
   out._stance = !out._swing;
   out._coupled = emptyTa || emptyProm;
   return out;

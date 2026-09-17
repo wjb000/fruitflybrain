@@ -10,10 +10,10 @@
  */
 import {
   buildNmfMjcf, mnTarget, MUJOCO_CDN, TIMESTEP, qmul, qrot, qinv, qaxis, qnormalize,
-} from "./nmfMjcf.js?v=realfly3";
+} from "./nmfMjcf.js?v=realfly4";
 import {
   LEG_NAMES, GROUND_Y, anatomicalLegAxes, slipWeight, IDLE_WALK_GATE,
-} from "./poseMap.js?v=realfly3";
+} from "./poseMap.js?v=realfly4";
 
 const BODY_TTL = 25;
 const MAX_BODIES = 8;
@@ -285,7 +285,9 @@ class ContactPlant {
         : a.joint;
       const tgt = mnTarget(a, { ...cmd, t: cmd.t || 0 });
       const cur = b.hinges[key] || 0;
-      const blend = 1 - Math.exp(-h * n / 0.055);
+      // Faster hinge follow while walking so MN tip deltas actually move the thorax.
+      const hingeTau = walking ? 0.032 : 0.055;
+      const blend = 1 - Math.exp(-h * n / hingeTau);
       b.hinges[key] = cur + (tgt - cur) * blend;
     }
     // Reduced g keeps explicit Euler planted (WASM uses 9810 mm/s²).
@@ -310,7 +312,8 @@ class ContactPlant {
       const m = (cmd.muscle && cmd.muscle[our]) || {};
       const swing = !!m._swing;
       // Peel almost fully in swing — sticky swing feet caused vault/twitch.
-      const adh = swing ? 0.06 : 1;
+      // realfly4: ease stance adhesion while walking (parity with nmfMjcf peel).
+      const adh = swing ? 0.06 : (walking ? 0.35 : 1);
       let c = false;
       let f = 0;
       if (w[1] < GROUND_Y + 0.06) {
@@ -321,52 +324,76 @@ class ContactPlant {
         fy += ny * adh;
         f = Math.abs(ny);
         if (adh > 0.55) {
-          fx += -b.vx * 14;
-          fz += -b.vz * 14;
+          // Weaker XY glue while walking so stance-slip is not canceled each frame.
+          const glue = walking ? 4.5 : 14;
+          fx += -b.vx * glue;
+          fz += -b.vz * glue;
         }
       }
       contact[our] = c;
       force[our] = f;
-      // Stance-slip: planted feet that moved from hinge change push the thorax.
-      // Same MN foot vectors as kinematic fallback — no walk thruster / CPG.
-      if (walking && !swing && c && tip0[our]) {
+      // Stance-slip: MN hinge tip deltas push the thorax (no thruster / CPG).
+      // Contact optional — floating tips under adhesion settle were gating slip to 0
+      // (WASM already used stance||contact; contact plant must match).
+      const planted = c || (!swing && walking);
+      if (walking && !swing && planted && tip0[our]) {
         const dx = w[0] - tip0[our][0];
         const dz = w[2] - tip0[our][2];
         const ww = slipWeight(our);
-        slipX -= dx * ww;
-        slipZ -= dz * ww;
-        slipN += ww;
-        const back = -(dx * sy + dz * cy) * ww;
-        if (our.startsWith("L")) yawL += back * 0.85;
-        else yawR += back * 0.85;
+        // Body-frame: heading forward = (sy, cy). Tip rearward → thorax forward.
+        // Rectify: ignore stance protraction (MN noise) so forward/back cancel
+        // cannot zero net travel over tens of seconds (realfly4).
+        const tipBack = -(dx * sy + dz * cy);
+        const tipLat = dx * cy - dz * sy;
+        if (tipBack > 0) {
+          slipX += sy * tipBack * ww;
+          slipZ += cy * tipBack * ww;
+          slipN += ww;
+        } else {
+          // Weak residual so pure geometric slip still moves a little.
+          slipX -= dx * ww * 0.18;
+          slipZ -= dz * ww * 0.18;
+          slipN += ww * 0.18;
+        }
+        const back = tipBack * ww;
+        if (our.startsWith("L")) yawL += (back + tipLat * 0.25) * 0.85;
+        else yawR += (back - tipLat * 0.25) * 0.85;
       }
     }
-    if (walking && slipN > 0.15) {
+    if (walking && slipN > 0.12) {
       let sx = slipX / slipN;
       let sz = slipZ / slipN;
       const step = Math.hypot(sx, sz);
-      const maxStep = 0.068;
+      // realfly4: larger per-frame slip so garden MN bursts yield body-lengths,
+      // not micro-fidget that averages to zero net displacement.
+      const maxStep = 0.14;
       if (step > maxStep) {
         const kk = maxStep / step;
         sx *= kk; sz *= kk;
       }
-      // Gain scales with walkDrive (phasic T2/T3+DNa) — quiet idle stays put.
-      const gain = 0.92 + 0.55 * Math.min(1, walkDrive);
+      const gain = 1.55 + 1.35 * Math.min(1, walkDrive);
       sx *= gain; sz *= gain;
-      const a = 1 - Math.exp(-dt / 0.09);
+      const a = 1 - Math.exp(-dt / 0.045);
       b._sx = (b._sx || 0) + (sx - (b._sx || 0)) * a;
       b._sz = (b._sz || 0) + (sz - (b._sz || 0)) * a;
-      const dyawT = Math.max(-0.038, Math.min(0.038, (yawR - yawL) * 0.55 * walkDrive));
+      // realfly4: slip-yaw was systematically biased (NMF L/R geometry) → circles
+      // in place (path>>net). Keep tiny yaw; translation is the thrive signal.
+      const yawAsym = yawR - yawL;
+      const yawDead = 0.012;
+      const yawCmd = Math.abs(yawAsym) > yawDead
+        ? (yawAsym - Math.sign(yawAsym) * yawDead) * 0.12 * walkDrive
+        : 0;
+      const dyawT = Math.max(-0.012, Math.min(0.012, yawCmd));
       b._dyaw = (b._dyaw || 0) + (dyawT - (b._dyaw || 0)) * a;
       b.x += b._sx;
       b.z += b._sz;
       // Bleed integrated velocity so adhesion damping does not fight the slip.
-      b.vx *= 0.55;
-      b.vz *= 0.55;
+      b.vx *= 0.42;
+      b.vz *= 0.42;
     } else {
-      b._sx = (b._sx || 0) * 0.72;
-      b._sz = (b._sz || 0) * 0.72;
-      b._dyaw = (b._dyaw || 0) * 0.72;
+      b._sx = (b._sx || 0) * 0.78;
+      b._sz = (b._sz || 0) * 0.78;
+      b._dyaw = (b._dyaw || 0) * 0.78;
       b.vx *= 0.78;
       b.vz *= 0.78;
     }
@@ -619,12 +646,20 @@ class WasmPlant {
       const dx = dLocal[0] * cy + dLocal[2] * sy;
       const dz = -dLocal[0] * sy + dLocal[2] * cy;
       const ww = slipWeight(our);
-      slipX -= dx * ww;
-      slipZ -= dz * ww;
-      slipN += ww;
-      const back = -(dx * sy + dz * cy) * ww;
-      if (our.startsWith("L")) yawL += back * 0.85;
-      else yawR += back * 0.85;
+      const tipBack = -(dx * sy + dz * cy);
+      const tipLat = dx * cy - dz * sy;
+      if (tipBack > 0) {
+        slipX += sy * tipBack * ww;
+        slipZ += cy * tipBack * ww;
+        slipN += ww;
+      } else {
+        slipX -= dx * ww * 0.18;
+        slipZ -= dz * ww * 0.18;
+        slipN += ww * 0.18;
+      }
+      const back = tipBack * ww;
+      if (our.startsWith("L")) yawL += (back + tipLat * 0.25) * 0.85;
+      else yawR += (back - tipLat * 0.25) * 0.85;
     }
     if (slipN <= 0.15) {
       this._sx = (this._sx || 0) * 0.72;
@@ -635,17 +670,22 @@ class WasmPlant {
     let sx = slipX / slipN;
     let sz = slipZ / slipN;
     const step = Math.hypot(sx, sz);
-    const maxStep = 0.068;
+    const maxStep = 0.14;
     if (step > maxStep) {
       const kk = maxStep / step;
       sx *= kk; sz *= kk;
     }
-    const gain = 0.92 + 0.55 * Math.min(1, walkDrive);
+    const gain = 1.55 + 1.35 * Math.min(1, walkDrive);
     sx *= gain; sz *= gain;
-    const a = 1 - Math.exp(-(Number(cmd.dt) || 0.016) / 0.09);
+    const a = 1 - Math.exp(-(Number(cmd.dt) || 0.016) / 0.045);
     this._sx = (this._sx || 0) + (sx - (this._sx || 0)) * a;
     this._sz = (this._sz || 0) + (sz - (this._sz || 0)) * a;
-    const dyawT = Math.max(-0.038, Math.min(0.038, (yawR - yawL) * 0.55 * walkDrive));
+    const yawAsym = yawR - yawL;
+    const yawDead = 0.012;
+    const yawCmd = Math.abs(yawAsym) > yawDead
+      ? (yawAsym - Math.sign(yawAsym) * yawDead) * 0.12 * walkDrive
+      : 0;
+    const dyawT = Math.max(-0.012, Math.min(0.012, yawCmd));
     this._dyaw = (this._dyaw || 0) + (dyawT - (this._dyaw || 0)) * a;
     const adr = this.qposadr;
     const d = this.data;

@@ -7,9 +7,9 @@
 
 import {
   plantUrl, plantProbeOrigins, plantHealthUrl, plantHudLabel, persistPlant,
-} from "./plantConfig.js?v=realfly3";
-import { startBrowserPlant, browserPlant, stopBrowserPlant } from "./browserPlant.js?v=realfly3";
-import { loadNmf } from "./fly.js?v=realfly3";
+} from "./plantConfig.js?v=realfly4";
+import { startBrowserPlant, browserPlant, stopBrowserPlant } from "./browserPlant.js?v=realfly4";
+import { loadNmf } from "./fly.js?v=realfly4";
 
 export const physics = {
   ok: false,

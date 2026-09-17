@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { loadNmf, createMaleFly } from "./fly.js?v=realfly3";
-import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=realfly3";
-import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=realfly3";
-import { EmbodiedFly } from "./agent.js?v=realfly3";
-import { drawOmmatidia } from "./eye.js?v=realfly3";
-import { OdorWorld } from "./plume.js?v=realfly3";
-import { physics, connectPhysics, clearPhysics, flushPhysics, connectRemotePlant, useBrowserPlant, plantHudLabel } from "./physics.js?v=realfly3";
-import { parseLesionFlag } from "./lesion.js?v=realfly3";
-import { mountAssayPanel } from "./assay/panel.js?v=realfly3";
-import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=realfly3";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=realfly3";
-import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=realfly3";
-import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=realfly3";
+import { loadNmf, createMaleFly } from "./fly.js?v=realfly4";
+import { createCubeChassis, createDroneChassis, bodyModeFromUrl, isKinematicChassis } from "./chassis.js?v=realfly4";
+import { createOpenWorld, UTOPIA_FOOD, UTOPIA_HOME } from "./world/procgen.js?v=realfly4";
+import { EmbodiedFly } from "./agent.js?v=realfly4";
+import { drawOmmatidia } from "./eye.js?v=realfly4";
+import { OdorWorld } from "./plume.js?v=realfly4";
+import { physics, connectPhysics, clearPhysics, flushPhysics, connectRemotePlant, useBrowserPlant, plantHudLabel } from "./physics.js?v=realfly4";
+import { parseLesionFlag } from "./lesion.js?v=realfly4";
+import { mountAssayPanel } from "./assay/panel.js?v=realfly4";
+import { mountStimMapPanel, stimMapWanted, stimMapUrl } from "./stimmap.js?v=realfly4";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints, ROBOT_HOWTO, PORTABLE_SIGNAL_DOC } from "./controller/portable.js?v=realfly4";
+import { createHandCam, camWanted, applyCamToFly } from "./handcam.js?v=realfly4";
+import { fetchBufProgress, fetchJson, CONNECTOME_BYTES, connectomeWaitMsg } from "./loadutil.js?v=realfly4";
 
 const BODY_MODE = bodyModeFromUrl(); // default "fly"; ?body=cube|drone optional
 

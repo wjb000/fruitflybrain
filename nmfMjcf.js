@@ -15,7 +15,7 @@ import {
   LEG_NAMES, nmfJointLimit,
   anatomicalLegAxes, NECK_SPAN, ABD_SEG_KEYS, ABD_YAW_SPAN,
   WING_FLAP_GATE, WING_FLAP_AMP, GROUND_Y,
-} from "./poseMap.js?v=realfly3";
+} from "./poseMap.js?v=realfly4";
 
 export const MUJOCO_CDN = "https://cdn.jsdelivr.net/npm/@mujoco/mujoco@3.11.0";
 export const TIMESTEP = 0.0008;
@@ -131,9 +131,10 @@ export function mnTarget(act, cmd) {
     );
     // Peel swing/lift feet — sticky swing was a vault + twitch-in-place source.
     // While walking, ease stance adhesion so WASM freejoint can accept FK slip.
-    if (swinging) return 0.08;
-    if (lifting) return 0.22;
-    if (walk >= 0.05) return 0.55;
+    if (swinging) return 0.06;
+    if (lifting) return 0.16;
+    // realfly4: peel stance harder while walking so contact/WASM slip is not glued flat.
+    if (walk >= 0.05) return 0.32;
     return 1;
   }
   if (act.kind === "neck") {
