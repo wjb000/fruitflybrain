@@ -174,7 +174,7 @@ function makeBombOrb() {
 
 export class OdorWorld {
   constructor() {
-    this.food = new PuffField({ color: 0xf0c040, emitHz: 22, mass: 1.15, life: 6.5, y0: 0.35 });
+    this.food = new PuffField({ color: 0xf0c040, emitHz: 28, mass: 1.55, life: 7.2, y0: 0.35 });
     this.pher = new PuffField({ color: 0xff4fd8, emitHz: 10, mass: 0.7, life: 4.8, y0: 1.15 });
     this.co2 = new PuffField({ color: 0x88a0c0, emitHz: 7, mass: 0.45, life: 3.6, y0: 1.2 });
     this.moist = new PuffField({ color: 0x4aa8ff, emitHz: 9, mass: 0.55, life: 5.5, y0: 0.3 });

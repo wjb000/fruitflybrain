@@ -8,8 +8,8 @@
  * Enable: ?stim=1 / ?map=1 (also default on cube/drone). Disable: ?stim=0.
  * Homepage fly-body default leaves this off — link from the HUD.
  */
-import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly1";
-import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=realfly1";
+import { portableControls, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly2";
+import { STIM_MAP_POOLS, DEFAULT_STIM_HZ } from "./agent.js?v=realfly2";
 
 export function stimMapWanted(bodyMode = "fly") {
   try {

@@ -15,7 +15,7 @@ import {
   LEG_NAMES, nmfJointLimit,
   anatomicalLegAxes, NECK_SPAN, ABD_SEG_KEYS, ABD_YAW_SPAN,
   WING_FLAP_GATE, WING_FLAP_AMP, GROUND_Y,
-} from "./poseMap.js?v=realfly1";
+} from "./poseMap.js?v=realfly2";
 
 export const MUJOCO_CDN = "https://cdn.jsdelivr.net/npm/@mujoco/mujoco@3.11.0";
 export const TIMESTEP = 0.0008;

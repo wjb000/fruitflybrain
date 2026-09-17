@@ -6,12 +6,12 @@
  * Empty annotation pools stay 0. No CPG gait, no bearing thruster.
  */
 import * as THREE from "three";
-import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly1";
-import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly1";
-import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly1";
-import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly1";
-import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly1";
-import { spinRotors } from "./chassis.js?v=realfly1";
+import { stepLife, applyPhysicsPose } from "./fly.js?v=realfly2";
+import { CompoundEye, encodeOpticRates } from "./eye.js?v=realfly2";
+import { physics, setCommand, spawnPhysics, despawnPhysics, resetPhysics } from "./physics.js?v=realfly2";
+import { mergePoolMaps, normalizeLesion, resolvePools } from "./lesion.js?v=realfly2";
+import { portableControls, stubRobotDriver, chassisSetpoints, droneSetpoints } from "./controller/portable.js?v=realfly2";
+import { spinRotors } from "./chassis.js?v=realfly2";
 import {
   LEG_NAMES as POSE_LEG_NAMES, MUSCLE_NAMES as POSE_MUSCLE_NAMES,
   ABD_SEG_KEYS, IDLE_WALK_GATE, EMPTY_MALE_MUSCLE_POOLS,
@@ -19,8 +19,8 @@ import {
   wingFromEma, feedFromEma, abdomenFromEma, antennaFromJo, haltereFromSense,
   residualIds, closeLoopProprio, nearestXZ, underCanopy, smoothSlip,
   effectorMapStats, proprioJointHz, POSE_EMA_ALPHA,
-} from "./poseMap.js?v=realfly1";
-import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly1";
+} from "./poseMap.js?v=realfly2";
+import { HDELTA_PLASTIC_IDS } from "./stp.js?v=realfly2";
 
 const LEG_NAMES = POSE_LEG_NAMES;
 const MUSCLE_NAMES = POSE_MUSCLE_NAMES;
@@ -374,7 +374,7 @@ export class EmbodiedFly {
     this.cns.add(this.points);
     this.setCnsVisible(false);
 
-    this.worker = new Worker("sim.worker.js?v=realfly1");
+    this.worker = new Worker("sim.worker.js?v=realfly2");
     this.worker.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === "ready") {
@@ -425,6 +425,9 @@ export class EmbodiedFly {
         for (const k of ODOR_TYPES) {
           channels[k + "L"] = this.odor[k].L;
           channels[k + "R"] = this.odor[k].R;
+          // Full typed pool (union L∪R) for aggregate floor drive.
+          const full = this.stim?.[k] || P[k] || [];
+          if (full.length) channels[k] = full;
         }
         for (const k of CLOCK_KEYS) channels[k] = stim[k] || P[k] || [];
         channels.sweet = stim.sweet || P.sweet || [];
@@ -1405,22 +1408,30 @@ export class EmbodiedFly {
     this.worker.postMessage({
       type: "rates",
       rates: {
-        // Keep symmetric `vision` for UI stim button only — L/R eye goes through visionL/R.
-        vision: extraV,
+        // L/R eyes primary; aggregate floor so full vision pool is not starved.
+        vision: Math.max(extraV, 0.55 * 0.5 * (visionL + visionR)),
         visionL,
         visionR,
         smellL: Math.max(smellBlendL, extra.smellL || 0),
         smellR: Math.max(smellBlendR, extra.smellR || 0),
         foodORNL: Math.max(smellL, extra.smellL || 0),
         foodORNR: Math.max(smellR, extra.smellR || 0),
+        // Aggregate floor on the full typed pools (real IDs). L/R still wins via
+        // max-merge when stronger — keeps klinotaxis without starving MNs.
+        foodORN: 0.62 * 0.5 * (
+          Math.max(smellL, extra.smellL || 0) + Math.max(smellR, extra.smellR || 0)
+        ),
         pherORNL: pherHzL,
         pherORNR: pherHzR,
+        pherORN: 0.55 * 0.5 * (pherHzL + pherHzR),
         co2ORNL: co2HzL,
         co2ORNR: co2HzR,
+        co2ORN: 0.55 * 0.5 * (co2HzL + co2HzR),
         aversiveORNL: avL,
         aversiveORNR: avR,
         JOL: joL,
         JOR: joR,
+        JO: 0.50 * 0.5 * (joL + joR),
         taste: Math.max(taste, extra.taste || 0),
         sweet: Math.max(sweetHz, extra.taste || 0),
         bitter: bitterHz,

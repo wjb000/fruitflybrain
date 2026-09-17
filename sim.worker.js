@@ -37,9 +37,9 @@ let params = {
   refractory: 2,
   // Connectome weights via chemWeight (√w + linear), not unit hits.
   // Scaled so a first ACh spike (U≈0.40) matches the old sqrt·wScale regime.
-  wScale: 0.028,
+  wScale: 0.042,
   inhibGain: 2.15,
-  stimAmp: 0.11,
+  stimAmp: 0.16,
   // Legacy stdUse kept for params messages; TM uses NT_U.
   stdUse: 0.40,
   facOA: 0.08,

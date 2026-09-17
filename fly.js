@@ -5,7 +5,7 @@ import {
   ANTENNA_SPAN, ANTENNA_PARTS, GROUND_Y,
   nmfJointLimit, clampJointDelta, anatomicalLegAxes, tarsusTipOffset,
   antagonist, follow, isForeleg, slipWeight,
-} from "./poseMap.js?v=realfly1";
+} from "./poseMap.js?v=realfly2";
 
 const LEG_NAMES = ["L1", "R1", "L2", "R2", "L3", "R3"];
 const _foot = new THREE.Vector3();

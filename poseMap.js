@@ -5,8 +5,9 @@
  * pool EMAs into antagonist DoFs. Empty pools stay 0 — no invented MN IDs,
  * no CPG gait, no walk thruster.
  *
- * dynw1: synapses are time-varying (connectome weights × TM STD). Tonic
- * T2/T3 is not a constant slip push; abdomen is phasic (no butt-lift loop).
+ * dynw1: synapses are time-varying (connectome weights × TM STD). Abdomen is
+ * phasic (no butt-lift loop). realfly2: walk prefers phasic but keeps a thrive
+ * floor so sustained sensory→MN rates still open stance-slip.
  * fullfly1: idle MN noise was tarsus-tap + abdomen twitch while stance-slip
  * stayed gated. Quiet T2/T3/DNa → planted rest (all six legs). Walk MNs →
  * stance/swing from those flex/ext pools; empty T2/T3 Ta* / coxaProm are
@@ -347,27 +348,30 @@ export function feedFromEma(e) {
  * Walk drive from walking-leg neuromeres (T2/T3) + DNa.
  * T1 twitch alone must not gate stance-slip (that froze or thrashed XY).
  *
- * Saturated tonic T2/T3 (constant push) is not a gait: optional `state`
- * high-passes against a slow tonic so repeated identical drive fades.
- * Bursting / changing MN rates still walk.
+ * realfly2: optional `state` still prefers phasic (plume / burst) over a
+ * pegged crawl, but must NOT hard-zero sustained sensory→MN walk into rest.
+ * Utopia closed loop needs a thrive floor so garden ORN/vision drive keeps
+ * translating; extreme tonic is attenuated, not paralyzed.
  */
 export function walkDriveFromEma(e, state = null, dt = 0.032) {
   const t23 = ((e.T2L || 0) + (e.T2R || 0) + (e.T3L || 0) + (e.T3R || 0)) / 4;
   const t1 = ((e.T1L || 0) + (e.T1R || 0)) / 2;
   const dna = e.DNa || 0;
-  if (t23 + dna * 0.6 < 0.10) {
-    if (state) state.walkTonic = (state.walkTonic || 0) * 0.92;
+  if (t23 + dna * 0.6 < 0.08) {
+    if (state) state.walkTonic = (state.walkTonic || 0) * 0.90;
     return 0;
   }
   const raw = t23 * 0.92 + dna * 0.55 + t1 * 0.08;
-  if (!state) return softDrive(raw, 1.95);
-  const a = 1 - Math.exp(-dt / 0.70);
+  if (!state) return softDrive(raw, 2.05);
+  // Faster tonic track: intermittent plume filaments stay phasic longer.
+  const a = 1 - Math.exp(-dt / 0.48);
   state.walkTonic = (state.walkTonic || 0) + (raw - (state.walkTonic || 0)) * a;
   const tonic = state.walkTonic;
-  const phasic = Math.max(0, raw - 0.98 * tonic);
-  // Pegged T2/T3 (same circuit every frame) → no constant slip push.
-  if (phasic < 0.05 && tonic > 0.16) return 0;
-  return softDrive(phasic * 0.90 + raw * 0.10, 1.95);
+  const phasic = Math.max(0, raw - 0.82 * tonic);
+  const burst = softDrive(phasic * 0.88 + raw * 0.22, 2.05);
+  // Thrive floor: quiet garden sensory→MN rates still open the walk gate.
+  const sustained = softDrive(raw, 1.70) * 0.48;
+  return Math.max(burst, sustained);
 }
 
 export function legsMean(e) {

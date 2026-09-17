@@ -2,16 +2,17 @@
  * In-browser NeuroMechFly plant. No Mac, no paid host.
  *
  * 1. MuJoCo WASM (@mujoco/mujoco from jsDelivr) + NMF-compatible MJCF
+ *    + MN stance-slip on the freejoint (WASM contacts alone stick in place)
  * 2. If WASM fails: contact/adhesion/gravity JS plant (same MN map + limits)
  *
  * Snapshot shape matches physics.py so applyPhysicsPose / applyMujoco work.
  */
 import {
   buildNmfMjcf, mnTarget, MUJOCO_CDN, TIMESTEP, qmul, qrot, qinv, qaxis, qnormalize,
-} from "./nmfMjcf.js?v=realfly1";
+} from "./nmfMjcf.js?v=realfly2";
 import {
   LEG_NAMES, GROUND_Y, anatomicalLegAxes, slipWeight, IDLE_WALK_GATE,
-} from "./poseMap.js?v=realfly1";
+} from "./poseMap.js?v=realfly2";
 
 const BODY_TTL = 25;
 const MAX_BODIES = 8;
@@ -558,13 +559,95 @@ class WasmPlant {
     return out;
   }
 
+  _tipWorld() {
+    const xpos = this.data.xpos;
+    const out = {};
+    for (const t of this.spec.tarsi) {
+      const id = this.bodyId[t.body];
+      if (id == null) continue;
+      out[t.our] = [xpos[id * 3], xpos[id * 3 + 1], xpos[id * 3 + 2]];
+    }
+    return out;
+  }
+
+  _applyStanceSlip(cmd, tip0, contact) {
+    const walkDrive = Number(cmd.walk != null ? cmd.walk : 0);
+    if (walkDrive < IDLE_WALK_GATE) {
+      this._sx = (this._sx || 0) * 0.72;
+      this._sz = (this._sz || 0) * 0.72;
+      this._dyaw = (this._dyaw || 0) * 0.72;
+      return;
+    }
+    const tip1 = this._tipWorld();
+    const snap = this._snapshot();
+    const yaw = snap.yaw;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    let slipX = 0, slipZ = 0, slipN = 0, yawL = 0, yawR = 0;
+    for (const our of LEG_NAMES) {
+      const m = (cmd.muscle && cmd.muscle[our]) || {};
+      const swing = !!m._swing;
+      if (swing || !contact[our] || !tip0[our] || !tip1[our]) continue;
+      const dx = tip1[our][0] - tip0[our][0];
+      const dz = tip1[our][2] - tip0[our][2];
+      const ww = slipWeight(our);
+      slipX -= dx * ww;
+      slipZ -= dz * ww;
+      slipN += ww;
+      const back = -(dx * sy + dz * cy) * ww;
+      if (our.startsWith("L")) yawL += back * 0.85;
+      else yawR += back * 0.85;
+    }
+    if (slipN <= 0.15) {
+      this._sx = (this._sx || 0) * 0.72;
+      this._sz = (this._sz || 0) * 0.72;
+      this._dyaw = (this._dyaw || 0) * 0.72;
+      return;
+    }
+    let sx = slipX / slipN;
+    let sz = slipZ / slipN;
+    const step = Math.hypot(sx, sz);
+    const maxStep = 0.068;
+    if (step > maxStep) {
+      const kk = maxStep / step;
+      sx *= kk; sz *= kk;
+    }
+    const gain = 0.92 + 0.55 * Math.min(1, walkDrive);
+    sx *= gain; sz *= gain;
+    const a = 1 - Math.exp(-(Number(cmd.dt) || 0.016) / 0.09);
+    this._sx = (this._sx || 0) + (sx - (this._sx || 0)) * a;
+    this._sz = (this._sz || 0) + (sz - (this._sz || 0)) * a;
+    const dyawT = Math.max(-0.038, Math.min(0.038, (yawR - yawL) * 0.55 * walkDrive));
+    this._dyaw = (this._dyaw || 0) + (dyawT - (this._dyaw || 0)) * a;
+    const adr = this.qposadr;
+    const d = this.data;
+    d.qpos[adr] += this._sx;
+    d.qpos[adr + 2] += this._sz;
+    const yawOut = yaw + (this._dyaw || 0);
+    const h = 0.5 * yawOut;
+    d.qpos[adr + 3] = Math.cos(h);
+    d.qpos[adr + 4] = 0;
+    d.qpos[adr + 5] = Math.sin(h);
+    d.qpos[adr + 6] = 0;
+    // Bleed freejoint XY vel so adhesion does not fight the slip.
+    if (d.qvel) {
+      d.qvel[0] *= 0.45;
+      d.qvel[2] *= 0.45;
+    }
+    this.mj.mj_forward(this.model, d);
+  }
+
   _stepOne(dt, cmd) {
+    const tip0 = this._tipWorld();
     const ctrl = this.data.ctrl;
     const tgts = applyCtrlTargets(this.spec, cmd);
     for (let i = 0; i < tgts.length && i < ctrl.length; i++) ctrl[i] = tgts[i];
     const n = Math.max(1, Math.min(80, Math.round(dt / TIMESTEP)));
     for (let i = 0; i < n; i++) this.mj.mj_step(this.model, this.data);
-    const snap = this._snapshot();
+    let snap = this._snapshot();
+    // Stance-slip: same MN foot vectors as contact plant — WASM adhesion alone
+    // sticks the freejoint in place while hinges twitch.
+    this._applyStanceSlip({ ...cmd, dt }, tip0, snap.contact || {});
+    snap = this._snapshot();
     const flyA = Number(cmd.fly || 0);
     const vaulted = !cmd.allow_flight && snap.y > this.standZ + 0.45;
     const lost = snap.y < 0.12 || snap.y > 6 || !Number.isFinite(snap.y);
@@ -578,6 +661,12 @@ class WasmPlant {
       if (this.data.qvel && this.data.qvel[1] > 0) this.data.qvel[1] *= 0.2;
       this.mj.mj_forward(this.model, this.data);
       return this._snapshot();
+    }
+    // Report slip speed so HUD v matches contact-plant scale when walking.
+    if ((this._sx || 0) || (this._sz || 0)) {
+      snap = this._snapshot();
+      snap.speed = Math.hypot(this._sx || 0, this._sz || 0)
+        + (snap.speed || 0) * 0.15;
     }
     return snap;
   }
